@@ -92,17 +92,41 @@ class TestIngest(DhritiTestCase):
         items = self.vidura.ingest_pass_answers(self.today.isoformat())
         self.assertEqual(items, [])
 
-    def test_identity_line_ingested_at_v050(self):
-        """The v0.5.0 behaviour (Bug B, fixed in v0.6.0): identity
-        statements were ingested as spaced cards whose front was just
-        a date — an unsolvable card. This test documents the mistake
-        so the v0.6.0 removal is a real diff."""
+class TestIdentityLine(DhritiTestCase):
+    def test_identity_line_is_not_ingested(self):
+        """Bug B: the identity card was unsolvable — its 'front' was
+        just a date. It is no longer a Vidura item."""
+        self.config["vidura"]["enabled"] = True
         self.seal_today()
         contract = self.contracts.for_day(self.today.isoformat())
-        item = self.vidura.ingest_identity_line(contract)
-        self.assertIsNotNone(item)
-        self.assertEqual(item["kind"], "identity_line")
-        self.assertIn("identity", item["front"])
+        with self.assertRaises(AttributeError):
+            # the method no longer exists
+            self.vidura.ingest_identity_line(contract)
+
+    def test_identity_appears_at_top_of_day_report(self):
+        self.seal_today()
+        report = self.aftermath.day_report(self.today.isoformat())
+        identity = self.contracts.for_day(
+            self.today.isoformat())["payload"]["identity_statement"]
+        md = report["md"]
+        # the identity line comes before "Contract (written cold)"
+        self.assertLess(md.index(identity), md.index("Contract (written cold)"))
+
+    def test_ingest_records_identity_not_spaced_event(self):
+        """The record shows the decision was made, not forgotten."""
+        self.config["vidura"]["enabled"] = True
+        self.seal_today()
+        import argparse
+        from dhriti.cli import cmd_vidura_ingest
+        ctx = self.make_cli_context()
+        try:
+            cmd_vidura_ingest(
+                argparse.Namespace(date=self.today.isoformat()), ctx)
+        finally:
+            ctx.close()
+        events = self.ledger.events(
+            event_type="vidura_identity_not_spaced")
+        self.assertEqual(len(events), 1)
 
 
 if __name__ == "__main__":

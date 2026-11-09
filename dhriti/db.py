@@ -182,11 +182,11 @@ CREATE TABLE IF NOT EXISTS policy_state(
   current_version INTEGER,
   updated_at TEXT);
 
--- Curiosity parking lot (plan Part 1 §5.9 + "under-utilized mechanisms"
--- note): the wall's mail slot. A branch is captured in one line and
--- deferred to cold state instead of being followed or silently lost.
--- v0.5.0 shape: source / disposed_at / note (renamed from
--- origin / disposition_at / disposition_note by migration v3).
+-- Curiosity parking lot (plan Part 1 §5.9): the wall's mail slot.
+-- v0.6.0 shape (Part 2 §1.1): kinds, sparks, and the resurfacing
+-- columns. disposition is NULL while the item is open (the spec's
+-- queries read disposition IS NULL) — terminal values are
+-- approved | dropped | explored.
 CREATE TABLE IF NOT EXISTS parking_lot(
   id TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,
@@ -194,9 +194,15 @@ CREATE TABLE IF NOT EXISTS parking_lot(
   day_id TEXT,
   question TEXT NOT NULL,
   source TEXT,
-  disposition TEXT NOT NULL DEFAULT 'parked',  -- parked|approved|dropped|explored
+  kind TEXT NOT NULL DEFAULT 'question',
+  sparked_by_url TEXT,
+  sparked_by_event_id TEXT,
+  disposition TEXT,
   disposed_at TEXT,
-  note TEXT);
+  note TEXT,
+  evening_surfaced_at TEXT,
+  review_surfaced_at TEXT,
+  approved_to_contract_day TEXT);
 
 -- Cold-state review answers (D-031 competence source, graduation
 -- meta-metric, evidence quality, surveillance comfort, out-of-scope
@@ -364,12 +370,17 @@ class Database:
         row = self.query_one("SELECT value FROM meta WHERE key=?", (key,))
         return row["value"] if row else None
 
+    # v0.6.0 names (the spec's calls read better): meta_get/meta_set
+    meta_get = get_meta
+
     def set_meta(self, key: str, value: str):
         self.execute(
             "INSERT INTO meta(key,value) VALUES(?,?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (key, value),
         )
+
+    meta_set = set_meta
 
     # -- domain helpers ----------------------------------------------------
     def insert(self, table: str, row: dict) -> None:

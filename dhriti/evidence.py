@@ -44,9 +44,14 @@ class EvidenceService:
                     note: str = "",
                     workspace: Optional[Path] = None) -> dict:
         target = Path(path).expanduser()
-        if not target.is_absolute():
-            # v0.5.0 behaviour (Bug D): relative to the process CWD.
-            target = Path.cwd() / target
+        if workspace is not None and not target.is_absolute():
+            # Bug D fix (v0.6.0): relative to the CONTRACT's workspace.
+            target = Path(workspace) / target
+        elif not target.is_absolute():
+            # fall back to the dhriti home (never CWD — a file that
+            # lands wherever the shell happened to be is lost evidence,
+            # same rule as the report dir and the backup dest)
+            target = self.home / target
         if not target.is_file():
             return self._record(
                 session_id, EvidenceClass.SUBMITTED, kind, "file",

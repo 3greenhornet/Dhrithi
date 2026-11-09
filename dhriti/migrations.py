@@ -85,6 +85,53 @@ MIGRATIONS = {
         ("drop research_pass.return_condition (moved to question)",
          "ALTER TABLE research_pass DROP COLUMN return_condition"),
     ],
+    # v0.6.0 Part 1 §2 (Bug B): orphan identity_line vidura items are
+    # dropped — identity statements are shown, not spaced.
+    4: [
+        ("drop orphan identity_line items",
+         "DELETE FROM vidura_review WHERE item_id IN (SELECT id FROM "
+         "vidura_item WHERE kind='identity_line')"),
+        ("drop orphan identity_line items (items)",
+         "DELETE FROM vidura_item WHERE kind='identity_line'"),
+    ],
+    # v0.6.0 Part 2 §1.1: the parking lot resurfacing columns. The
+    # table is rebuilt (disposition becomes nullable; the kind/spark/
+    # surfacing columns arrive in one pass — SQLite cannot alter a
+    # column's nullability in place).
+    5: [
+        ("rebuild parking_lot with resurfacing columns",
+         "CREATE TABLE parking_lot_v6("
+         " id TEXT PRIMARY KEY,"
+         " created_at TEXT NOT NULL,"
+         " session_id TEXT,"
+         " day_id TEXT,"
+         " question TEXT NOT NULL,"
+         " source TEXT,"
+         " kind TEXT NOT NULL DEFAULT 'question',"
+         " sparked_by_url TEXT,"
+         " sparked_by_event_id TEXT,"
+         " disposition TEXT,"
+         " disposed_at TEXT,"
+         " note TEXT,"
+         " evening_surfaced_at TEXT,"
+         " review_surfaced_at TEXT,"
+         " approved_to_contract_day TEXT)"),
+        ("copy parking_lot into the new shape",
+         "INSERT INTO parking_lot_v6(id, created_at, session_id, "
+         "day_id, question, source, kind, sparked_by_url, "
+         "sparked_by_event_id, disposition, disposed_at, note) "
+         "SELECT id, created_at, session_id, day_id, question, source, "
+         "'question', NULL, NULL, "
+         "CASE WHEN disposition='parked' THEN NULL ELSE disposition END, "
+         "disposed_at, note FROM parking_lot"),
+        ("replace parking_lot with the new shape",
+         "DROP TABLE parking_lot"),
+        ("rename parking_lot_v6 to parking_lot",
+         "ALTER TABLE parking_lot_v6 RENAME TO parking_lot"),
+        ("index parking_lot_kind",
+         "CREATE INDEX IF NOT EXISTS idx_parking_lot_kind "
+         "ON parking_lot(kind)"),
+    ],
 }
 
 

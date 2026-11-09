@@ -87,7 +87,8 @@ class Ledger:
             "event_type": event_type,
             "parent_event_id": parent_event_id,
             "process_instance_id": process_instance_id,
-            "observed_payload": json.dumps(observed or {}, default=str),
+            "observed_payload": json.dumps(
+                observed or {}, default=str, separators=(",", ":")),
             "raw_payload_reference": raw_payload_reference,
             "inference_payload": json.dumps(inference_payload or {}, default=str),
             "model_id_or_rule_version": model_id_or_rule_version,

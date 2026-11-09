@@ -86,6 +86,10 @@ class TestEarnedEvening(DhritiTestCase):
         daemon.evidence.machine_check_command(
             sess["id"], "reversal passes its test",
             daily_payload()["targets"][0]["evidence"]["command"])
+        (daemon.home / "notes.md").write_text("notes", encoding="utf-8")
+        daemon.evidence.submit_file(
+            sess["id"], "notes written",
+            str(daemon.home / "notes.md"))
         daemon.end_session_success(sess["id"])
         self.clock.advance(hours=10, minutes=2)   # day_close, targets met
         daemon._tick()

@@ -77,7 +77,8 @@ class Daemon:
         self.contracts = self.days.contracts
         self.sessions = SessionService(self.db, self.clock)
         self.evidence = EvidenceService(self.db, self.clock, home=self.home)
-        self.passes = ResearchService(self.db, self.config, self.clock)
+        self.passes = ResearchService(self.db, self.config, self.clock,
+                                  self.ledger)
         self.bootcamp = BootcampService(self.db, self.config, self.clock)
         self.breaks = BreakGlassService(
             self.db, self.config, self.clock, self.ledger)
@@ -102,6 +103,7 @@ class Daemon:
         self._evening_marker_date = None    # D-048 dedupe
         self._earned_marker_date = None     # D-049 dedupe
         self._heartbeat_prune_date = None   # v0.5.0: once per day
+        self._last_anti_drift_date = None  # v0.6.0: parking anti-drift
 
         self._bridge_state = BridgeState()
         self._policy_provider = self._current_extension_policy
@@ -403,6 +405,15 @@ class Daemon:
             "at_utc": to_iso(now), "pid": os.getpid(),
             "host": socket.gethostname()})
         self._prune_heartbeats()
+        self._anti_drift_parking()
+        # v0.6.0 (§9.2): the daemon's config fingerprint is persisted
+        # so `dhriti health` can compare the disk against the RUNNING
+        # daemon, not against itself (the dead v0.5.0 check).
+        from .health import config_fingerprint as _cf
+        if self.db.get_meta("daemon_config_fingerprint") \
+                != _cf(self.config):
+            self.db.meta_set("daemon_config_fingerprint",
+                             _cf(self.config))
         today = self._local_today()
         self.days.ensure_day(today)
         day = self.days.get(today)
@@ -462,16 +473,25 @@ class Daemon:
 
         self._publish()
 
+    def _anti_drift_parking(self):
+        """Part 2 §1.6: the parking lot's anti-drift check runs once
+        per day from the tick — flood and graveyard are events and
+        aftermath facts, never in-session interruptions."""
+        today = self.clock.now_utc().strftime("%Y-%m-%d")
+        if self._last_anti_drift_date == today:
+            return
+        self._last_anti_drift_date = today
+        self.parking.anti_drift()
+
     def _prune_heartbeats(self, keep_hours: int = 48):
         """Heartbeats older than keep_hours are deleted, once per day.
-        v0.5.0: the guard is per-daemon-instance (`_heartbeat_prune_date`)
-        — a restarting daemon prunes again on the same day (idempotent,
-        but the "once per day" claim is only per-instance). v0.6.0
-        Part 1 §9.1 persists the guard in meta."""
+        v0.6.0 (§9.1): the once-per-day guard is persisted in meta, so
+        a restarting daemon no longer re-prunes on the same day — the
+        claim is now a database claim, not a per-instance claim."""
         today = self.clock.now_utc().strftime("%Y-%m-%d")
-        if self._heartbeat_prune_date == today:
+        if self.db.get_meta("last_heartbeat_prune_date") == today:
             return
-        self._heartbeat_prune_date = today
+        self.db.meta_set("last_heartbeat_prune_date", today)
         cutoff = (self.clock.now_utc()
                   - timedelta(hours=keep_hours)).strftime(
                       "%Y-%m-%dT%H:%M:%SZ")

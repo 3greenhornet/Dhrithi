@@ -5,6 +5,19 @@ with well-made placeholders wherever something needs manual
 download/integration. This is that build. Read this page, then you
 are oriented.
 
+## v0.6 — the restoration and resurfacing batch (one screen)
+
+Four bugs fixed (health's bridge probe went HTTP; the unsolvable
+identity card is gone; a contract file's date can no longer be
+silently overridden; evidence resolves against the contract's
+workspace, never the shell's CWD). The D-030 five-field group and the
+base's six review questions are restored. The parking lot became the
+inversion of the feed: kinds, sparks, evening surfacing at the earned
+moment, age-based review surfacing, approved-to-contract, flood and
+graveyard anti-drift, break-glass linkage. Mechanisms 2, 4, 5, 10
+(contract revision, declared unknowns, the research-pass grace
+period, the research-to-application ratio).
+
 ## v0.5 — the surface rebuild + Vidura (one screen)
 
 The CLI became a Context architecture (every command wired the same

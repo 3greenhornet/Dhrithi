@@ -29,6 +29,13 @@ from .timeutil import Clock, RealClock, parse_iso, to_iso
 # -- parking lot ------------------------------------------------------------
 
 class ParkingLotService:
+    """v0.6.0 Part 2 §1: the parking lot as the inversion of the feed —
+    capture, evening surfacing, age-based resurfacing, anti-drift. You
+    park curiosity; the system hands it back at the moment you can
+    follow it, not the moment you can't."""
+
+    VALID_KINDS = ("question", "resource", "desire", "association")
+
     def __init__(self, db: Database, clock: Optional[Clock] = None,
                  ledger=None):
         self.db = db
@@ -36,33 +43,49 @@ class ParkingLotService:
         self.ledger = ledger
 
     def park(self, question: str, source: str = "cli",
+             kind: str = "question",
+             sparked_by_url: Optional[str] = None,
+             sparked_by_event_id: Optional[str] = None,
              session_id: Optional[str] = None,
              day_id: Optional[str] = None) -> dict:
         """One line, one glance, back to work. The wall takes mail; it
-        does not discuss it."""
+        does not discuss it. Kinds: question | resource | desire |
+        association (the four shapes curiosity takes)."""
         question = (question or "").strip()
         if not question:
             raise ValueError("park a question, not an empty line")
+        if kind not in self.VALID_KINDS:
+            raise ValueError(
+                f"kind must be one of {self.VALID_KINDS}, got {kind!r}")
         if len(question) > 200:
             question = question[:197] + "..."
         row_id = str(uuid.uuid4())
+        now = self.clock.now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
         self.db.insert("parking_lot", {
             "id": row_id,
-            "created_at": self.clock.iso(),
+            "created_at": now,
             "session_id": session_id,
             "day_id": day_id,
             "question": question,
             "source": (source or "cli")[:200],
-            "disposition": "parked",
+            "kind": kind,
+            "sparked_by_url": (sparked_by_url or "")[:500] or None,
+            "sparked_by_event_id": sparked_by_event_id or None,
+            "disposition": None,
             "disposed_at": None,
             "note": None,
+            "evening_surfaced_at": None,
+            "review_surfaced_at": None,
+            "approved_to_contract_day": None,
         })
         if self.ledger is not None:
             self.ledger.record(
                 "curiosity_topic_parked",
                 session_id=session_id,
-                observed={"question": question,
-                          "source": (source or "cli")[:100]},
+                observed={"question": question, "kind": kind,
+                          "source": (source or "cli")[:100],
+                          "sparked_by_url": sparked_by_url,
+                          "sparked_by_event_id": sparked_by_event_id},
                 action_taken="curiosity captured; not followed "
                              "in-session")
         return self.get(row_id)
@@ -73,7 +96,7 @@ class ParkingLotService:
 
     def open_items(self) -> list:
         return self.db.query(
-            "SELECT * FROM parking_lot WHERE disposition='parked' "
+            "SELECT * FROM parking_lot WHERE disposition IS NULL "
             "ORDER BY created_at")
 
     def list(self, disposition: Optional[str] = None) -> list:
@@ -85,7 +108,7 @@ class ParkingLotService:
             "SELECT * FROM parking_lot ORDER BY created_at")
 
     def pending(self) -> list:
-        return self.list("parked")
+        return self.open_items()
 
     def dispose(self, row_id: str, disposition: str,
                 note: str = "") -> dict:
@@ -96,9 +119,19 @@ class ParkingLotService:
         row = self.get(row_id)
         if not row:
             raise ValueError("no such parked topic")
-        if row["disposition"] != "parked":
+        if row["disposition"] is not None:
             raise ValueError(
                 f"already dispositioned as {row['disposition']}")
+        # Abandonment ritual (v0.7.0 §3.6 extends this): dropping
+        # requires a one-line reason (min 10 chars) — the reason is
+        # contract-design feedback, not shame.
+        if disposition == "dropped":
+            reason = (note or "").strip()
+            if len(reason) < 10:
+                raise ValueError(
+                    "dropping requires a one-line reason (min 10 "
+                    "chars) — cold-state feedback, not a silent "
+                    "disappearance")
         self.db.update("parking_lot", row_id, {
             "disposition": disposition,
             "disposed_at": self.clock.iso(),
@@ -108,9 +141,154 @@ class ParkingLotService:
             self.ledger.record(
                 "parking_lot_disposition",
                 observed={"disposition": disposition,
-                          "question": row["question"][:100]},
+                          "question": row["question"][:100],
+                          "note": (note or "")[:200]},
                 action_taken="cold-state decision recorded")
         return self.get(row_id)
+
+    # -- resurfacing (v0.6.0 Part 2 §1.2) --------------------------------
+
+    def evening(self, day: str) -> list:
+        """Items parked on `day`, not yet evening-surfaced."""
+        return self.db.query(
+            "SELECT * FROM parking_lot WHERE created_at LIKE ? "
+            "AND disposition IS NULL "
+            "AND evening_surfaced_at IS NULL "
+            "ORDER BY created_at", (day + "%",))
+
+    def evening_all(self, day: str) -> list:
+        """Items parked on `day`, whether or not they were surfaced —
+        the aftermath's record of what the evening offered (the
+        surface marker dedupes the surfacing event, not the record)."""
+        return self.db.query(
+            "SELECT * FROM parking_lot WHERE created_at LIKE ? "
+            "AND disposition IS NULL "
+            "ORDER BY created_at", (day + "%",))
+
+    def surface_evening(self, day: str) -> list:
+        """Mark the day's un-surfaced items as evening-surfaced; return
+        them. Called at the earned-evening moment."""
+        items = self.evening(day)
+        if not items:
+            return []
+        now = self.clock.now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+        for item in items:
+            self.db.execute(
+                "UPDATE parking_lot SET evening_surfaced_at=? WHERE id=?",
+                (now, item["id"]))
+        if self.ledger is not None:
+            self.ledger.record(
+                "parking_evening_surfaced",
+                observed={"day": day, "count": len(items),
+                          "ids": [i["id"] for i in items]},
+                action_taken=f"{len(items)} parked item(s) surfaced "
+                             "for the evening")
+        return items
+
+    def older_than(self, days: int, limit: int = 20) -> list:
+        """Items parked `days`+ ago, still open, not yet
+        review-surfaced."""
+        cutoff = (self.clock.now_utc()
+                  - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return self.db.query(
+            "SELECT * FROM parking_lot WHERE created_at <= ? "
+            "AND disposition IS NULL "
+            "AND review_surfaced_at IS NULL "
+            "ORDER BY created_at LIMIT ?",
+            (cutoff, limit))
+
+    def surface_review(self, min_age_days: int = 3,
+                       limit: int = 20) -> list:
+        """Mark old open items as review-surfaced; return them."""
+        items = self.older_than(min_age_days, limit)
+        if not items:
+            return []
+        now = self.clock.now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+        for item in items:
+            self.db.execute(
+                "UPDATE parking_lot SET review_surfaced_at=? WHERE id=?",
+                (now, item["id"]))
+        if self.ledger is not None:
+            self.ledger.record(
+                "parking_review_surfaced",
+                observed={"count": len(items),
+                          "ids": [i["id"] for i in items]},
+                action_taken=f"{len(items)} older parked item(s) "
+                             "surfaced for the cold review")
+        return items
+
+    def dispose_approved_to_contract(self, record_id: str,
+                                     contract_day: str) -> dict:
+        """Approved -> the contract for `contract_day` gains a research
+        fallback with a time-box. The contract must not be sealed yet;
+        the user adds the fallback to the draft (the system does not
+        author the contract's fields — commitment precedes temptation)."""
+        row = self.get(record_id)
+        if row is None:
+            raise ValueError(f"no parked item {record_id}")
+        if row["disposition"] != "approved":
+            raise ValueError(
+                "dispose_approved_to_contract requires "
+                "disposition='approved'")
+        contract = self.db.query_one(
+            "SELECT * FROM contract WHERE kind='daily' AND "
+            "scope_date=? AND state='SEALED'", (contract_day,))
+        if contract is not None:
+            raise ValueError(
+                f"contract for {contract_day} is already sealed; the "
+                "research fallback cannot be added after seal "
+                "(commitment precedes temptation)")
+        self.db.execute(
+            "UPDATE parking_lot SET approved_to_contract_day=? "
+            "WHERE id=?", (contract_day, record_id))
+        if self.ledger is not None:
+            self.ledger.record(
+                "parking_approved_to_contract",
+                observed={"id": record_id,
+                          "question": row["question"],
+                          "kind": row["kind"],
+                          "contract_day": contract_day},
+                action_taken=f"approved for {contract_day} research "
+                             "fallback")
+        return self.get(record_id)
+
+    def anti_drift(self) -> dict:
+        """Detect the parking lot becoming a graveyard or a flood.
+        Facts for the aftermath, not verdicts."""
+        now = self.clock.now_utc()
+        week_ago = (now - timedelta(days=7)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+        month_ago = (now - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+
+        parked_week = self.db.query_one(
+            "SELECT COUNT(*) AS n FROM parking_lot WHERE created_at >= ?",
+            (week_ago,))["n"]
+        disposed_week = self.db.query_one(
+            "SELECT COUNT(*) AS n FROM parking_lot WHERE "
+            "disposition IS NOT NULL AND disposed_at >= ?",
+            (week_ago,))["n"]
+        graveyard = self.db.query_one(
+            "SELECT COUNT(*) AS n FROM parking_lot WHERE created_at <= ? "
+            "AND disposition IS NULL", (month_ago,))["n"]
+
+        flood = (parked_week >= 10 and disposed_week <= 2)
+        if flood and self.ledger is not None:
+            self.ledger.record(
+                "parking_flood",
+                observed={"parked_week": parked_week,
+                          "disposed_week": disposed_week},
+                action_taken="parking lot growing faster than "
+                             "dispositions")
+        if graveyard >= 5 and self.ledger is not None:
+            self.ledger.record(
+                "parking_graveyard",
+                observed={"graveyard_count": graveyard},
+                action_taken="30+ day old undisposed items accumulate")
+        return {"flood": flood, "graveyard": graveyard >= 5,
+                "parked_week": parked_week,
+                "disposed_week": disposed_week,
+                "graveyard_count": graveyard}
 
     def for_day_id(self, day_id: str) -> list:
         return self.db.query(
@@ -121,35 +299,60 @@ class ParkingLotService:
         rows = self.db.query(
             "SELECT disposition, COUNT(*) AS n FROM parking_lot "
             "GROUP BY disposition")
-        return {r["disposition"]: r["n"] for r in rows}
+        stats = {"parked": 0}
+        for r in rows:
+            key = r["disposition"] or "parked"
+            stats[key] = r["n"]
+        return stats
 
 
 # -- cold review ------------------------------------------------------------
 
-# v0.5.0 questions. The rebuild replaced five of the base's six with
-# its own; only competence_source survived. (v0.6.0 Part 1 §6 restores
-# the base six — that correction is deliberate and recorded.)
+# v0.6.0 (Part 1 §6): the base's six questions are authoritative (the
+# v0.5.0 rebuild had silently replaced five of them); the v0.5.0
+# additions that do not overlap are kept; mechanism 4 adds
+# declared_thinking as the tenth.
 REVIEW_QUESTIONS = [
+    # From the base (Part 1 §3.11); do not rename or remove.
     ("competence_source",
      "Where did the feeling of competence come from — the task, "
      "or talk about the task?"),
+    ("faking_it",
+     "You said you were managing. Were you? (D-029 productive "
+     "substitution check)"),
+    ("wall_or_choice",
+     "Did you do the work because the wall was up, or because you "
+     "chose to? (graduation meta-metric)"),
+    ("out_of_scope_device",
+     "Did you use an out-of-scope device (phone/tablet/other machine) "
+     "to reach the audience during the window?"),
+    ("evidence_quality",
+     "Was your accepted evidence substantive or superficial? Name the "
+     "weakest one. (recognition mechanism 12)"),
+    ("surveillance_comfort",
+     "Is what the system captures still acceptable? What should be "
+     "narrowed? (recognition mechanism 11)"),
+    # From v0.5.0 (kept — genuinely additive, no overlap with above).
     ("targets_honest",
      "Were the targets honest — could they be met on a normal day?"),
     ("toll_worth_it",
      "If the toll was paid: was it worth the declared penalty?"),
     ("what_would_make_tomorrow_sealable",
      "What would make tomorrow's contract sealable by 10:00?"),
-    ("substitute_time",
-     "Where did the substitute budget actually go since the last "
-     "review?"),
-    ("window_held",
-     "Did the window hold — did the work stay inside it?"),
+    # Mechanism 4 (v0.6.0 Part 2 §2.2): declared thinking.
+    ("declared_thinking",
+     "Were there questions this week you decided not to answer? "
+     "Name one. (declared-thinking: what you decided NOT to research)"),
 ]
 
 CONDITIONAL_QUESTIONS = {
     "leisure_honored": (
         "Was the declared leisure honored as declared — same label, "
         "same length, no drift past it? (D-047)"),
+    "curation_choice": (
+        "You surfaced N items this week and opened M. Which of the "
+        "items you did not open did you choose not to open, and why? "
+        "(asked only when items were surfaced)"),
 }
 
 
@@ -160,12 +363,29 @@ class ColdReviewService:
         self.clock = clock or RealClock()
         self.ledger = ledger
 
-    def questions_for(self, leisure_declared: bool) -> list:
+    def questions_for(self, leisure_declared: bool,
+                      curation_applicable: bool = False) -> list:
+        """The fixed protocol plus the conditionals that apply. The
+        caller computes applicability from the record (leisure
+        declarations for the scope; surfaced items / reviews in the
+        week), never from a guess."""
         qs = list(REVIEW_QUESTIONS)
         if leisure_declared:
             qs.append(("leisure_honored",
                        CONDITIONAL_QUESTIONS["leisure_honored"]))
+        if curation_applicable:
+            qs.append(("curation_choice",
+                       CONDITIONAL_QUESTIONS["curation_choice"]))
         return qs
+
+    def curation_applicable(self, week_start_iso: str) -> bool:
+        """v0.6.0: the curation question fires only when Vidura items
+        were reviewed in the week (the mirror proper is not built yet;
+        v0.7.0 gates it on content_item_surfaced events)."""
+        row = self.db.query_one(
+            "SELECT 1 AS one FROM vidura_review WHERE reviewed_at >= ? "
+            "LIMIT 1", (week_start_iso + "T00:00:00Z",))
+        return row is not None
 
     def record(self, scope: str, question_key: str, answer: str,
                day_date: Optional[str] = None) -> dict:
@@ -291,6 +511,12 @@ def build_digest(db: Database, ledger, week_start_iso: str,
         lines.append(f"  - {b['reason']}")
     emergency_count = emergency[0]["n"] if emergency else 0
     lines.append(f"emergency exceptions: {emergency_count}")
+    if emergency_count >= 3:
+        lines.append(
+            f"emergency exits: {emergency_count} in 7 days. The "
+            "pattern is yours to read.")
+        lines.append("(threshold: 3 in 7 days; below threshold, this "
+                     "line is absent.)")
     lines.append("")
     lines.append("== parking lot ==")
     if not parked:

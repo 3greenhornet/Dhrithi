@@ -49,22 +49,39 @@ def make_config(**overrides) -> dict:
 
 
 def daily_payload() -> dict:
-    """The v0.5.0 contract shape: identity, contract line, main belief
-    label, targets with evidence classes. (v0.6.0 Part 1 §5 restores
-    the full five-field D-030 group; the fixture grows there.)"""
+    """The v0.6.0 contract shape (Part 1 §5 + §9.5): identity, contract
+    line, the FULL five-field D-030 group, targets with evidence
+    classes, and a workspace_dir the evidence layer resolves against.
+    Tests that care about a different workspace override it."""
     return {
         "identity_statement": (
             "I am the person who writes the compiler, not the person "
             "who reads about compilers."),
         "contract_line": "reverse the array in Java, in place",
         "main_belief": {"label": "compiler practice"},
+        "main_belief_metric": "parse_decl passes its test",
+        "main_belief_current_state": "behind on the C book chapters",
+        "substitute_activities": ["reading about parsers",
+                                  "watched talks"],
+        "substitute_budget": "2 hours per week",
         "profile": "coding",
+        "workspace_dir": None,  # filled per-test (see _payload)
         "targets": [
             {"label": "reversal passes its test",
              "evidence": {"class": "machine",
                           "command": "python3 -c \"print('ok')\""}},
+            {"label": "notes written",
+             "evidence": {"class": "file", "path": "notes.md"}},
         ],
     }
+
+
+def payload_for(home) -> dict:
+    """daily_payload with the workspace pointed at a real directory
+    (workspace_dir is validated at seal time — Bug D)."""
+    payload = daily_payload()
+    payload["workspace_dir"] = str(home)
+    return payload
 
 
 class DhritiTestCase(unittest.TestCase):
@@ -77,12 +94,14 @@ class DhritiTestCase(unittest.TestCase):
         self.config = make_config()
         self.db = Database(self.home / "dhriti.sqlite3")
         self.ledger = Ledger(self.db, self.clock, anchor_interval=5)
-        self.contracts = ContractService(self.db, self.clock)
+        self.contracts = ContractService(self.db, self.clock,
+                                        self.ledger)
         self.days = DayService(self.db, self.config, self.clock)
         self.sessions = SessionService(self.db, self.clock)
         self.evidence = EvidenceService(self.db, self.clock,
                                         home=self.home)
-        self.passes = ResearchService(self.db, self.config, self.clock)
+        self.passes = ResearchService(self.db, self.config, self.clock,
+                                  self.ledger)
         self.bootcamp = BootcampService(self.db, self.config, self.clock)
         self.breaks = BreakGlassService(
             self.db, self.config, self.clock, self.ledger)
@@ -177,17 +196,15 @@ class DhritiTestCase(unittest.TestCase):
         from dhriti import cli
         ctx = self.make_cli_context()
         out = io.StringIO()
-        exit_code = None
         try:
             with contextlib.redirect_stdout(out):
-                try:
-                    getattr(cli, command)(
-                        argparse.Namespace(**args), ctx)
-                except SystemExit as exc:
-                    exit_code = exc.code
+                # SystemExit propagates (refusals are refusals); the
+                # caller catches what it expects
+                getattr(cli, command)(
+                    argparse.Namespace(**args), ctx)
         finally:
             ctx.close()
-        return out.getvalue(), exit_code
+        return out.getvalue(), None
 
 
 if __name__ == "__main__":

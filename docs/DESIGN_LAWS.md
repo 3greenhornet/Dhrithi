@@ -110,6 +110,27 @@ assert OFF-by-default behavior in their test files; the allowlist
 interaction is asserted in `tests/test_review.py` and
 `tests/test_daemon_integration.py`.
 
+v0.6.0 addition: the parking lot resurfacing surfaces items only
+after the earned-evening moment; the parking lot never pushes during
+a session (the evening block requires `targets_met`, and the
+review surfacing is a cold-state command).
+
+---
+
+## L-8. Bounded, not optimized (v0.6.0)
+
+The conversation is bounded, not optimized — any in-session mechanism
+must bound the interaction, never optimize it (no engagement
+maximization, no "smarter" recommendations, no pacing). The
+curation_choice conditional question is the only L-8 mechanism in
+v0.6.0's scope; the topic-lock and completion-detector mechanisms
+arrive with their own consent gates in later versions, bounded by
+this law. A mechanism that makes the bounded thing more engaging is a
+violation even if it is "helpful."
+
+*Tests:* `tests/test_design_laws.py` (surface lint); the parking and
+mirror surfaces carry no affordances.
+
 ---
 
 ## How to use these laws

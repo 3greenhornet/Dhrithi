@@ -10,9 +10,25 @@ Payload schema (docs/SCHEMAS.md):
   identity_statement    who this task serves (the user's own words)
   contract_line         the one line the wall shows — written cold
   main_belief           {"label": "..."} — the belief this traces to
+
+D-030 group (v0.6.0 restoration, Part 1 §5 — required as a unit;
+  every task traces to the main belief; the main belief is a filter,
+  not a slogan):
+  main_belief_metric        what would prove the belief is becoming real
+  main_belief_current_state the honest assessment today ("I am failing
+                            the course") — the failure state is the signal
+  substitute_activities     known substitutes (guitar, multiplayer games)
+  substitute_budget         time allowed for substitutes while healthy
+
   targets               [{label, evidence: {class: machine|file|manual,
                         command|path}}] — what counts as done
   profile               task profile name (coding|study|research|writing)
+  workspace_dir         optional; absolute path to the directory the
+                        evidence layer resolves relative paths against
+                        (validated at seal time — Bug D, v0.6.0)
+  declared_unknowns     optional; [{topic, current_state:
+                        unknown|partial}] — mechanism 4: uncertainty
+                        declared explicitly instead of false certainty
   research_fallback     optional {scope, sources[], max_minutes,
                         return_condition} — bounded allowance declared cold
   IF–THEN obstacle plan (optional group; present means complete):
@@ -22,6 +38,7 @@ Payload schema (docs/SCHEMAS.md):
 import datetime as _dt
 import json
 import uuid
+from pathlib import Path
 from typing import Optional
 
 from .db import Database
@@ -31,6 +48,16 @@ from .timeutil import Clock, RealClock
 
 REQUIRED_DAILY_FIELDS = [
     "identity_statement", "contract_line",
+]
+
+# D-030 (v0.6.0 restoration): the four fields that complete the
+# main-belief group. main_belief itself is the anchor; these are the
+# exchange rate.
+MAIN_BELIEF_FIELDS = [
+    "main_belief_metric",
+    "main_belief_current_state",
+    "substitute_activities",
+    "substitute_budget",
 ]
 
 IF_THEN_FIELDS = ["expected_obstacle", "if_then_response",
@@ -64,6 +91,25 @@ def validate(payload: dict) -> None:
             "main_belief must be an object with a non-empty 'label' "
             "(e.g. {\"label\": \"compiler practice\"})")
 
+    # D-030 group (v0.6.0 restoration, Part 1 §5): required as a unit.
+    missing_belief = [f for f in MAIN_BELIEF_FIELDS
+                      if not _present(payload.get(f))]
+    if missing_belief:
+        problems.append(
+            "main-belief group incomplete (D-030), missing: "
+            + ", ".join(missing_belief))
+    else:
+        if not isinstance(payload.get("substitute_activities"), list) \
+                or not payload["substitute_activities"]:
+            problems.append(
+                "substitute_activities must be a non-empty list of "
+                "strings")
+        if not isinstance(payload.get("substitute_budget"), str) \
+                or not payload["substitute_budget"].strip():
+            problems.append(
+                "substitute_budget must be a non-empty string "
+                "(e.g. '3 hours per week')")
+
     targets = payload.get("targets")
     if not isinstance(targets, list) or not targets:
         problems.append("targets must be a non-empty list")
@@ -78,6 +124,35 @@ def validate(payload: dict) -> None:
                 problems.append(
                     f"targets[{i}].evidence needs a class of "
                     "machine|file|manual")
+
+    # Bug D (v0.6.0 Part 1 §4.1): workspace_dir is optional; when
+    # present it must be an absolute path to a directory that exists
+    # at seal time — the evidence layer resolves relative paths
+    # against it, and a relative workspace would resolve against
+    # whatever the shell happened to be in.
+    workspace = payload.get("workspace_dir")
+    if workspace is not None:
+        if not isinstance(workspace, str):
+            problems.append("workspace_dir must be a string")
+        else:
+            wp = Path(workspace).expanduser()
+            if not wp.is_absolute():
+                problems.append(
+                    f"workspace_dir must be absolute (got {workspace!r}); "
+                    "the evidence layer resolves relative paths against "
+                    "it, and a relative workspace would resolve against "
+                    "whatever the shell happened to be in")
+            elif not wp.is_dir():
+                problems.append(
+                    f"workspace_dir {wp} does not exist or is not a "
+                    "directory (checked at seal time; a workspace that "
+                    "doesn't exist cannot carry evidence)")
+
+    # Mechanism 4 (v0.6.0 Part 2 §2.2): declared uncertainty instead
+    # of false certainty.
+    unknowns = payload.get("declared_unknowns", [])
+    if unknowns and not isinstance(unknowns, list):
+        problems.append("declared_unknowns must be a list")
 
     present_if_then = [f for f in IF_THEN_FIELDS
                        if _present(payload.get(f))]
@@ -99,9 +174,11 @@ def validate(payload: dict) -> None:
 
 
 class ContractService:
-    def __init__(self, db: Database, clock: Optional[Clock] = None):
+    def __init__(self, db: Database, clock: Optional[Clock] = None,
+                 ledger=None):
         self.db = db
         self.clock = clock or RealClock()
+        self.ledger = ledger
 
     # -- validation ----------------------------------------------------------
     def validate(self, payload: dict) -> None:
@@ -178,6 +255,54 @@ class ContractService:
         if "payload" in contract:
             return contract["payload"]
         return json.loads(contract["payload_json"])
+
+    # -- revision (mechanism 2: the false-positive correction path) ------
+    def revise(self, contract_id: str, patch: dict,
+               reason: str) -> dict:
+        """Cold-state revision of a DRAFT. Sealed contracts are
+        immutable (principle 1); the revision event is the record.
+        The system does not author the contract's fields; it only
+        re-validates what the operator rewrote."""
+        row = self.get(contract_id)
+        if row is None:
+            raise ContractError(f"no such contract {contract_id}")
+        if row["state"] == "SEALED":
+            raise ContractError(
+                "sealed contracts are immutable (principle 1); "
+                "write a new draft with `dhriti contract write`")
+        payload = dict(row["payload"])
+        payload.update(patch)
+        self.validate(payload)
+        self.db.update("contract", contract_id, {
+            "payload_json": json.dumps(payload, ensure_ascii=False,
+                                       default=str)})
+        self.ledger.record(
+            "contract_revised",
+            case_id=f"day-{row['scope_date']}",
+            observed={"contract_id": contract_id,
+                      "day": row["scope_date"],
+                      "patched_fields": list(patch.keys()),
+                      "reason": reason},
+            action_taken="draft revised; re-validation passed")
+        return self.get(contract_id)
+
+    def get_history_of_field(self, field_name: str) -> list:
+        """The sequence of a payload field's values across every sealed
+        contract, oldest first (identity-revision; used for
+        main_belief_current_state)."""
+        history = []
+        for row in self.db.query(
+                "SELECT scope_date, payload_json FROM contract "
+                "WHERE kind='daily' AND state='SEALED' "
+                "ORDER BY scope_date"):
+            try:
+                payload = json.loads(row["payload_json"])
+            except Exception:
+                continue
+            if _present(payload.get(field_name)):
+                history.append({"date": row["scope_date"],
+                                "value": payload[field_name]})
+        return history
 
     def for_day(self, date: str) -> Optional[dict]:
         row = self.db.query_one(

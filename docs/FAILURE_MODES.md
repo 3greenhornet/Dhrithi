@@ -39,3 +39,24 @@ design and by honest statement (dossier 2.7). The one full solution
 the dossier names is another human who cares; the software's job is
 making the gap between said and did impossible to hide from that
 person (PDF 3.8).
+
+
+## v0.6.0 failure modes
+
+- **F-30: workspace_dir missing at seal** — refused at validation
+  (`workspace_dir must be absolute` / `does not exist`).
+- **F-31: workspace_dir doesn't exist at seal** — refused (a
+  workspace that doesn't exist cannot carry evidence).
+- **F-32: --date mismatch on seal** — refused (D-061 extension): the
+  file's date is authoritative; rename the file or drop --date.
+- **F-33: health bridge probe HTTP failure** — disclosed as [warn]
+  with the exact outcome (token rejected / bridge down with lock
+  present), exit code 1.
+- **F-34: identity_line ingest attempted** — AttributeError (the
+  method no longer exists) or the `vidura_identity_not_spaced` event
+  is recorded (depending on the path).
+- **F-35: parking flood** — event recorded, aftermath flags the fact.
+- **F-36: parking graveyard** — event recorded, aftermath flags the
+  fact.
+- **F-37: research pass grace** — sources gone at expiry, answer
+  accepted for 120s more; the pass then expires honestly.

@@ -66,11 +66,19 @@ class AftermathService:
         leisure_rows = self.db.query(
             "SELECT * FROM leisure_declaration WHERE day_date=? "
             "ORDER BY created_at", (date_iso,))
+        contract = self._contract_for(day)
+        if contract is None:
+            # the day row may not exist yet (a report can be requested
+            # cold, straight after the seal); the sealed contract is
+            # still the record
+            from .contract import ContractService
+            contract = ContractService(self.db, self.clock).for_day(
+                date_iso)
         return {
             "scope": f"day:{date_iso}", "date": date_iso, "day": day,
             "sessions": sessions, "evidence": evidence, "breaks": breaks,
             "review": review, "leisure_rows": leisure_rows,
-            "contract": self._contract_for(day),
+            "contract": contract,
         }
 
     def _week_data(self, week_start_iso: str) -> dict:
@@ -130,26 +138,166 @@ class AftermathService:
 
     def week_report(self, week_start_iso: str) -> dict:
         data = self._week_data(week_start_iso)
-        return self._render(
+        report = self._render(
             f"week {week_start_iso}", data["scope"], data)
+        # the week report carries the parking-lot week section on top
+        # of the common blocks
+        extra = []
+        self._parking_week_block(extra, data)
+        md = report["markdown"]
+        marker = "## Proof"
+        if marker in md:
+            md = md.replace(marker, "\n".join(extra) + marker, 1)
+        else:
+            md += "\n" + "\n".join(extra)
+        report["markdown"] = md
+        report["md"] = md
+        return report
 
     # -- the shared blocks --------------------------------------------------------
     def _common_blocks(self, data: dict) -> list:
-        """The section builders, in report order. v0.5.0 order keeps
-        the identity line at the bottom (v0.3.0 heritage)."""
+        """The section builders, in report order. v0.6.0 (Bug B): the
+        identity line moved to the top of the report (see _render);
+        v0.6.0 (D-030 restoration): the exchange block follows it."""
         lines = []
+        self._exchange_block(lines, data)
         self._contract_block(lines, data)
         self._reality_block(lines, data)
         self._consumption_block(lines, data)
         self._ratio_block(lines, data)
         self._leisure_block(lines, data)
+        self._research_ratio_block(lines, data)
         self._proof_block(lines, data)
         self._breaks_block(lines, data)
         self._loop_block(lines, data)
         self._parking_block(lines, data)
+        self._evening_block(lines, data)
         self._review_block(lines, data)
         self._facts_block(lines, data)
         return lines
+
+    def _exchange_block(self, lines, data):
+        """The D-030 exchange: the main belief and its exchange rate
+        with substitutes, restored in v0.6.0 (Part 1 §5.2)."""
+        contract = data.get("contract")
+        if not contract:
+            return
+        payload = contract.get("payload") or {}
+        belief = payload.get("main_belief") or {}
+        if not payload.get("main_belief_metric"):
+            return
+        lines.append("## The exchange")
+        lines.append(f"- Main belief: {belief.get('label', '')}")
+        lines.append(f"- Metric that would prove it: "
+                     f"{payload['main_belief_metric']}")
+        lines.append(f"- Current state (your words, cold): "
+                     f"{payload.get('main_belief_current_state', '')}")
+        substitutes = payload.get("substitute_activities") or []
+        lines.append(f"- Declared substitutes: "
+                     f"{', '.join(substitutes)}")
+        lines.append(f"- Substitute budget: "
+                     f"{payload.get('substitute_budget', '')}")
+        if payload.get("declared_unknowns"):
+            lines.append("- Declared unknowns:")
+            for unknown in payload["declared_unknowns"]:
+                if isinstance(unknown, dict):
+                    lines.append(f"  - {unknown.get('topic', '')} "
+                                 f"({unknown.get('current_state', '')})")
+        sessions = data.get("sessions") or []
+        success = sum(1 for s in sessions
+                      if s.get("state") == "SUCCESS")
+        lines.append(f"- Observed this scope: {len(sessions)} session(s), "
+                     f"{success} with accepted evidence.")
+        lines.append("(The system does not judge the exchange. "
+                     "It shows the two sides.)")
+        lines.append("")
+
+    def _research_ratio_block(self, lines, data):
+        """Mechanism 10 (v0.6.0 Part 2 §2.4): research minutes vs
+        application minutes per session, computed from the research
+        passes' opened/returned timestamps."""
+        ratio_data = self._research_to_application_ratio(
+            data.get("date"))
+        if not ratio_data:
+            return
+        lines.append("## Research-to-application ratio")
+        for sid, m in ratio_data.items():
+            ratio_str = (f"{m['ratio']}:1" if m["ratio"] is not None
+                         else "no application time")
+            lines.append(
+                f"- session {sid[:8]}: {m['research_minutes']} min "
+                f"research / {m['application_minutes']} min application "
+                f"({ratio_str})")
+        for sid, m in ratio_data.items():
+            if m["ratio"] is not None and m["ratio"] > 2.0:
+                lines.append(
+                    f"- NOTE (session {sid[:8]}): research exceeds "
+                    "application 2:1. The metrics show the exchange; "
+                    "you read it.")
+        lines.append("")
+
+    def _research_to_application_ratio(self, date: str) -> dict:
+        """Minutes in-pass vs out-of-pass per session (mechanism 10)."""
+        if not date:
+            return {}
+        sessions = self.db.query(
+            "SELECT id, started_at, ended_at FROM session "
+            "WHERE day_id = (SELECT id FROM day WHERE date=?)",
+            (date,))
+        result = {}
+        for s in sessions:
+            if not s["ended_at"]:
+                continue
+            try:
+                session_minutes = (
+                    parse_iso(s["ended_at"])
+                    - parse_iso(s["started_at"])).total_seconds() / 60
+            except Exception:
+                continue
+            passes = self.db.query(
+                "SELECT opened_at, returned_at FROM research_pass "
+                "WHERE session_id=? AND returned_at IS NOT NULL",
+                (s["id"],))
+            research_minutes = 0.0
+            for p in passes:
+                try:
+                    research_minutes += (
+                        parse_iso(p["returned_at"])
+                        - parse_iso(p["opened_at"])
+                    ).total_seconds() / 60
+                except Exception:
+                    continue
+            application_minutes = max(0.0, session_minutes
+                                      - research_minutes)
+            result[s["id"]] = {
+                "research_minutes": round(research_minutes, 1),
+                "application_minutes": round(application_minutes, 1),
+                "ratio": (round(research_minutes / application_minutes, 2)
+                          if application_minutes > 0 else None),
+            }
+        return result
+
+    def _evening_block(self, lines, data):
+        """v0.6.0 Part 2 §1.3: the earned-evening surfacing of parked
+        items — the parking lot handed back at the moment it can be
+        followed, only after the day's targets were met."""
+        day = data.get("day")
+        if not (day and day.get("targets_met")):
+            return
+        evening_items = self.parking.evening_all(day["date"])
+        if not evening_items:
+            return
+        lines.append("## The evening is yours")
+        lines.append("You earned it. You parked these today:")
+        for item in evening_items:
+            spark = ""
+            if item.get("sparked_by_url"):
+                spark = f" (sparked by: {item['sparked_by_url']})"
+            lines.append(f"- [{item['kind']}] {item['question']}{spark}")
+        lines.append("")
+        lines.append("Pick one, or don't. The list is yours — it does not "
+                     "come back until you ask for it in the cold review.")
+        lines.append("")
 
     def _contract_block(self, lines, data):
         contract = data.get("contract")
@@ -335,9 +483,56 @@ class AftermathService:
             lines.append("")
             return
         for item in open_items:
-            spark = (f" (sparked by: {item['source']})"
-                     if item.get("source") else "")
-            lines.append(f"- {item['question']}{spark}")
+            spark = ""
+            if item.get("sparked_by_url"):
+                spark = f" (sparked by: {item['sparked_by_url']})"
+            lines.append(f"- [{item['kind']}] {item['question']}{spark}")
+        lines.append("")
+
+    def _parking_week_block(self, lines, data):
+        """Part 2 §1.3: the week's parked items, the older ones still
+        open with their ages, and the anti-drift flags — the parking
+        lot read cold, as facts."""
+        lines.append("## Parking lot (the week)")
+        dates = [d["date"] for d in (data.get("days") or [])]
+        start = dates[0] if dates else data.get("date")
+        end = dates[-1] if dates else data.get("date")
+        open_items = self.db.query(
+            "SELECT * FROM parking_lot WHERE disposition IS NULL "
+            "AND created_at >= ? AND created_at < ?",
+            (start + "T00:00:00Z", end + "T23:59:59Z")) \
+            if start and end else []
+        older = self.parking.older_than(3, limit=10)
+        if open_items:
+            lines.append("Parked this week:")
+            for item in open_items:
+                spark = (f" (sparked by: {item['sparked_by_url']})"
+                         if item.get("sparked_by_url") else "")
+                lines.append(f"- [{item['kind']}] "
+                             f"{item['question']}{spark}")
+        else:
+            lines.append("Nothing parked this week.")
+        if older:
+            lines.append("")
+            lines.append("Older items still open:")
+            for item in older:
+                age_days = (self.clock.now_utc()
+                            - parse_iso(item["created_at"])).days
+                lines.append(f"- [{item['kind']}] {item['question']} "
+                             f"({age_days} days)")
+        anti = self.parking.anti_drift()
+        if anti["flood"]:
+            lines.append("")
+            lines.append(
+                f"Parking flood: {anti['parked_week']} parked, "
+                f"{anti['disposed_week']} disposed this week. "
+                "The lot is growing faster than you are reading it.")
+        if anti["graveyard"]:
+            lines.append("")
+            lines.append(
+                f"Parking graveyard: {anti['graveyard_count']} items "
+                "are 30+ days old and undisposed. Let them go or "
+                "face them.")
         lines.append("")
 
     def _review_block(self, lines, data):
@@ -414,16 +609,17 @@ class AftermathService:
         chain = self.ledger.verify_chain() if self.ledger else {
             "ok": None, "checked": 0}
 
+        # Bug B (v0.6.0): the identity line is the first thing in the
+        # report — before "Contract (written cold)" — not the footer.
+        # The identity statement is shown, not spaced.
         md = [f"# Dhriti aftermath — {title}", ""]
         md.append(f"Scope: {scope}")
         md.append(f"Generated: {self.clock.iso()}")
         md.append("")
-        md.extend(blocks)
         if identity:
-            md.append("## Identity (your own words, from your contract)")
+            md.append(f"""{identity}""")
             md.append("")
-            md.append(f"> {identity}")
-            md.append("")
+        md.extend(blocks)
         md.append("---")
         md.append(f"Ledger head at generation: `{head['row_hash']}`")
         md.append(f"Chain verified: {chain['ok']} "
@@ -432,6 +628,9 @@ class AftermathService:
 
         html = ["<h1>Dhriti aftermath</h1>"]
         html.append(f"<p>Scope: {_html.escape(scope)}</p>")
+        if identity:
+            html.append("<blockquote>"
+                        + _html.escape(identity) + "</blockquote>")
         for line in blocks:
             if line.startswith("## "):
                 html.append(f"<h2>{_html.escape(line[3:])}</h2>")
@@ -439,9 +638,6 @@ class AftermathService:
                 html.append(f"<div>{_html.escape(line[2:])}</div>")
             elif line.strip():
                 html.append(f"<p>{_html.escape(line)}</p>")
-        if identity:
-            html.append("<blockquote>"
-                        + _html.escape(identity) + "</blockquote>")
         return {"markdown": markdown, "html": "\n".join(html),
                 "md": markdown}
 

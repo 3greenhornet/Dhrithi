@@ -6,15 +6,21 @@ BROKEN and the exit code is 0 only when everything required is
 healthy. The operator's answer to "is the system working?" — without
 it, honesty is a guess.
 
+v0.6.0 (Bug A): the extension bridge is probed over HTTP, not through
+the adapter instance — a CLI process has no daemon, so the adapter
+probe could only ever report NOT_INSTALLED and healthy systems showed
+DEGRADED.
+
 Exit codes: 0 = OK, 1 = DEGRADED or BROKEN.
 """
 
 import json
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
-from .adapters.registry import build_adapters
 from .constants import load_config
 from .db import Database
 from .ledger import Ledger
@@ -29,10 +35,66 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
+def _probe_extension_bridge(report, home: Path,
+                            config: dict, daemon_running: bool) -> str:
+    """Bug A fix (v0.6.0): probe the bridge over HTTP with the token
+    from <home>/bridge_token — never through the adapter instance
+    (a CLI process has no daemon; the adapter probe could only lie).
+    Returns the probe outcome for the health_check_run event:
+    ok | bridge_down | token_rejected | daemon_not_running."""
+    bridge_cfg = config.get("bridge", {})
+    token_file = home / bridge_cfg.get("token_file", "bridge_token")
+    port = int(bridge_cfg.get("port", 7311))
+    if not token_file.exists():
+        report.check(
+            "adapter.extension_bridge", True,
+            "daemon not running (bridge dormant, not a fault)")
+        return "daemon_not_running"
+    token = token_file.read_text(encoding="utf-8").strip()
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/status",
+        headers={"X-Dhriti-Token": token})
+    try:
+        with urllib.request.urlopen(request, timeout=2) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        if "day" in payload:
+            report.check(
+                "adapter.extension_bridge", True,
+                f"bridge responded (day state: {payload['day']})")
+            return "ok"
+        report.check(
+            "adapter.extension_bridge", False,
+            "bridge responded without a day state — daemon older "
+            "than the bridge contract")
+        return "bridge_down"
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            report.check(
+                "adapter.extension_bridge", False,
+                "bridge up, token rejected — run 'dhriti token rotate' "
+                "or re-paste in extension/config.js")
+            return "token_rejected"
+        report.check(
+            "adapter.extension_bridge", False,
+            f"bridge returned HTTP {exc.code}")
+        return "bridge_down"
+    except (urllib.error.URLError, OSError, TimeoutError):
+        if daemon_running:
+            report.check(
+                "adapter.extension_bridge", False,
+                "daemon lock present but bridge not responding")
+            return "bridge_down"
+        report.check(
+            "adapter.extension_bridge", True,
+            "daemon not running (bridge dormant, not a fault)")
+        return "daemon_not_running"
+
+
 class HealthReport:
     def __init__(self):
         self.lines: list = []
         self.overall = "OK"
+        self.extension_bridge_probe = "daemon_not_running"
 
     def check(self, name: str, ok: bool, message: str,
               degraded_when_false: bool = True):
@@ -109,21 +171,18 @@ def build_health(home: Path, config: Optional[dict] = None,
                      if active else "none active")
 
         # -- adapters -------------------------------------------------------
-        # An adapter disabled in config is a cold-state choice, not a
-        # fault ([ok], disclosed). An adapter ENABLED but missing on the
-        # machine is DEGRADED. A required adapter that cannot run is
-        # BROKEN (handled by the arming gate at session time).
-        adapters = build_adapters(config, home, None)
-        daemon_running_flag = daemon_running
-        for adapter in adapters:
+        # Bug A (v0.6.0): the extension bridge is probed over HTTP with
+        # the real token; the other adapters keep the config-aware probe
+        # (disabled in config = a cold-state choice, not a fault;
+        # enabled but missing = DEGRADED).
+        report.extension_bridge_probe = _probe_extension_bridge(
+            report, home, config, daemon_running)
+        from .adapters.registry import build_adapters
+        for adapter in build_adapters(config, home, None):
+            if adapter.name == "extension_bridge":
+                continue  # probed above
             probe = adapter.probe()
             enabled = bool(adapter.config.get("enabled", True))
-            if adapter.name == "extension_bridge" \
-                    and not daemon_running_flag:
-                report.check(
-                    f"adapter.{adapter.name}", True,
-                    "daemon not running (bridge dormant, not a fault)")
-                continue
             if not enabled:
                 report.check(
                     f"adapter.{adapter.name}", True,
@@ -137,19 +196,31 @@ def build_health(home: Path, config: Optional[dict] = None,
                 + (f" — {probe.hint}" if probe.status != "INSTALLED"
                    and probe.hint else ""))
 
-        # -- config drift (v0.4.0 form) -------------------------------------
-        # Compares the freshly loaded config against itself; this only
-        # detects load failure, not live drift. See v0.6.0 (Part 1 §9.2):
-        # the check is replaced by a comparison against the daemon's
-        # recorded fingerprint.
+        # -- config drift (v0.6.0, Part 1 §9.2) -----------------------------
+        # Compares the config on disk against the fingerprint the daemon
+        # recorded at its start (daemon_config_fingerprint in meta). The
+        # v0.5.0 form compared the freshly loaded config against itself
+        # and could never fail — a dead check.
         try:
-            disk_config = load_config(home)
-            report.check(
-                "config.drift", True,
-                f"config loads (fingerprint {config_fingerprint(disk_config)[:12]}...)")
+            disk_fp = config_fingerprint(load_config(home))
         except Exception as exc:
             report.check("config.drift", False,
                          f"config on disk does not load: {exc}")
+        else:
+            running_fp = db.get_meta("daemon_config_fingerprint")
+            if running_fp is None:
+                report.check(
+                    "config.drift", True,
+                    "no daemon fingerprint recorded (daemon has not run)")
+            elif disk_fp == running_fp:
+                report.check(
+                    "config.drift", True,
+                    "config on disk matches the running daemon")
+            else:
+                report.check(
+                    "config.drift", False,
+                    "config edited on disk since the daemon started "
+                    "(restart to apply)")
     finally:
         if own_db:
             db.close()

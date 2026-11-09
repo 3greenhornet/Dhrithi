@@ -112,3 +112,34 @@ placeholder toggles), `taper` thresholds, `research_pass` defaults.
 overlay fragments matching dossier 11.1 (Lite is what v1 runs;
 Standard adds Sysmon + ActivityWatch + PM4Py; Research adds Screenpipe
 trial + embedding experiments once labels exist).
+
+
+## v0.6.0 additions
+
+Contract payload gains:
+- `workspace_dir` — optional; when present, must be an absolute path
+  to an existing directory (validated at seal time). Evidence paths
+  and machine-check CWDs resolve against it; when absent, evidence
+  resolves against the dhriti home, never the shell's CWD.
+- `declared_unknowns` — optional list of `{topic, current_state:
+  unknown|partial}` (mechanism 4: declared uncertainty instead of
+  false certainty).
+- The full D-030 group is required: `main_belief {label}`,
+  `main_belief_metric`, `main_belief_current_state`,
+  `substitute_activities`, `substitute_budget`.
+
+`parking_lot` gains: `kind` (question|resource|desire|association),
+`sparked_by_url`, `sparked_by_event_id`, `evening_surfaced_at`,
+`review_surfaced_at`, `approved_to_contract_day`. `disposition` is
+NULL while an item is open (migration v5 rebuilds the column as
+nullable).
+
+Events added in v0.6.0: `contract_draft_written`, `contract_revised`,
+`parking_evening_surfaced`, `parking_review_surfaced`,
+`parking_approved_to_contract`, `parking_flood`, `parking_graveyard`,
+`vidura_identity_not_spaced`, `health_check_run` (with
+`extension_bridge_probe`), `heartbeat_pruned`,
+`builder_clause_overridden_by_allowlist`.
+
+Schema version: 5 (migration v4 drops orphan identity_line Vidura
+items; v5 rebuilds parking_lot with the resurfacing columns).

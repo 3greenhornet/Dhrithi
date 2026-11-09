@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 5
 
 APP_NAME = "dhriti"
 HOMEDIR_ENV = "DHRITI_HOME"

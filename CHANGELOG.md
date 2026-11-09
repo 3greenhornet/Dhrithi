@@ -5,6 +5,56 @@ test suite, and each release line states the decision-register rows
 (`docs/DECISIONS_PROPOSED.md`) it implements. Formats follow the
 project's own rules — facts and dates, no spin.
 
+## v0.6.0 — 2026-11-09 — the restoration and resurfacing batch
+
+> Rebuilt this session from the v0.3.0 bundle after the sandbox
+> recycle; this is the version the uploaded v0.6.0 specification
+> (Parts 1 and 2) was written against, applied in full.
+
+### Fixes (Part 1)
+- Bug A: health probes the bridge over HTTP with the real token — a
+  CLI process no longer reports a healthy daemon as DEGRADED
+- Bug B: identity_line removed from Vidura (unsolvable card); the
+  identity statement leads the day report; vidura ingest records
+  vidura_identity_not_spaced; migration v4
+- Bug C: --date on seal no longer silently overrides the file's date
+- Bug D: evidence resolves against contract.workspace_dir (validated
+  absolute at seal), else the dhriti home — never CWD
+- Doc D-1, D-2: mooted honestly — the v0.5.0 rebuild wrote
+  docs/VIDURA.md §3 to match the code (the pseudocode and the
+  SM-2-variant note are the corrected forms); the behavior tests
+  (first-review = 1 day, second review < 6 days) hold
+
+### Restorations (Part 1)
+- D-030 group: five-field main-belief validation, exchange block in
+  the aftermath, the ritual asks all five
+- Review questions: the base's six restored + v0.5.0's three kept +
+  declared_thinking (mechanism 4) = ten fixed; leisure_honored and
+  curation_choice conditionals
+- Emergency threshold line in the digest (3 in 7 days)
+- Heartbeat prune guard persisted across daemon restarts (§9.1)
+- Config drift in health compares against the daemon's recorded
+  fingerprint (§9.2) — the dead self-comparison is gone
+- The demo exercises health, backup, vidura, journal, parking
+
+### Additions (Part 2)
+- Parking lot resurfacing: four kinds, sparks, evening surfacing at
+  the earned-evening moment, age-based review surfacing,
+  approved-to-contract (pre-seal only), flood/graveyard anti-drift,
+  break-glass linkage --from-parking-lot (D-067)
+- Mechanism 2: contract_revised (file-hash comparison at seal + the
+  draft revise service path)
+- Mechanism 4: declared_unknowns + the declared_thinking question
+- Mechanism 5: research pass grace period, default 120s (D-069)
+- Mechanism 10: research-to-application ratio per session, >2:1
+  flagged as a fact (D-070)
+- D-065..D-072 recorded in docs/DECISIONS_PROPOSED.md (D-071/D-072
+  are the spec's own ambiguity rows, opened per its rule)
+
+### Tests
+- Suite: 151 -> 195, all green (target per the spec was ~284 for the
+  original v0.5.0 base; the rebuild's honest count is recorded)
+
 ## v0.5.0 — 2026-11-09 — the surface rebuild + Vidura
 
 > Rebuilt 2026-11-09 from the v0.3.0 bundle after the sandbox recycle;

@@ -117,7 +117,7 @@ class TestParkingLot(DhritiTestCase):
     def test_park_and_dispose(self):
         row = self.parking.park("why does the JVM verify bytecode",
                                 source="curiosity while coding")
-        self.assertEqual(row["disposition"], "parked")
+        self.assertIsNone(row["disposition"])
         self.assertIn("curiosity_topic_parked",
                       [e["event_type"] for e in self.ledger.events()])
         done = self.parking.dispose(row["id"], "approved",
@@ -138,19 +138,32 @@ class TestParkingLot(DhritiTestCase):
     def test_pending_and_stats(self):
         a = self.parking.park("topic a")
         self.parking.park("topic b")
-        self.parking.dispose(a["id"], "dropped")
+        self.parking.dispose(a["id"], "dropped",
+                             note="not worth the time, honestly")
         self.assertEqual(len(self.parking.pending()), 1)
         self.assertEqual(self.parking.stats(),
                          {"parked": 1, "dropped": 1})
 
+    def test_dropped_requires_a_reason(self):
+        """The abandonment ritual: dropping is a decision with a
+        one-line reason — cold-state feedback, not a silent
+        disappearance."""
+        row = self.parking.park("topic a")
+        with self.assertRaises(ValueError) as ctx:
+            self.parking.dispose(row["id"], "dropped")
+        self.assertIn("one-line reason", str(ctx.exception))
+
 
 class TestColdReview(DhritiTestCase):
-    def test_six_fixed_questions_exist(self):
+    def test_ten_fixed_questions_exist(self):
         keys = {k for k, _ in REVIEW_QUESTIONS}
-        self.assertEqual(len(REVIEW_QUESTIONS), 6)
-        for key in ("competence_source", "targets_honest",
+        self.assertEqual(len(REVIEW_QUESTIONS), 10)
+        for key in ("competence_source", "faking_it", "wall_or_choice",
+                    "out_of_scope_device", "evidence_quality",
+                    "surveillance_comfort", "targets_honest",
                     "toll_worth_it",
-                    "what_would_make_tomorrow_sealable"):
+                    "what_would_make_tomorrow_sealable",
+                    "declared_thinking"):
             self.assertIn(key, keys)
 
     def test_answers_stored_outside_ledger_payload(self):
@@ -171,9 +184,9 @@ class TestColdReview(DhritiTestCase):
 
     def test_leisure_question_conditional(self):
         qs = self.review.questions_for(leisure_declared=False)
-        self.assertEqual(len(qs), 6)
+        self.assertEqual(len(qs), 10)
         qs = self.review.questions_for(leisure_declared=True)
-        self.assertEqual(len(qs), 7)
+        self.assertEqual(len(qs), 11)
         self.assertIn("leisure_honored", {k for k, _ in qs})
 
 
@@ -287,3 +300,52 @@ class TestSpecimenCoder(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRestoredQuestions(unittest.TestCase):
+    """v0.6.0 Part 1 §6: the base's six questions are authoritative;
+    the v0.5.0 additions that do not overlap are kept."""
+
+    def test_base_six_questions_all_present(self):
+        keys = {k for k, _ in REVIEW_QUESTIONS}
+        for required in ("competence_source", "faking_it",
+                         "wall_or_choice", "out_of_scope_device",
+                         "evidence_quality", "surveillance_comfort"):
+            self.assertIn(required, keys,
+                          f"base question {required!r} missing")
+
+    def test_v050_additions_present(self):
+        keys = {k for k, _ in REVIEW_QUESTIONS}
+        for kept in ("targets_honest", "toll_worth_it",
+                     "what_would_make_tomorrow_sealable"):
+            self.assertIn(kept, keys)
+
+    def test_curation_choice_conditional(self):
+        from dhriti.review import CONDITIONAL_QUESTIONS
+        self.assertIn("curation_choice", CONDITIONAL_QUESTIONS)
+
+    def test_ten_fixed_questions(self):
+        self.assertEqual(len(REVIEW_QUESTIONS), 10)
+
+
+class TestDigestV060(DhritiTestCase):
+    def test_emergency_threshold_line(self):
+        """§9.3: 3+ emergency exits in the week get the threshold
+        line; below it, the line is absent."""
+        from dhriti.models import SessionState
+        self.seal_today()
+        day = self.days.today()
+        day = self.days.try_open(day, self.contracts.for_day(day["date"]))
+        session = self.sessions.create(day["id"], "c1")
+        self.walk_to_active(session["id"])
+        for i in range(3):
+            self.breaks.emergency(
+                session["id"], f"production incident {i}",
+                session_finish=lambda sid: None)
+        text = build_digest(self.db, self.ledger, "2026-11-02",
+                            self.config, self.clock)
+        self.assertIn("3 in 7 days", text)
+        # and absent below the threshold
+        text2 = build_digest(self.db, self.ledger, "2026-11-09",
+                             self.config, self.clock)
+        self.assertNotIn("in 7 days. The pattern", text2)

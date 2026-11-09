@@ -62,7 +62,8 @@ class Context:
         self.sessions = SessionService(self.db, self.clock)
         self.evidence = EvidenceService(self.db, self.clock,
                                         home=self.home)
-        self.passes = ResearchService(self.db, self.config, self.clock)
+        self.passes = ResearchService(self.db, self.config, self.clock,
+                                  self.ledger)
         self.bootcamp = BootcampService(self.db, self.config, self.clock)
         self.breaks = BreakGlassService(
             self.db, self.config, self.clock, self.ledger)
@@ -145,10 +146,20 @@ def cmd_ritual(args, ctx):
                 "identity statement (one sentence)"),
             "contract_line": _ask(
                 "the contract line — today's goal, one line"),
-            "main_belief": {"label": _ask(
-                "main belief (e.g. compiler practice)")},
-            "targets": [],
         }
+        print("--- the main belief (D-030; honest, cold, no audience) ---")
+        payload["main_belief"] = {"label": _ask(
+            "main belief (e.g. compiler practice)")}
+        payload["main_belief_metric"] = _ask(
+            "what would prove the belief is becoming real")
+        payload["main_belief_current_state"] = _ask(
+            "current state, honest (e.g. behind on the C book chapters)")
+        payload["substitute_activities"] = _ask_list(
+            "known substitute activities (comma separated)")
+        payload["substitute_budget"] = _ask(
+            "substitute budget while the belief is healthy",
+            "3 hours per week")
+        payload["targets"] = []
         while True:
             label = _ask("target label (enter to finish targets)")
             if not label:
@@ -187,14 +198,22 @@ def cmd_contract_write(args, ctx):
 
 
 def _seal_target_date(args, ctx) -> str:
-    """v0.5.0 behaviour (Bug C, fixed in v0.6.0 Part 1 §3): an explicit
-    --date wins over the file's own date, silently."""
+    """Bug C fix (v0.6.0 Part 1 §3): the file's own date is
+    authoritative. --date is accepted only when it matches the file's
+    date (or when the file name carries no date at all)."""
     explicit = _parse_date_arg(getattr(args, "date", None))
+    file_match = _CONTRACT_FILE_RE.match(Path(args.file).name)
+    file_date = file_match.group(1) if file_match else None
+
+    if file_date and explicit and file_date != explicit:
+        raise SystemExit(
+            f"date mismatch: the file is named for {file_date} but "
+            f"--date says {explicit}. The file's date is authoritative; "
+            "either rename the file or drop --date.")
+    if file_date:
+        return file_date
     if explicit:
         return explicit
-    file_match = _CONTRACT_FILE_RE.match(Path(args.file).name)
-    if file_match:
-        return file_match.group(1)
     return ctx.days.today()["date"]
 
 
@@ -212,6 +231,28 @@ def cmd_contract_seal(args, ctx):
         observed={"date": date, "file": str(path),
                   "contract_id": contract["id"]},
         action_taken="sealed cold; the day may open")
+    # Mechanism 2 (v0.6.0 Part 2 §2.1): a draft that was written,
+    # edited, and then sealed emits contract_revised — the fact of
+    # the revision is recorded, whatever path edited the file.
+    draft_events = ctx.ledger.events(event_type="contract_draft_written")
+    prior_hash = None
+    for ev in draft_events:
+        try:
+            observed = json.loads(ev["observed_payload"])
+        except Exception:
+            continue
+        if observed.get("date") == date:
+            prior_hash = observed.get("sha256")  # last wins
+    if prior_hash:
+        current_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        if prior_hash != current_hash:
+            ctx.ledger.record(
+                "contract_revised",
+                case_id=f"day-{date}",
+                observed={"date": date,
+                          "prior_sha256": prior_hash,
+                          "final_sha256": current_hash},
+                action_taken="draft revised before seal")
     print(f"sealed: {contract['id'][:8]} for {date}")
     win = resolve_window(_dt.date.fromisoformat(date), ctx.config)
     print(f"day window: {win.window_start.astimezone(local_tz(ctx.config.get('timezone', 'UTC'))):%H:%M} .. "
@@ -294,12 +335,24 @@ def cmd_break_initiate(args, ctx):
 def cmd_break_confirm(args, ctx):
     from .models import SessionState
 
+    parked_id = args.from_parking_lot
+    item = None
+    if parked_id:
+        item = ctx.parking.get(parked_id)
+        if item is None:
+            raise SystemExit(f"no parked item {parked_id}")
+        if item["disposition"]:
+            raise SystemExit(
+                f"item is already {item['disposition']}; cannot use "
+                "as break-glass justification")
+
     def finish(session_id):
         ctx.sessions.finish(session_id, SessionState.BREAK_GLASS)
 
     try:
         row = ctx.breaks.confirm(args.id, args.reason,
-                                 session_finish=finish)
+                                 session_finish=finish,
+                                 parked_item_id=parked_id)
     except BreakGlassError as exc:
         raise SystemExit(f"not confirmed: {exc}")
     print(f"break confirmed ({row['kind']}); "
@@ -308,6 +361,9 @@ def cmd_break_confirm(args, ctx):
     if row["penalty_declared"]:
         print("declared penalties (yours, from the cold state): "
               + "; ".join(row["penalty_declared"]))
+    if parked_id and item is not None:
+        print(f"linked to parked item {parked_id[:8]}: "
+              f"{item['question']}")
 
 
 def cmd_break_emergency(args, ctx):
@@ -549,26 +605,59 @@ def cmd_ignite(args, ctx):
 
 def cmd_park(args, ctx):
     active = ctx.sessions.active()
-    row = ctx.parking.park(
-        args.question, source=args.source or "cli",
-        session_id=active["id"] if active else None)
-    print(f"parked ({row['id'][:8]}): {row['question']}")
-    print("(deferred to cold review; back to the task)")
+    try:
+        row = ctx.parking.park(
+            args.question, kind=args.kind or "question",
+            source=args.source or "cli",
+            sparked_by_url=args.sparked_by,
+            sparked_by_event_id=args.sparked_by_event,
+            session_id=active["id"] if active else None)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    print(f"parked ({row['id'][:8]}) [{row['kind']}]: "
+          f"{row['question']}")
 
 
 def cmd_parking(args, ctx):
     if args.sub == "list":
         for row in ctx.parking.open_items():
-            spark = (f" (sparked by: {row['source']})"
-                     if row.get("source") else "")
-            print(f"- [{row['id'][:8]}] {row['question']}{spark}")
+            spark = (f" (sparked by: {row['sparked_by_url']})"
+                     if row.get("sparked_by_url") else "")
+            print(f"- [{row['id'][:8]}] [{row['kind']}] "
+                  f"{row['question']}{spark}")
         if not ctx.parking.open_items():
             print("(the parking lot is empty)")
+    elif args.sub == "evening":
+        day = args.date or _local_today(ctx)
+        items = ctx.parking.surface_evening(day)
+        if not items:
+            print(f"nothing parked on {day}")
+            return
+        print(f"The evening is yours. {len(items)} parked today:")
+        for row in items:
+            print(f"- [{row['kind']}] {row['question']}")
+    elif args.sub == "review":
+        items = ctx.parking.surface_review(min_age_days=3)
+        if not items:
+            print("nothing older than 3 days is open")
+            return
+        print(f"{len(items)} older items:")
+        for row in items:
+            age = (ctx.clock.now_utc()
+                   - parse_iso(row["created_at"])).days
+            print(f"- [{row['kind']}] {row['question']} ({age} days)")
 
 
 def cmd_parking_dispose(args, ctx):
-    row = ctx.parking.dispose(args.id, args.disposition,
-                              note=args.note or "")
+    try:
+        row = ctx.parking.dispose(args.id, args.disposition,
+                                  note=args.note or "")
+        if args.disposition == "approved" and args.to_contract:
+            ctx.parking.dispose_approved_to_contract(
+                args.id, args.to_contract)
+            print(f"approved for {args.to_contract} research fallback")
+    except ValueError as exc:
+        raise SystemExit(str(exc))
     print(f"{row['disposition']}: {row['question']}")
     if row["disposition"] == "approved":
         print("add it to the next contract's allowed_tools or research "
@@ -712,6 +801,15 @@ def cmd_declare(args, ctx):
 def cmd_vidura_ingest(args, ctx):
     """Ingest a day's returned research-pass answers as spaced items."""
     date = args.date or _local_today(ctx)
+    # Bug B (v0.6.0): identity statements are shown in the day report,
+    # never spaced. The ingest command records that decision honestly
+    # whenever the date carries a sealed contract.
+    if ctx.contracts.for_day(date) is not None:
+        ctx.ledger.record(
+            "vidura_identity_not_spaced",
+            observed={"date": date,
+                      "note": "identity statements are shown, not spaced"},
+            action_taken="considered and rejected as a card (D-065)")
     items = ctx.vidura.ingest_pass_answers(date)
     if not items:
         print(f"no returned research passes on {date} to ingest")
@@ -747,10 +845,13 @@ def cmd_health(args, ctx):
     print(f"Overall: {report.overall}")
     ctx.ledger.record(
         "health_check_run",
-        observed={"overall": report.overall},
+        observed={"overall": report.overall,
+                  "extension_bridge_probe":
+                      report.extension_bridge_probe},
         action_taken="health checked")
-    if report.overall != "OK":
-        sys.exit(1)
+    # explicit exit codes: 0 = OK, 1 = DEGRADED or BROKEN (a clean
+    # run is a fact, not the absence of a failure)
+    sys.exit(0 if report.overall == "OK" else 1)
 
 
 def cmd_backup(args, ctx):
@@ -916,6 +1017,9 @@ def build_parser() -> argparse.ArgumentParser:
     bc = bsub.add_parser("confirm", help="confirm with a typed reason")
     bc.add_argument("id")
     bc.add_argument("--reason", required=True)
+    bc.add_argument("--from-parking-lot", dest="from_parking_lot",
+                    default=None,
+                    help="parked item id this break is for")
     bc.set_defaults(func=cmd_break_confirm)
     be = bsub.add_parser("emergency", help="D-019 immediate path")
     be.add_argument("--reason", default="")
@@ -990,13 +1094,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("park", help="curiosity parking lot (one line)")
     p.add_argument("question", nargs="?", default="")
+    p.add_argument("--kind", default="question",
+                   choices=["question", "resource", "desire",
+                            "association"])
     p.add_argument("--source", default=None,
-                   help="where it came from (url, event id)")
+                   help="where it came from")
+    p.add_argument("--sparked-by", dest="sparked_by", default=None,
+                   help="URL that sparked this")
+    p.add_argument("--sparked-by-event", dest="sparked_by_event",
+                   default=None, help="event id that sparked this")
     p.set_defaults(func=cmd_park)
 
     p = sub.add_parser("parking", help="the parking lot, cold")
     psub = p.add_subparsers(dest="sub", required=True)
     psub.add_parser("list")
+    ev = psub.add_parser("evening",
+                         help="surface today's parked items (earned)")
+    ev.add_argument("--date", default=None)
+    rv = psub.add_parser("review",
+                         help="surface older open items (cold)")
     p.set_defaults(func=cmd_parking)
 
     p = sub.add_parser("parking-dispose", help="dispose a parked item")
@@ -1004,6 +1120,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("disposition",
                    choices=["approved", "dropped", "explored"])
     p.add_argument("--note", default="")
+    p.add_argument("--to-contract", dest="to_contract", default=None,
+                   help="YYYY-MM-DD: the contract day this becomes a "
+                        "research fallback for")
     p.set_defaults(func=cmd_parking_dispose)
 
     p = sub.add_parser("review", help="cold review question protocol")

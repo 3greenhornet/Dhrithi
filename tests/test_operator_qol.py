@@ -103,3 +103,127 @@ class TestConfigCli(DhritiTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHealthV060(DhritiTestCase):
+    """Bug A + §9.2: the bridge is probed over HTTP; config drift is
+    compared against the daemon's recorded fingerprint."""
+
+    def test_health_with_daemon_running_reports_bridge_ok(self):
+        """Bug A: the old health check reported DEGRADED whenever the
+        daemon lock existed but the probe was made from a CLI process.
+        The new probe is an HTTP call, not an adapter method call."""
+        from dhriti.daemon import Daemon
+        import argparse, contextlib, io
+        from dhriti.cli import cmd_health
+
+        # start a real daemon+bridge on an ephemeral port
+        self.config["bridge"]["port"] = 0
+        daemon = Daemon(self.home, self.config, clock=self.clock)
+        daemon.bridge.start()
+        daemon._publish()  # a running daemon publishes its status
+        real_port = daemon.bridge.port_bound
+
+        # write the daemon lock so health sees daemon_running=True
+        (self.home / "daemon.lock").write_text(
+            str(__import__("os").getpid()))
+
+        # health runs from a separate Context (as the CLI would)
+        ctx = self.make_cli_context()
+        # point the health probe at the real port
+        ctx.config["bridge"]["port"] = real_port
+        out = io.StringIO()
+        exit_code = None
+        try:
+            with contextlib.redirect_stdout(out):
+                try:
+                    cmd_health(argparse.Namespace(), ctx)
+                except SystemExit as exc:
+                    exit_code = exc.code
+        finally:
+            ctx.close()
+            daemon.bridge.stop()
+            (self.home / "daemon.lock").unlink(missing_ok=True)
+            daemon.db.close()
+
+        text = out.getvalue()
+        self.assertNotIn("[warn] adapter.extension_bridge", text)
+        self.assertNotIn("[FAIL] adapter.extension_bridge", text)
+        self.assertIn("[ok  ] adapter.extension_bridge", text)
+        self.assertEqual(exit_code, 0)
+
+    def test_health_bridge_down_with_lock_reports_warn(self):
+        from dhriti.daemon import Daemon
+        import argparse, contextlib, io
+        from dhriti.cli import cmd_health
+
+        self.config["bridge"]["port"] = 0
+        daemon = Daemon(self.home, self.config, clock=self.clock)
+        # bridge NOT started; lock present
+        (self.home / "daemon.lock").write_text(
+            str(__import__("os").getpid()))
+        ctx = self.make_cli_context()
+        ctx.config["bridge"]["port"] = daemon.bridge.port or 0
+        out = io.StringIO()
+        exit_code = None
+        try:
+            with contextlib.redirect_stdout(out):
+                try:
+                    cmd_health(argparse.Namespace(), ctx)
+                except SystemExit as exc:
+                    exit_code = exc.code
+        finally:
+            ctx.close()
+            (self.home / "daemon.lock").unlink(missing_ok=True)
+            daemon.db.close()
+        self.assertIn("[warn] adapter.extension_bridge", out.getvalue())
+        self.assertEqual(exit_code, 1)
+
+    def test_config_drift_detected_from_disk(self):
+        from dhriti.daemon import Daemon
+        daemon = Daemon(self.home, self.config, clock=self.clock)
+        daemon._tick()  # writes daemon_config_fingerprint to meta
+        daemon.db.close()
+
+        # user edits config while the daemon is "running"
+        (self.home / "dhriti.config.json").write_text(
+            '{"day_window": {"start": "09:00"}}', encoding="utf-8")
+
+        # health catches the drift
+        import argparse, contextlib, io
+        from dhriti.cli import cmd_health
+        ctx = self.make_cli_context()
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                try:
+                    cmd_health(argparse.Namespace(), ctx)
+                except SystemExit:
+                    pass
+        finally:
+            ctx.close()
+        self.assertIn("[warn] config.drift", out.getvalue())
+
+    def test_no_drift_when_disk_matches_daemon(self):
+        import json as _json
+        from dhriti.daemon import Daemon
+        # the same config the daemon loads must be on disk, or the
+        # comparison is meaningless
+        (self.home / "dhriti.config.json").write_text(
+            _json.dumps(self.config), encoding="utf-8")
+        daemon = Daemon(self.home, self.config, clock=self.clock)
+        daemon._tick()
+        daemon.db.close()
+        import argparse, contextlib, io
+        from dhriti.cli import cmd_health
+        ctx = self.make_cli_context()
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                try:
+                    cmd_health(argparse.Namespace(), ctx)
+                except SystemExit:
+                    pass
+        finally:
+            ctx.close()
+        self.assertIn("[ok  ] config.drift", out.getvalue())

@@ -89,3 +89,135 @@ class TestStateMachine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMainBeliefGroup(DhritiTestCase):
+    """D-030 restoration (v0.6.0 Part 1 §5): the five-field group is
+    required as a unit."""
+
+    def test_all_five_fields_required(self):
+        base = daily_payload()
+        self.contracts.validate(base)  # all five present: passes
+        for field in ("main_belief_metric",
+                      "main_belief_current_state",
+                      "substitute_activities",
+                      "substitute_budget"):
+            broken = dict(base)
+            del broken[field]
+            with self.assertRaises(ContractError) as ctx:
+                self.contracts.validate(broken)
+            self.assertIn("D-030", str(ctx.exception))
+            self.assertIn(field, str(ctx.exception))
+
+    def test_exchange_block_in_aftermath(self):
+        payload = daily_payload()
+        self.contracts.seal(self.today.isoformat(), payload)
+        md = self.aftermath.day_report(self.today.isoformat())["md"]
+        self.assertIn("## The exchange", md)
+        self.assertIn("parse_decl passes its test", md)
+        self.assertIn("behind on the C book chapters", md)
+        self.assertIn("reading about parsers, watched talks", md)
+        self.assertIn("2 hours per week", md)
+
+
+class TestNightWriteCLI(DhritiTestCase):
+    """Bug C (v0.6.0 Part 1 §3): the file's date is authoritative."""
+
+    def _write_contract(self, name):
+        import json as _json
+        path = self.home / name
+        path.write_text(_json.dumps(daily_payload()),
+                        encoding="utf-8")
+        return path
+
+    def test_seal_date_mismatch_is_refused(self):
+        """Bug C: sealing with --date != the file's date was silently
+        accepted, storing a payload written for one day as another's
+        contract."""
+        from dhriti.timeutil import parse_iso
+        self.clock.set(parse_iso("2026-11-02T16:00:00Z"))  # 21:30 IST
+        path = self._write_contract("contract-2026-11-02.json")
+        with self.assertRaises(SystemExit) as ctx:
+            self._run("cmd_contract_seal",
+                      {"file": str(path), "date": "2026-11-03"})
+        self.assertIn("date mismatch", str(ctx.exception))
+
+    def test_seal_date_matches_file_date(self):
+        from dhriti.timeutil import parse_iso
+        self.clock.set(parse_iso("2026-11-02T16:00:00Z"))
+        self.days.ensure_day("2026-11-03")
+        path = self._write_contract("contract-2026-11-03.json")
+        self._run("cmd_contract_seal",
+                  {"file": str(path), "date": "2026-11-03"})
+        self.assertIsNotNone(self.contracts.for_day("2026-11-03"))
+
+    def test_seal_date_when_file_has_no_date(self):
+        """The explicit --date still works when the file name carries
+        no date (a hand-authored payload)."""
+        from dhriti.timeutil import parse_iso
+        self.clock.set(parse_iso("2026-11-02T16:00:00Z"))
+        path = self._write_contract("my-contract.json")
+        self._run("cmd_contract_seal",
+                  {"file": str(path), "date": "2026-11-03"})
+        self.assertIsNotNone(self.contracts.for_day("2026-11-03"))
+
+
+class TestMechanismsV060(DhritiTestCase):
+    def test_contract_revised_event(self):
+        """Mechanism 2: a draft written, edited, and sealed emits a
+        contract_revised event."""
+        import json, hashlib
+        from dhriti.timeutil import parse_iso
+        self.clock.set(parse_iso("2026-11-02T02:00:00Z"))
+        payload = daily_payload()
+        path = self.home / "contract-2026-11-02.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        # a draft_written event with the file's hash
+        self.ledger.record(
+            "contract_draft_written",
+            observed={"date": "2026-11-02", "path": str(path),
+                      "sha256": hashlib.sha256(
+                          path.read_bytes()).hexdigest()},
+            action_taken="draft written")
+        # edit the file (a valid change)
+        payload["contract_line"] = "revised line, still valid"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        # seal
+        self._run("cmd_contract_seal",
+                  {"file": str(path), "date": None})
+        events = self.ledger.events(event_type="contract_revised")
+        self.assertEqual(len(events), 1)
+
+    def test_declared_unknowns_recorded(self):
+        """Mechanism 4: uncertainty declared explicitly, shown in the
+        day report's exchange block."""
+        payload = daily_payload()
+        payload["declared_unknowns"] = [
+            {"topic": "how type inference works",
+             "current_state": "unknown"},
+            {"topic": "parser combinator performance",
+             "current_state": "partial"},
+        ]
+        self.contracts.seal(self.today.isoformat(), payload)
+        md = self.aftermath.day_report(self.today.isoformat())["md"]
+        self.assertIn("Declared unknowns", md)
+        self.assertIn("how type inference works", md)
+
+    def test_revise_draft_records_event(self):
+        """Mechanism 2 (service path): revising a DRAFT re-validates
+        and records; sealed contracts refuse revision."""
+        from dhriti.models import ContractKind
+        cid = self.contracts.create_draft(
+            ContractKind.DAILY, "2026-11-05", daily_payload())
+        row = self.contracts.revise(
+            cid, {"contract_line": "a better line"},
+            reason="the target was wrong, cold-state fix")
+        self.assertEqual(row["payload"]["contract_line"],
+                         "a better line")
+        events = self.ledger.events(event_type="contract_revised")
+        self.assertEqual(len(events), 1)
+        # sealed contracts are immutable
+        self.contracts.seal_id(cid)
+        with self.assertRaises(ContractError):
+            self.contracts.revise(cid, {"contract_line": "nope"},
+                                  reason="too late")

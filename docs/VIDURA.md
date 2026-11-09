@@ -19,7 +19,7 @@ question you asked; the reveal is the answer you typed.
 | Kind | Source | Example |
 |---|---|---|
 | research_answer | a returned research pass | "does Arrays.asList reverse in place?" |
-| identity_line | the contract's identity statement | (v0.5.0; see the v0.6.0 correction) |
+| identity_line | not ingested — identity statements are shown in the day report, not spaced. (Recalling them is not the goal; seeing them is.) |
 | note | a hand-added item | `dhriti` has no CLI for this yet — service only |
 
 ## 3. The scheduler (an SM-2 variant)

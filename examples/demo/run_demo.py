@@ -34,6 +34,11 @@ CONTRACT = {
     "identity_statement": "I am someone who ships code daily",
     "contract_line": "reverse the array in Java, in place",
     "main_belief": {"label": "compiler practice"},
+    "main_belief_metric": "parse_decl passes its test",
+    "main_belief_current_state": "behind on the C book chapters",
+    "substitute_activities": ["reading about parsers",
+                              "watched talks"],
+    "substitute_budget": "2 hours per week",
     "profile": "coding",
     "targets": [
         {"label": "reversal passes its test",
@@ -153,7 +158,17 @@ def main():
     stats = daemon.bootcamp.evidence_summary()
     print(f"bootcamp stats: {json.dumps(stats)}")
 
-    banner("8b/10  the evening: declared rest, and one drift (D-046/D-047)")
+    banner("8a/10  a curiosity appears mid-session -> parked, not followed")
+    from dhriti.review import ParkingLotService
+    parking = ParkingLotService(daemon.db, clock, daemon.ledger)
+    parked = parking.park(
+        "why does the JVM verifier exist at all",
+        kind="question", source="demo",
+        sparked_by_url="https://youtube.com/watch?v=some-talk")
+    print(f"parked ({parked['id'][:8]}) [{parked['kind']}]: "
+          f"{parked['question']}")
+
+    banner("8b/10  the evening: declared rest, drift, and the parked list")
     from dhriti.leisure import LeisureService
     clock.set(_dt.datetime(2026, 11, 2, 15, 45, tzinfo=UTC))  # 21:15 IST
     LeisureService(daemon.db, clock, daemon.ledger).declare(
@@ -170,6 +185,12 @@ def main():
         "browser_navigation", source_adapter="extension",
         observed={"url": "https://www.reddit.com", "title": ""})
     print("declared: one episode (45 min); observed: 1 rest, 1 drift")
+    # the earned evening: the day's targets were met, so the parked
+    # items are handed back (surface_evening)
+    clock.set(_dt.datetime(2026, 11, 2, 16, 0, tzinfo=UTC))
+    evening_items = parking.surface_evening("2026-11-02")
+    for item in evening_items:
+        print(f"evening: [{item['kind']}] {item['question']}")
 
     banner("9/10  Vidura: the day's pass answer becomes a spaced item")
     from dhriti.vidura import ViduraService
@@ -180,7 +201,12 @@ def main():
         print(f"vidura: [{item['kind']}] {item['front'][:60]}")
         print(f"         due {item['due_at']}")
 
-    banner("10/10  aftermath + backup + verification")
+    banner("10/10  aftermath + backup + health + verification")
+    from dhriti.journal import JournalService
+    journal = JournalService(home, clock)
+    journal.add("the demo day ran clean; the wall held")
+    print(f"journal: entry stored in {journal.path}")
+    journal.close()
     paths = daemon.run_aftermath(daemon._local_today().isoformat())
     print(f"report: {paths['markdown']}")
     from dhriti.backup import BackupService
@@ -190,6 +216,13 @@ def main():
           f"(chain verified: {manifest.get('chain_verified_after')})")
     verify = daemon.ledger.verify_chain()
     print(f"ledger chain: ok={verify['ok']} events={verify['checked']}")
+    from dhriti.health import build_health
+    report = build_health(home, config, clock, db=daemon.db,
+                          ledger=daemon.ledger)
+    for line in report.lines:
+        if line.startswith("[ok  ]"):
+            print(f"health: {line}")
+    print(f"health: Overall: {report.overall}")
     anchor = daemon.ledger.write_anchor(note="demo end")
     print(f"anchor head: {anchor['head_hash'][:32]}...")
 

@@ -35,11 +35,17 @@ class TestDaemonIntegration(DhritiTestCase):
         # 4. session start through the arming gate
         sess = daemon.start_session("reverse the array")
         self.assertEqual(sess["state"], SessionState.ACTIVE.value)
-        # 5. proof: the contract's declared command, machine-checked
+        # 5. proof: the contract's declared command, machine-checked,
+        #    plus the declared file target
         ev = daemon.evidence.machine_check_command(
             sess["id"], "reversal passes its test",
             daily_payload()["targets"][0]["evidence"]["command"])
         self.assertEqual(ev["verdict"], "ACCEPTED")
+        (daemon.home / "notes.md").write_text("notes", encoding="utf-8")
+        ev2 = daemon.evidence.submit_file(
+            sess["id"], "notes written",
+            str(daemon.home / "notes.md"))
+        self.assertEqual(ev2["verdict"], "ACCEPTED")
         # 6. session success
         daemon.end_session_success(sess["id"])
         # 7. simulate a browser event through the bridge wiring
@@ -253,3 +259,29 @@ class TestBuilderClauseAllowlist(DhritiTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHeartbeatRetention(DhritiTestCase):
+    def test_prune_survives_daemon_restart(self):
+        """§9.1: the once-per-day prune guard is persisted in meta —
+        a restarting daemon does not re-prune on the same day."""
+        daemon1 = self.make_daemon()
+        daemon1._tick()   # prunes (nothing old) and stamps today
+        daemon1.db.close()
+
+        daemon2 = self.make_daemon()
+        # a stale heartbeat exists; without the persisted guard the
+        # restart would prune it again on the same day
+        daemon2.db.execute(
+            "INSERT INTO heartbeat (at_utc) VALUES (?)",
+            ("2026-10-01T00:00:00Z",))
+        daemon2._tick()
+        # the guard persisted: no re-prune on the same day
+        self.assertEqual(
+            len(self.ledger.events(event_type="heartbeat_pruned")), 0)
+        # and the stale row survives until tomorrow's prune
+        rows = daemon2.db.query("SELECT * FROM heartbeat")
+        self.assertTrue(any(r["at_utc"] == "2026-10-01T00:00:00Z"
+                            for r in rows))
+        daemon2.release_lock()
+        daemon2.db.close()

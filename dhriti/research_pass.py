@@ -36,9 +36,10 @@ def _default_sources() -> list:
 
 class ResearchService:
     def __init__(self, db: Database, config: dict,
-                 clock: Optional[Clock] = None):
+                 clock: Optional[Clock] = None, ledger=None):
         self.db = db
         self.config = config
+        self.ledger = ledger
         self.default_max_minutes = int(
             config.get("research_pass", {}).get("default_max_minutes", 20))
         self.clock = clock or RealClock()
@@ -93,9 +94,11 @@ class ResearchService:
 
     def return_pass(self, answer: str, pass_id: Optional[str] = None) -> dict:
         """Return from the pass with the answer (typed, kept for the
-        cold review and the Vidura ingest)."""
+        cold review and the Vidura ingest). v0.6.0 (mechanism 5): a
+        return inside the grace window is accepted — the sources were
+        already gone; the answer still lands."""
         if pass_id is None:
-            row = self.active()
+            row = self.active() or self.open_pass_in_grace()
             if row is None:
                 raise ResearchPassError("no open pass to return from")
             pass_id = row["id"]
@@ -119,29 +122,57 @@ class ResearchService:
             "state": ResearchPassState.EXPIRED.value,
             "expired_at": self.clock.iso(),
         })
+        if self.ledger is not None:
+            self.ledger.record(
+                "research_pass_expired",
+                observed={"pass": pass_id},
+                action_taken="sources no longer allowed (grace over)")
         return self.get(pass_id)
 
-    def expire_overdue(self, grace_seconds: int = 0) -> list:
-        """Daemon tick: expire OPEN passes past their expiry (v0.5.0:
-        hard expiry at expires_at; see v0.6.0 mechanism 5 for the grace
-        period that accepts a mid-paragraph return)."""
+    def expire_overdue(self, grace_seconds: int = 120) -> list:
+        """Daemon tick: expire OPEN passes past their expiry. v0.6.0
+        (mechanism 5): a grace period (default 120s) accepts a return
+        typed mid-paragraph — the pass stays OPEN during grace so the
+        answer still lands, but the sources are already gone."""
         expired = []
         for row in self.db.query(
                 "SELECT id, expires_at FROM research_pass "
                 "WHERE state='OPEN'"):
-            if self.clock.now_utc() > parse_iso(row["expires_at"]):
+            if self.clock.now_utc() > parse_iso(row["expires_at"]) \
+                    + timedelta(seconds=grace_seconds):
                 self.expire(row["id"])
                 expired.append(row["id"])
+            # else: still inside the grace window — the pass remains
+            # OPEN; return_pass still accepts the answer.
         return expired
 
     # -- queries ----------------------------------------------------------------
     def active(self, session_id: Optional[str] = None) -> Optional[dict]:
-        """The open, unexpired pass (optionally for one session)."""
+        """The open, unexpired pass (optionally for one session).
+        Inside the grace window the pass is still OPEN (the answer is
+        accepted) but active() reports None — the wall-clock allowance
+        is over."""
         rows = self.db.query(
             "SELECT * FROM research_pass WHERE state='OPEN' "
             "ORDER BY opened_at DESC")
         for row in rows:
             if parse_iso(row["expires_at"]) <= self.clock.now_utc():
+                continue
+            if session_id and row["session_id"] != session_id:
+                continue
+            row["sources"] = json.loads(row["sources_json"])
+            return row
+        return None
+
+    def open_pass_in_grace(self,
+                           session_id: Optional[str] = None) -> Optional[dict]:
+        """The pass inside its grace window: OPEN, past expires_at,
+        not yet expired. return_pass accepts its answer."""
+        rows = self.db.query(
+            "SELECT * FROM research_pass WHERE state='OPEN' "
+            "ORDER BY opened_at DESC")
+        for row in rows:
+            if parse_iso(row["expires_at"]) > self.clock.now_utc():
                 continue
             if session_id and row["session_id"] != session_id:
                 continue

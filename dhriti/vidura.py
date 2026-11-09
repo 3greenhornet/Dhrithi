@@ -27,10 +27,11 @@ GRADES = ("again", "hard", "good", "easy")
 EF_MIN, EF_MAX = 1.3, 2.5
 EF_DEFAULT = 2.5
 
-# Item kinds. `identity_line` exists in v0.5.0 and is REMOVED in
-# v0.6.0 (Bug B: an identity statement is shown, not spaced — serving
-# "2026-11-02 — identity" as a recall prompt is a category error).
-KINDS = ("research_answer", "identity_line", "note")
+# Item kinds (v0.6.0, Bug B): identity statements are NOT Vidura
+# items — they are shown at the top of the day report, never spaced
+# (serving "2026-11-02 — identity" as a recall prompt is a category
+# error: the user wrote it; there is nothing to recall from a date).
+KINDS = ("research_answer", "note")
 
 
 def _ef_update(ef: float, grade: str) -> float:
@@ -84,18 +85,15 @@ class ViduraService:
                 action_taken="item scheduled for spaced review")
         return self.item(item_id)
 
-    def ingest_identity_line(self, contract: dict) -> Optional[dict]:
-        """v0.5.0 mistake, removed in v0.6.0 (Bug B): an identity
-        statement is not a spaced item — there is nothing to recall
-        from a date the user wrote themselves."""
-        payload = contract.get("payload") or json.loads(
-            contract.get("payload_json") or "{}")
-        statement = payload.get("identity_statement")
-        if not statement:
-            return None
-        return self.add("identity_line",
-                        f"{contract['scope_date']} — identity", statement,
-                        day_date=contract["scope_date"])
+    def ingest_identity_line(self, contract: dict) -> None:
+        """v0.6.0 (Bug B): removed. Identity statements are not spaced
+        items; they are shown at the top of the day report. The method
+        intentionally no longer exists — this stub documents the
+        removal and raises so old callers fail loudly, not silently."""
+        raise AttributeError(
+            "ingest_identity_line was removed in v0.6.0 (Bug B): "
+            "identity statements are shown in the day report, not "
+            "spaced. See docs/VIDURA.md §2 and D-065.")
 
     def ingest_pass_answers(self, date: str, passes=None) -> list:
         """Ingest the research-pass answers returned on `date` as
