@@ -1,0 +1,7 @@
+{
+  "name": "com.dhriti.bridge",
+  "description": "Dhriti native messaging host (optional alternative to the HTTP bridge)",
+  "path": "REPLACE_WITH_ABSOLUTE_PATH_TO_dhriti_host.py",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://REPLACE_WITH_EXTENSION_ID/"]
+}

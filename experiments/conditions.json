@@ -1,0 +1,82 @@
+{
+  "protocol": "N-of-1 personal experiment (dossier section 10)",
+  "note": "Conditions are repeated on comparable tasks, order varied where practical. Never compare unlike tasks as if equivalent.",
+  "conditions": [
+    {
+      "id": "baseline",
+      "name": "Baseline observation",
+      "description": "Observation only; no new restriction. Several comparable sessions first.",
+      "enforcement": "off",
+      "launcher": false,
+      "if_then_plan": false,
+      "research_pass": false
+    },
+    {
+      "id": "A",
+      "name": "Restriction only",
+      "description": "Existing blocker, no custom detector. Does access restriction change the environment?",
+      "enforcement": "E1",
+      "launcher": false,
+      "if_then_plan": false,
+      "research_pass": false
+    },
+    {
+      "id": "B",
+      "name": "Restriction + workspace launcher",
+      "description": "Add ignite.ps1: open real project, files, terminal, first command.",
+      "enforcement": "E1",
+      "launcher": true,
+      "if_then_plan": false,
+      "research_pass": false
+    },
+    {
+      "id": "C",
+      "name": "Restriction + IF-THEN plan",
+      "description": "Add the cold-state obstacle plan (expected obstacle + response).",
+      "enforcement": "E1",
+      "launcher": true,
+      "if_then_plan": true,
+      "research_pass": false
+    },
+    {
+      "id": "D",
+      "name": "Best combination + bounded research",
+      "description": "Permit task dependencies through a finite research pass with expiry.",
+      "enforcement": "E1",
+      "launcher": true,
+      "if_then_plan": true,
+      "research_pass": true
+    },
+    {
+      "id": "E",
+      "name": "External accountability / environment",
+      "description": "Optional: body doubling, library, coworking. Low software cost.",
+      "enforcement": "E1",
+      "launcher": true,
+      "if_then_plan": true,
+      "research_pass": true,
+      "environment_change": true
+    }
+  ],
+  "three_questions": {
+    "experiment_A": "Does access restriction change the environment? (blocker vs OS allowlist vs restricted desktop)",
+    "experiment_B": "Can Dhriti reconstruct what happened? (event completeness and lineage)",
+    "experiment_C": "Which intervention improves execution? (restriction alone vs launcher vs IF-THEN vs bounded research)"
+  },
+  "measures": {
+    "primary": ["meaningful_task_progress", "accepted_milestones"],
+    "secondary": [
+      "time_to_first_meaningful_action",
+      "milestone_completion",
+      "artifact_quality",
+      "branch_count", "branch_duration",
+      "return_to_task_rate", "return_latency",
+      "false_positive_interventions", "missed_detours",
+      "break_glass_frequency",
+      "interruptions_and_recovery",
+      "offline_time",
+      "sustained_outcomes_after_novelty"
+    ],
+    "anti_measure": "screen_time_reduction alone is NOT a success measure"
+  }
+}

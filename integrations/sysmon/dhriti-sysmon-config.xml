@@ -1,0 +1,42 @@
+<!--
+  Dhriti narrow Sysmon profile (audit item 6 / dossier 5.2).
+  Deliberately MINIMAL: process create/terminate + parent + command
+  line + image hash + DNS queries. The verbose research profiles from
+  sysmon-modular are reference material, NOT continuous configuration —
+  measure log volume first.
+
+  Install (manual, admin PowerShell):
+    sysmon64 -accepteula -i dhriti-sysmon-config.xml
+
+  Export events for the adapter (admin):
+    wevtutil epl "Microsoft-Windows-Sysmon/Operational" events.evtx /lf:true
+    # convert to CSV (e.g. with EvtxECmd or PowerShell) into the
+    # export_dir configured below; the adapter archives parsed files.
+
+  Adapter config (~/.dhriti/dhriti.config.json):
+    "sysmon": {"enabled": true, "export_dir": "C:/Tools/dhriti-sysmon-out"}
+
+  Verify: dhriti adapter status
+-->
+<Sysmon schemaversion="4.90">
+  <EventFiltering>
+
+    <ProcessCreate onmatch="exclude">
+      <!-- capture all process creations; volume is bounded by the
+           eventlog itself. ProcessGuid + ParentGuid give lineage. -->
+    </ProcessCreate>
+
+    <ProcessTerminate onmatch="exclude">
+    </ProcessTerminate>
+
+    <!-- DNS queries: correlate research/branch behavior at the
+         resolver level (dossier 4.2: Sysmon -> provenance graph) -->
+    <DnsQuery onmatch="exclude">
+    </DnsQuery>
+
+    <!-- NOT enabled on purpose (volume/cost): NetworkConnect,
+         FileCreate, RegistryEvent, ImageLoad, CreateRemoteThread,
+         ProcessAccess, RawAccess* -->
+
+  </EventFiltering>
+</Sysmon>

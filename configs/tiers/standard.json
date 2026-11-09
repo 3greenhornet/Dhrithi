@@ -1,0 +1,17 @@
+{
+  "name": "standard",
+  "description": "Dossier 11.1 Standard tier: richer sequence reconstruction. Requires the manual installs in integrations/.",
+  "components": {
+    "core": ["contract/state machine", "sqlite ledger", "policy engine"],
+    "enforcement": ["extension_bridge (E1)", "hosts_file (E2, manual apply)"],
+    "observation": ["activitywatch", "sysmon (narrow profile)"],
+    "launcher": ["powershell ignite"],
+    "offline": ["pm4py (pip install pm4py)"]
+  },
+  "adapters": {
+    "activitywatch": {"enabled": true, "url": "http://127.0.0.1:5600"},
+    "sysmon": {"enabled": true, "export_dir": "C:/Tools/dhriti-sysmon-out"},
+    "screenpipe": {"enabled": false},
+    "hosts_file": {"enabled": true}
+  }
+}

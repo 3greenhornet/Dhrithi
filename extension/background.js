@@ -1,0 +1,247 @@
+/**
+ * Dhriti Wall — MV3 service worker.
+ *
+ * Behaviour (Wall Principle — PDF section 2.4):
+ *   - Fetches the policy from the local daemon bridge on an alarm.
+ *   - Applies declarativeNetRequest redirect rules for blocked domains.
+ *   - Redirected navigations land on blocked.html, which shows ONLY the
+ *     user's own contract line. No reasons, no copy, no engagement.
+ *   - Posts navigation events to the daemon (observation, not judgement).
+ *   - No badge text, no notifications, no sounds, nothing to argue with.
+ *
+ * Fail-safe design:
+ *   - No cached policy -> dormant (fail-open outside enforcement).
+ *   - Cached policy not expired + enforce=true -> keep enforcing even
+ *     if the daemon is unreachable (fail-closed during the window).
+ *   - Cached policy EXPIRED -> stop enforcing (a dead daemon can never
+ *     lock the browser forever). The TTL is chosen by the daemon.
+ *   - Queued events are capped; a dead daemon must not eat memory.
+ */
+
+importScripts("config.js");
+
+const RULE_OFFSET = 10000;      // our dynamic rule ids start here
+const MAX_RULES = 500;          // DNR dynamic rule cap safety
+const QUEUE_KEY = "eventQueue";
+const MAX_QUEUE = 200;
+const POLICY_KEY = "cachedPolicy";
+
+let currentRuleIds = [];
+
+async function fetchPolicy() {
+  const cfg = self.DHRITI_CONFIG;
+  try {
+    const resp = await fetch(cfg.bridgeUrl + "/policy", {
+      headers: { "X-Dhriti-Token": cfg.bridgeToken },
+      cache: "no-store",
+    });
+    if (!resp.ok) throw new Error("status " + resp.status);
+    const policy = await resp.json();
+    await chrome.storage.local.set({ [POLICY_KEY]: policy });
+    return policy;
+  } catch (err) {
+    // Bridge unreachable: fall back to the cached policy if still valid.
+    const stored = await chrome.storage.local.get(POLICY_KEY);
+    const cached = stored[POLICY_KEY];
+    if (cached && cached.expires_at && new Date(cached.expires_at) > new Date()) {
+      return cached; // fail-closed inside the TTL window
+    }
+    return { enforce: false, reason: "bridge unreachable and cache expired" };
+  }
+}
+
+function ruleFor(domain, idx) {
+  // Redirect main-frame navigations to the wall page. Sub-resources are
+  // blocked outright so the page cannot half-load around the wall.
+  const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [
+    {
+      id: RULE_OFFSET + idx * 2,
+      priority: 1,
+      action: {
+        type: "redirect",
+        redirect: { url: chrome.runtime.getURL("blocked.html") },
+      },
+      condition: {
+        urlFilter: "||" + domain + "^",
+        resourceTypes: ["main_frame"],
+      },
+    },
+    {
+      id: RULE_OFFSET + idx * 2 + 1,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        urlFilter: "||" + domain + "^",
+        resourceTypes: [
+          "sub_frame", "script", "image", "stylesheet", "media",
+          "xmlhttprequest", "other",
+        ],
+      },
+    },
+  ];
+}
+
+async function applyPolicy(policy) {
+  const wanted = [];
+  if (policy.enforce && Array.isArray(policy.blocked_domains)) {
+    // Honor the active research pass: temporarily allowed sources are
+    // excluded from blocking (bounded allowance, dossier 6.4).
+    const researchSources = policy.research_sources || [];
+    const isResearchSource = (domain) =>
+      researchSources.some((s) => domain === s || domain.endsWith("." + s));
+    for (const domain of policy.blocked_domains.slice(0, MAX_RULES)) {
+      if (isResearchSource(domain)) continue;
+      wanted.push(...ruleFor(domain, wanted.length / 2 | 0));
+    }
+  }
+  const options = { removeRuleIds: currentRuleIds, addRules: wanted };
+  await chrome.declarativeNetRequest.updateDynamicRules(options);
+  currentRuleIds = wanted.map((r) => r.id);
+}
+
+async function postEvent(url, title, tabId) {
+  const cfg = self.DHRITI_CONFIG;
+  const stored = await chrome.storage.local.get(QUEUE_KEY);
+  const queue = stored[QUEUE_KEY] || [];
+  queue.push({
+    url, title, tabId, ts: new Date().toISOString(),
+    ext_version: chrome.runtime.getManifest().version,
+  });
+  // cap the queue: a dead daemon must not grow memory forever
+  const trimmed = queue.slice(-MAX_QUEUE);
+  try {
+    const resp = await fetch(cfg.bridgeUrl + "/events", {
+      method: "POST",
+      headers: {
+        "X-Dhriti-Token": cfg.bridgeToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ events: trimmed }),
+    });
+    if (!resp.ok) throw new Error("status " + resp.status);
+    await chrome.storage.local.set({ [QUEUE_KEY]: [] });
+  } catch (err) {
+    await chrome.storage.local.set({ [QUEUE_KEY]: trimmed });
+  }
+}
+
+async function postTypedEvent(event) {
+  /** Typed events keep their type: surface_suppressed reaches the
+   * ledger as itself (D-024), not as a generic navigation. */
+  const cfg = self.DHRITI_CONFIG;
+  try {
+    await fetch(cfg.bridgeUrl + "/events", {
+      method: "POST",
+      headers: {
+        "X-Dhriti-Token": cfg.bridgeToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        events: [{
+          type: event.type,
+          url: "https://" + (event.site || "") + "/",
+          title: "",
+          tabId: -1,
+          ts: event.ts || new Date().toISOString(),
+          ext_version: chrome.runtime.getManifest().version,
+          rule: event.rule || "",
+        }],
+      }),
+    });
+  } catch (err) {
+    /* typed events are best-effort; the queue is for navigation */
+  }
+}
+
+let lastEnforce = null;
+
+async function notifyContentScripts(enforce) {
+  /** Tell loaded pages the wall flipped (arming or release) so
+   * suppression follows the window without a page reload. */
+  if (lastEnforce === enforce) return;
+  lastEnforce = enforce;
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: "enforcement_changed", enforce,
+      }, () => void chrome.runtime.lastError);
+    }
+  } catch (e) { /* no tabs to tell */ }
+}
+
+async function closeBlockedTabs(policy) {
+  /** Plan Part 4 §1.6 ARMING check 5 (open blocked tabs): when the wall
+   * arms, tabs already sitting on blocked domains are closed — the
+   * backend can, so it does. Counted, not hidden. */
+  if (!policy.enforce || !Array.isArray(policy.blocked_domains)) return;
+  let closed = 0;
+  for (const domain of policy.blocked_domains.slice(0, 100)) {
+    try {
+      const tabs = await chrome.tabs.query({
+        url: [`*://*.${domain}/*`, `*://${domain}/*`],
+      });
+      for (const tab of tabs) {
+        await chrome.tabs.remove(tab.id);
+        closed += 1;
+      }
+    } catch (e) { /* pattern or permission trouble: skip this domain */ }
+  }
+  if (closed > 0) {
+    await postTypedEvent({
+      type: "blocked_tabs_closed", site: "arming", rule: String(closed),
+    });
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "is_enforcing") {
+    chrome.storage.local.get(POLICY_KEY).then((stored) => {
+      const cached = stored[POLICY_KEY];
+      sendResponse({ enforce: !!(cached && cached.enforce) });
+    });
+    return true; // async response
+  }
+  if (msg && msg.type === "surface_suppressed") {
+    postTypedEvent(msg);
+    sendResponse({ ok: true });
+    return false;
+  }
+  return false;
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.url || changeInfo.title) {
+    postEvent(changeInfo.url || "", changeInfo.title || "", tabId);
+  }
+});
+
+chrome.runtime.onInstalled.addListener(() => syncAndApply());
+chrome.runtime.onStartup.addListener(() => syncAndApply());
+
+async function syncAndApply() {
+  const policy = await fetchPolicy();
+  await applyPolicy(policy);
+  // A tiny action badge shows ONLY whether the wall is up (state, not
+  // judgement). No counts, no streaks, no shame colors.
+  try {
+    await chrome.action.setBadgeText({
+      text: policy.enforce ? "D" : "",
+    });
+  } catch (e) {
+    /* action API optional */
+  }
+  await closeBlockedTabs(policy);
+  await notifyContentScripts(!!policy.enforce);
+}
+
+chrome.alarms.create("dhriti-sync", {
+  periodInMinutes: Math.max(0.5, (self.DHRITI_CONFIG.pollSeconds || 30) / 60),
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "dhriti-sync") syncAndApply();
+});
+
+syncAndApply();

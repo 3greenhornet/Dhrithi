@@ -1,0 +1,19 @@
+# Dhriti home contents (personal experiment data - never commit)
+dhriti.sqlite3*
+dhriti.sqlite3-wal
+dhriti.sqlite3-shm
+bridge_token
+daemon.lock
+hosts/
+extension_last_seen
+reports/
+profiles/ignite.*.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Demo output is regenerated, not tracked
+examples/demo/out/

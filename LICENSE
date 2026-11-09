@@ -1,0 +1,15 @@
+Dhriti — personal execution experiment
+Copyright 2026 the project owner
+
+UNLICENSED — private, personal experiment (decision D-001: this is not
+a commercial product or public brand).
+
+All rights reserved. Nothing here is granted for redistribution yet.
+Licensing is an open decision; revisit when the audit queue is done and
+the experiment stabilizes. The bundled third-party leads (source
+register) each carry their own licences — nothing from them is vendored
+into this repository.
+
+If this ever becomes public: the audit-gated placeholder pattern must
+survive (no README-adopted enforcement backends), and source-material/
+must be re-checked for what may be published.

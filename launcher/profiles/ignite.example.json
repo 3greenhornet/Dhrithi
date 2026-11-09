@@ -1,0 +1,15 @@
+{
+  "name": "coding",
+  "project_dir": "C:\\Users\\YOU\\Projects\\java-basics",
+  "files": [
+    "C:\\Users\\YOU\\Projects\\java-basics\\src\\ReverseArray.java"
+  ],
+  "terminal_command": "wt",
+  "first_command": "cd src && javac ReverseArray.java && java ReverseArray",
+  "browser": {
+    "profile": "Work",
+    "start_url": "https://docs.oracle.com/en/java/javase/21/docs/api/"
+  },
+  "expected_obstacle": "compile error: array index out of bounds",
+  "if_then": "IF compile error THEN read the first stack line, reproduce it with a 3-element array, fix the loop bound"
+}

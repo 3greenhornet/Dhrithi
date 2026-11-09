@@ -1,0 +1,24 @@
+ID,Topic,Current position,Status,Evidence/confidence,Next action
+D-001,Personal purpose,"Dhriti is primarily a personal execution/self-regulation experiment, not a commercial productivity product.",USER-CONFIRMED,Stable project constraint,Keep README/architecture free of marketing assumptions.
+D-002,Original source preservation,Keep the 95-page Project Dhrithi PDF unchanged as immutable source material.,DECIDED,Verified file copied into bundle,Do not edit the original; create derived specifications separately.
+D-003,Verbatim chat preservation,A structured dossier is not a verbatim transcript. A raw ChatGPT export must be added to guarantee no words are lost.,OPEN ACTION,Transcript not yet imported,Export conversation and add raw file unchanged.
+D-004,Research strategy,"Search by mechanism across unrelated domains, not only products marketed for focus/procrastination.",DECIDED,Supported by cross-domain leads,Continue using mechanism inversion catalogue.
+D-005,Enforcement engine,Do not build a blocker from scratch before testing existing enforcement products and Windows policies.,RECOMMENDED,Needs manual bake-off,"FocusMe, Cold Turkey, Focuser, Plucky, SEB and native policy trials."
+D-006,Focuser adoption,"Focuser is a high-priority source audit candidate, not yet approved as the foundation.",OPEN,Security/release audit incomplete,"Investigate Defender report, current source/build, service and recovery."
+D-007,Plucky role,Evaluate Plucky as a proprietary delayed-relaxation/network-control backend; do not plan to fork it.,RECOMMENDED,Documentation lead; no local test,Test CLI and delay semantics in disposable configuration.
+D-008,Safe Exam Browser,Investigate SEB as a restricted work desktop/kiosk inversion.,RECOMMENDED,Docs/source lead; no local test,Test on disposable standard Windows account/VM; inspect component licences.
+D-009,Observation,Compare ActivityWatch with a minimal observer; add filtered Sysmon for process provenance if useful.,RECOMMENDED,Docs/source lead; no local test,Avoid multiple redundant trackers.
+D-010,Process mining,Use PM4Py offline to discover personal work/avoidance event sequences.,RECOMMENDED,No PoC yet,Build synthetic event log first.
+D-011,Screenpipe,"Treat Screenpipe as optional rich capture, not always-on baseline.",RECOMMENDED,Resource figures/capture not locally tested,Run a controlled 60–90 minute trial and measure.
+D-012,Task initiation,Add a workspace launcher and IF–THEN obstacle plan; access restriction alone may not initiate work.,RECOMMENDED,Requires personal workflow definition,Implement PowerShell prototype first.
+D-013,Task semantics,Use task profiles and dependency graphs; do not rely on one task embedding vector.,RECOMMENDED,Design hypothesis,Start with coding/study/research profiles actually needed.
+D-014,AI classification,Never make a generative model a critical enforcement dependency.,DECIDED,Architectural invariant,Use model only as optional analysis/advisory component.
+D-015,Data capture,Retain useful local personal traces for longitudinal experiments; keep raw data and secrets out of public Git.,USER-CONFIRMED + RECOMMENDED,Need retention/schema definition,Define event sources and storage budget.
+D-016,Privacy/API,No accidental external upload. Any cloud processing must be deliberate and per-source/provider.,RECOMMENDED,Needs detailed consent/config design,Default local capture; explicit remote experiment setting.
+D-017,Evidence model,"Separate observed, submitted and machine-checked evidence.",DECIDED,Conceptually supported,Implement provenance and avoid screenshot-as-proof claims.
+D-018,Daily enforcement,"Resolve fixed end time, completion unlock, and incomplete-lock contradictions before implementation.",OPEN,Contradiction in source PDF,Choose one bounded daily release rule.
+D-019,Emergency handling,Always define an immediate emergency path distinct from ordinary break-glass delay.,RECOMMENDED,Policy decision open,"Specify essential access, emergency and maintenance bypass."
+D-020,Formal verification,Use TLA+/tests for state machine and recovery properties if complexity merits it.,RECOMMENDED,No model yet,Write invariants before adding privileged processes.
+D-021,Hardware modularity,Use capability manifests and Lite/Standard/Research configurations.,RECOMMENDED,Architecture proposal,Stable event schema; optional providers.
+D-022,Experiment design,"Separate restriction, observation, initiation and intervention-efficacy questions.",RECOMMENDED,Protocol not yet frozen,"Start baseline and compare repeated, similar sessions."
+D-023,Narrow first build,"First work is manual mechanism bake-off + baseline observation + simple launcher, not full rewrite.",RECOMMENDED,Next phase,Exit each experiment with measured result and decision.

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dhriti"
+version = "0.3.0"
+description = "Dhriti - local-first commitment-enforcement experiment (externalized will, not a coach)"
+requires-python = ">=3.9"
+# Intentionally EMPTY: the core is pure standard library so enforcement
+# never breaks because a dependency failed to install (fail-proof rule).
+dependencies = []
+
+[project.scripts]
+dhriti = "dhriti.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dhriti*"]

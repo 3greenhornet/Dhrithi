@@ -1,0 +1,12 @@
+case_id,event_id,occurred_at_utc,event_type,source_adapter,manual_label,notes
+demo-0001,ev-001,2026-11-02T04:31:00Z,contract_sealed,core,direct_execution,
+demo-0001,ev-002,2026-11-02T04:35:00Z,session_active,core,direct_execution,
+demo-0001,ev-003,2026-11-02T04:40:00Z,browser_navigation,extension,direct_execution,oracle docs for the exact API
+demo-0001,ev-004,2026-11-02T04:52:00Z,browser_navigation,extension,necessary_dependency_research,stack overflow: arrayindexoob
+demo-0001,ev-005,2026-11-02T05:10:00Z,evidence_submitted,core,direct_execution,
+demo-0001,ev-006,2026-11-02T05:11:00Z,session_success,core,direct_execution,
+demo-0002,ev-007,2026-11-03T04:31:00Z,contract_sealed,core,direct_execution,
+demo-0002,ev-008,2026-11-03T04:36:00Z,session_active,core,direct_execution,
+demo-0002,ev-009,2026-11-03T04:40:00Z,browser_navigation,extension,unrelated_branching,youtube
+demo-0002,ev-010,2026-11-03T04:47:00Z,browser_navigation,extension,repeated_tutorial_consumption,java tutorial video #7
+demo-0002,ev-011,2026-11-03T05:30:00Z,session_incomplete,core,unknown,

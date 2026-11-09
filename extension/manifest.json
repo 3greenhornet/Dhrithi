@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Dhriti Wall",
+  "version": "0.3.0",
+  "description": "Local commitment enforcement. The wall does not respond. Your own contract is the only voice. Requires the Dhriti daemon.",
+  "permissions": [
+    "storage",
+    "declarativeNetRequest",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.reddit.com/*",
+        "*://x.com/*",
+        "*://twitter.com/*",
+        "*://www.google.com/*",
+        "*://chatgpt.com/*",
+        "*://chat.openai.com/*",
+        "*://claude.ai/*",
+        "*://gemini.google.com/*"
+      ],
+      "js": ["suppress.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {}
+}

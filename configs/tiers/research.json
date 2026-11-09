@@ -1,0 +1,21 @@
+{
+  "name": "research",
+  "description": "Dossier 11.1 Research tier: rich personal behaviour research. Everything Standard plus optional heavy capture — enable each piece only after its trial (audit items 5-7, 9).",
+  "components": {
+    "core": ["contract/state machine", "sqlite ledger", "policy engine"],
+    "enforcement": ["extension_bridge (E1)", "hosts_file (E2)", "audited external backend (post-audit)"],
+    "observation": ["activitywatch", "sysmon (narrow)", "screenpipe (60-90min trial first)"],
+    "launcher": ["powershell ignite"],
+    "offline": ["pm4py", "embedding experiments (AFTER manual labels exist - see analysis/labels/)"]
+  },
+  "adapters": {
+    "activitywatch": {"enabled": true, "url": "http://127.0.0.1:5600"},
+    "sysmon": {"enabled": true, "export_dir": "C:/Tools/dhriti-sysmon-out"},
+    "screenpipe": {"enabled": false},
+    "hosts_file": {"enabled": true}
+  },
+  "warnings": [
+    "screenpipe stays disabled until the controlled 60-90 minute trial measures CPU/RAM/disk on YOUR machine",
+    "embedding models stay out until analysis/labels/ has a labelled sample; similarity is not policy (D-014)"
+  ]
+}

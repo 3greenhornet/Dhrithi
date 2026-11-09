@@ -1,0 +1,16 @@
+{
+  "name": "lite",
+  "description": "Dossier 11.1 Lite tier: commitment loop on modest hardware. This is what v1 runs.",
+  "components": {
+    "core": ["contract/state machine", "sqlite ledger", "policy engine"],
+    "enforcement": ["extension_bridge (E1)"],
+    "observation": ["none (manual + extension events)"],
+    "launcher": ["powershell ignite"]
+  },
+  "adapters": {
+    "activitywatch": {"enabled": false},
+    "sysmon": {"enabled": false},
+    "screenpipe": {"enabled": false},
+    "hosts_file": {"enabled": false}
+  }
+}
