@@ -39,11 +39,19 @@ class TestJournalMode(unittest.TestCase):
         (tmp / "dhriti.sqlite3-wal").write_bytes(b"garbage")
         db2 = Database(db_path, journal_mode="delete")
         db2.close()
-        leftovers = [p.name for p in tmp.iterdir() if "corrupt" in p.name]
-        # a clean open may checkpoint-and-delete the wal instead; either
-        # way the database must open and no garbage may remain
+        # Bug 8 (Phase 0): the old assertion passed trivially (it only
+        # checked names of files that contain 'corrupt'). The strengthened
+        # contract: the database opens, AND either the suspect sidecar was
+        # quarantined as *.corrupt-* or no -wal file remains — garbage
+        # must never silently survive under its old name.
         self.assertTrue(db_path.exists())
-        for name in leftovers:
+        corrupt = [p.name for p in tmp.iterdir() if "corrupt" in p.name]
+        wal = [p.name for p in tmp.iterdir() if p.name.endswith("-wal")]
+        self.assertTrue(
+            corrupt or not wal,
+            f"neither quarantined ({corrupt}) nor removed ({wal}); "
+            "garbage sidecar survived an open that should not trust it")
+        for name in corrupt:
             self.assertIn("corrupt", name)
 
 
@@ -221,9 +229,14 @@ class TestPolicySuppressionAndBuilderClause(DhritiTestCase):
 class TestDaemonBuilderClause(DhritiTestCase):
     def test_builder_clause_blocks_until_targets_met(self):
         self.seal_today()  # seal BEFORE the daemon swaps the db handle
+        # Bug 7 (Phase 0): github.com is in the coding profile's
+        # allowlist, so the allowlist wins and the clause does not fire
+        # for it. The clause is tested with a domain that is NOT
+        # allowlisted.
         cfg = make_config(builder_clause={
             "enabled": True,
-            "blocked_domains": ["github.com"]})
+            "blocked_domains": ["github.com",
+                                "builder-distraction.example"]})
         daemon = self.make_daemon(**{"builder_clause":
                                       cfg["builder_clause"]})
         daemon._tick()  # opens the day
@@ -231,11 +244,14 @@ class TestDaemonBuilderClause(DhritiTestCase):
         self.assertEqual(day["state"], "OPEN")
         session = daemon.start_session("reverse the array")
         self.assertEqual(session["state"], "ACTIVE")
-        # the clause fired because targets are unmet
+        # the clause fired for the non-allowlisted domain
         events = [e["event_type"] for e in daemon.ledger.events()]
         self.assertIn("builder_clause_applied", events)
+        self.assertIn("builder_clause_overridden_by_allowlist", events)
         snap = daemon.policy_engine.current_snapshot()
-        self.assertIn("github.com", snap["blocked_domains"])
+        self.assertIn("builder-distraction.example",
+                      snap["blocked_domains"])
+        self.assertNotIn("github.com", snap["blocked_domains"])
         daemon.release_lock()
         daemon.db.close()
 

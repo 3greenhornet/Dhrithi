@@ -97,8 +97,18 @@ next daemon start): the builder clause (D-035), evening observation
 (D-049). A session, a document, or an agent may propose; only the
 builder, cold, confirms.
 
+**Interaction with the allowlist (Phase 0, Bug 7):** the builder
+clause never overrides the profile allowlist. If a domain is an
+allowed work surface for the active profile (or the contract's
+`allowed_tools`), the builder clause does not block it — blocking the
+work surface that meets the day's targets would be self-defeating.
+The override is recorded as `builder_clause_overridden_by_allowlist`,
+never silent.
+
 *Tests:* defaults in `dhriti/constants.py`; the v0.3 mechanisms all
-assert OFF-by-default behavior in their test files.
+assert OFF-by-default behavior in their test files; the allowlist
+interaction is asserted in `tests/test_review.py` and
+`tests/test_daemon_integration.py`.
 
 ---
 

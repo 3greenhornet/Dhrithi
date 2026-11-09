@@ -103,6 +103,11 @@
   const fired = new Set();   // rule ids already reported this page load
   let styleEl = null;
   let observer = null;
+  // stale-selector bookkeeping (Bug 6): rule id -> first miss timestamp,
+  // and the set of rules already reported stale on this page load.
+  const STALE_AFTER_MS = 60000;
+  const firstMissAt = new Map();
+  const staleReported = new Set();
 
   function rulesFor(host) {
     return RULES[host] || [];
@@ -147,6 +152,19 @@
     }
   }
 
+  function reportStale(ruleId) {
+    try {
+      chrome.runtime.sendMessage({
+        type: "surface_rule_stale",
+        site: location.hostname,
+        rule: ruleId,
+        ts: new Date().toISOString(),
+      });
+    } catch (e) {
+      /* extension context gone; nothing to report to */
+    }
+  }
+
   function applyRules() {
     const host = location.hostname;
     const hostRules = activeRules(host);
@@ -157,15 +175,33 @@
       (document.head || document.documentElement).appendChild(styleEl);
     }
     styleEl.textContent = cssFor(hostRules);
-    // Report each rule that actually matched something (and mark rules
-    // that matched nothing across a whole minute as stale, cold-state).
+    // Report each rule that actually matched something. A rule whose
+    // selector matches nothing for STALE_AFTER_MS (a site redesign, a
+    // renamed class) is reported once as surface_rule_stale — the
+    // over-promised comment from v0.3.0 is now real behavior: the
+    // staleness is a maintenance signal for the cold review, not a
+    // silent no-op. (Bug 6, Phase 0.)
     for (const rule of hostRules) {
       try {
-        if (document.querySelector(rule.css)) {
+        const hit = document.querySelector(rule.css);
+        if (hit) {
           report(rule.id);
+          firstMissAt.delete(rule.id);
+        } else {
+          const now = Date.now();
+          if (!firstMissAt.has(rule.id)) firstMissAt.set(rule.id, now);
+          if (now - firstMissAt.get(rule.id) >= STALE_AFTER_MS
+              && !staleReported.has(rule.id)) {
+            staleReported.add(rule.id);
+            reportStale(rule.id);
+          }
         }
       } catch (e) {
         /* invalid selector — stale rule; ignored, cold review sees it */
+        if (!staleReported.has(rule.id)) {
+          staleReported.add(rule.id);
+          reportStale(rule.id);
+        }
       }
     }
     // YouTube autoplay: click the toggle off once per page load when

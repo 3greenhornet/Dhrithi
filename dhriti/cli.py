@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .backup import BackupService
 from .bootcamp import BootcampService
 from .break_glass import BreakGlassError, BreakGlassService
 from .constants import default_home, load_config
@@ -20,6 +21,8 @@ from .db import Database
 from .day_window import DayService, resolve_window
 from .errors import DhritiError
 from .evidence import EvidenceService
+from .health import build_health
+from .journal import JournalService
 from .ledger import Ledger
 from .policy import PolicyEngine
 from .profiles import DEFAULT_PROFILES, load_profiles
@@ -64,6 +67,140 @@ def _open_core(home: Path, clock: Clock = None):
 
 
 # ---------------------------------------------------------------- commands
+def cmd_health(args):
+    """Operational state, one screen, facts only (toolkit #1)."""
+    home = _home(args)
+    report = build_health(home)
+    for line in report.lines:
+        print(line)
+    print(f"Overall: {report.overall}")
+    if report.overall != "OK":
+        sys.exit(1)
+
+
+def cmd_backup(args):
+    """Local backup with manifest + chain verification (toolkit #3)."""
+    home = _home(args)
+    s = _open_core(home)
+    service = BackupService(home, s["db"], s["ledger"], s["clock"])
+    dest = Path(args.dest).expanduser() if args.dest else None
+    manifest = service.create(dest)
+    print(f"backup: {manifest['dest']}")
+    print(f"backup: chain ok before={manifest['chain_verified_before']} "
+          f"after={manifest.get('chain_verified_after')} "
+          f"({manifest['chain_events']} events)")
+    for entry in manifest["files"]:
+        print(f"backup: {entry['name']} sha256 {entry['sha256'][:16]}...")
+    s["db"].close()
+
+
+def cmd_journal(args):
+    """The experimenter's own log — separate DB, never the chain (toolkit #7)."""
+    home = _home(args)
+    service = JournalService(home)
+    try:
+        if args.sub == "add":
+            row = service.add(args.text)
+            s = _open_core(home)
+            s["ledger"].record(
+                "journal_entry_added",
+                observed_payload={"at": row["at_utc"]},
+                action_taken="fact recorded; content stays in the journal")
+            s["db"].close()
+            print(f"journal entry added at {row['at_utc']}")
+            print(f"stored in {service.path} (separate from the ledger)")
+        elif args.sub == "list":
+            rows = service.list(args.since)
+            for row in rows:
+                print(f"{row['at_utc']}  {row['text']}")
+            if not rows:
+                print("(no entries)")
+        elif args.sub == "export":
+            print(service.export())
+    finally:
+        service.close()
+
+
+def cmd_explain(args):
+    """Trace a number or an id back to its events (toolkit #2)."""
+    home = _home(args)
+    s = _open_core(home)
+    needle = (args.what or "").strip()
+    if not needle:
+        print("explain what? an event id prefix, 'chain', or a date")
+        sys.exit(1)
+    rows = s["ledger"].events()
+    if needle == "chain":
+        result = s["ledger"].verify_chain()
+        print(f"chain ok: {result['ok']} ({result['checked']} events)")
+        print(f"head: {s['ledger'].head()['row_hash']}")
+    else:
+        matched = [r for r in rows if r["event_id"].startswith(needle)
+                   or (r["session_id"] or "").startswith(needle)]
+        if not matched:
+            print(f"no events match {needle!r}")
+            sys.exit(1)
+        for row in matched[-10:]:
+            print(f"{row['seq']:>5} {row['occurred_at_utc']} "
+                  f"{row['event_type']:<28} "
+                  f"{row['observed_payload'][:160]}")
+        print(f"{len(matched)} event(s); newest shown; "
+              "every number in the reports derives from these rows")
+    s["db"].close()
+
+
+def cmd_config(args):
+    """Config validate/show/get/set/diff (toolkit #5, cold-state)."""
+    home = _home(args)
+    path = home / "dhriti.config.json"
+    if args.sub == "show":
+        print(json.dumps(load_config(home), indent=2))
+    elif args.sub == "validate":
+        try:
+            cfg = load_config(home)
+            problems = []
+            if not isinstance(cfg.get("day_window", {}).get("start"), str):
+                problems.append("day_window.start missing")
+            if not (cfg.get("enforcement", {}).get("required_adapters")):
+                problems.append("enforcement.required_adapters empty")
+            if problems:
+                for p in problems:
+                    print(f"[warn] {p}")
+                sys.exit(1)
+            print("[ok  ] config valid")
+        except Exception as exc:
+            print(f"[FAIL] config does not load: {exc}")
+            sys.exit(1)
+    elif args.sub == "get":
+        cfg = load_config(home)
+        node = cfg
+        for part in args.key.split("."):
+            if not isinstance(node, dict) or part not in node:
+                print(f"no such key: {args.key}")
+                sys.exit(1)
+            node = node[part]
+        print(json.dumps(node, indent=2, default=str))
+    elif args.sub == "set":
+        # cold-state act: refuse while the daemon holds the lock
+        if (home / "daemon.lock").exists():
+            print("refused: the daemon holds the lock. Stop it first — "
+                  "config changes apply at next start (L-3/D-050).")
+            sys.exit(1)
+        cfg = json.loads(path.read_text(encoding="utf-8")) \
+            if path.exists() else {}
+        node = cfg
+        parts = args.key.split(".")
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        try:
+            node[parts[-1]] = json.loads(args.value)
+        except json.JSONDecodeError:
+            node[parts[-1]] = args.value
+        path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        print(f"set {args.key} (applies at next daemon start)")
+    s = None
+
+
 def cmd_init(args):
     home = _home(args)
     home.mkdir(parents=True, exist_ok=True)
@@ -740,6 +877,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version",
                         version=f"dhriti {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("health", help="operational state, one screen")
+    p.set_defaults(func=cmd_health)
+
+    p = sub.add_parser("backup", help="local backup with manifest")
+    p.add_argument("--dest", default=None,
+                   help="backup root (default <home>/backups)")
+    p.set_defaults(func=cmd_backup)
+
+    p = sub.add_parser("journal", help="experimenter's log (separate DB)")
+    p.add_argument("sub", choices=["add", "list", "export"])
+    p.add_argument("text", nargs="?", default="",
+                   help="entry text (add)")
+    p.add_argument("--since", default=None, help="YYYY-MM-DD (list)")
+    p.set_defaults(func=cmd_journal)
+
+    p = sub.add_parser("explain", help="trace a number to its events")
+    p.add_argument("what", nargs="?", default="")
+    p.set_defaults(func=cmd_explain)
+
+    p = sub.add_parser("config", help="config validate/show/get/set")
+    p.add_argument("sub", choices=["validate", "show", "get", "set"])
+    p.add_argument("key", nargs="?", default="")
+    p.add_argument("value", nargs="?", default="")
+    p.set_defaults(func=cmd_config)
 
     p = sub.add_parser("init", help="initialize a Dhriti home")
     p.set_defaults(func=cmd_init)

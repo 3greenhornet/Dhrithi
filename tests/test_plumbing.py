@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from dhriti.aftermath import AftermathService
 from dhriti.bootcamp import BootcampService
 from dhriti.break_glass import BreakGlassService
 from dhriti.constants import DEFAULT_CONFIG, load_config
@@ -21,6 +22,7 @@ from dhriti.ledger import Ledger
 from dhriti.models import ContractKind
 from dhriti.policy import PolicyEngine
 from dhriti.research_pass import ResearchService
+from dhriti.review import ColdReviewService, ParkingLotService
 from dhriti.session import SessionService
 from dhriti.timeutil import SimulatedClock, local_tz
 
@@ -90,6 +92,10 @@ class DhritiTestCase(unittest.TestCase):
         self.break_glass = BreakGlassService(
             self.db, self.config, self.clock, self.ledger)
         self.policy = PolicyEngine(self.db, self.clock)
+        self.aftermath = AftermathService(
+            self.db, self.config, self.clock, self.ledger)
+        self.parking = ParkingLotService(self.db, self.clock, self.ledger)
+        self.review = ColdReviewService(self.db, self.clock, self.ledger)
         self.today = self.clock.now_utc().astimezone(
             local_tz(LOCAL_TZ)).date()
 
@@ -117,6 +123,22 @@ class DhritiTestCase(unittest.TestCase):
         daemon = Daemon(self.home, config=cfg, clock=self.clock,
                         tick_seconds=0.0)
         self.db = daemon.db  # keep a handle for assertions
+        # Bug 3 (Phase 0): reassign every service handle so stale
+        # references to the closed database cannot silently pass or
+        # crash depending on call order. After make_daemon(), the
+        # daemon's services are the test's services.
+        self.ledger = daemon.ledger
+        self.contracts = daemon.contracts if daemon.contracts else daemon.days.contracts
+        self.days = daemon.days
+        self.sessions = daemon.sessions
+        self.evidence = daemon.evidence
+        self.research = daemon.research
+        self.bootcamp = daemon.bootcamp
+        self.break_glass = daemon.break_glass
+        self.policy = daemon.policy_engine
+        self.aftermath = daemon.aftermath
+        self.parking = daemon.parking
+        self.review = daemon.review
         return daemon
 
 

@@ -69,19 +69,26 @@ class BootcampService:
                     "break_glass_7d": 0, "can_consider_taper": False}
         started = parse_iso(bc["started_at"])
         days_elapsed = (self.clock.now_utc() - started).days + 1
-        days = self.db.query("SELECT state, targets_met FROM day")
+        # Bug 4 (Phase 0): filter by the bootcamp's own window. The old
+        # query counted every day/session ever recorded, so restarting a
+        # bootcamp inherited the previous bootcamp's history.
+        started_iso = to_iso(started)
+        days = self.db.query(
+            "SELECT state, targets_met FROM day WHERE date>=?",
+            (started_iso[:10],))
         days_total = len(days)
         complete = [d for d in days if d["state"] in
                     ("RELEASED_EARLY", "CLOSED_COMPLETE")]
-        sessions = self.db.query("SELECT state FROM session")
+        sessions = self.db.query(
+            "SELECT state FROM session WHERE started_at>=?", (started_iso,))
         finished = [s for s in sessions
                     if s["state"] in ("SUCCESS", "INCOMPLETE",
                                       "BREAK_GLASS", "INTERRUPTED")]
         successes = [s for s in sessions if s["state"] == "SUCCESS"]
         since = to_iso(self.clock.now_utc() - timedelta(days=7))
         breaks = self.db.query_one(
-            "SELECT COUNT(*) AS n FROM break_glass WHERE confirmed_at>=?",
-            (since,))["n"]
+            "SELECT COUNT(*) AS n FROM break_glass WHERE confirmed_at>=? "
+            "AND confirmed_at IS NOT NULL", (since,))["n"]
         proof_rate = (len(successes) / len(finished)) if finished else 0.0
         compliance = (len(complete) / days_total) if days_total else 0.0
         min_days = int(self.taper_cfg.get("min_days", 30))

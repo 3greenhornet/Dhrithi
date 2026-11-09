@@ -1,4 +1,8 @@
 """Bootcamp evidence + taper computation (never by date alone)."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import unittest
 
 from dhriti.models import TaperStage
 
@@ -72,3 +76,27 @@ class TestBootcamp(DhritiTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBootcampRestart(DhritiTestCase):
+    def test_restart_does_not_count_old_days(self):
+        """Bug 4 (Phase 0): a restarted bootcamp must not inherit the
+        previous bootcamp's days and sessions."""
+        # bootcamp 1 with a compliant day
+        self.bootcamp.start(30)
+        self.seal_today()
+        day = self.days.ensure_day(self.today)
+        self.days.try_open(day)
+        session = self.sessions.start(day["id"], "t1", "")
+        self.sessions.seal(session["id"])
+        self.sessions.arming(session["id"])
+        self.sessions.activate(session["id"])
+        self.sessions.end_success(session["id"])
+        self.clock.advance(days=40)
+        self.bootcamp.graduate()
+        # bootcamp 2 starts fresh: zero days inside its window
+        self.bootcamp.start(30)
+        summary = self.bootcamp.evidence_summary()
+        self.assertEqual(summary["days_with_day"], 0)
+        self.assertEqual(summary["proof_rate"], 0.0)
+        self.assertEqual(summary["compliance_rate"], 0.0)

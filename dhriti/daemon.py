@@ -46,6 +46,7 @@ from .models import SessionState, WorkMode
 from .policy import PolicyEngine
 from .profiles import CATEGORY_DOMAINS, load_profiles
 from .research_pass import ResearchService
+from .review import ColdReviewService, ParkingLotService
 from .session import SessionService
 from .timeutil import Clock, RealClock, local_tz, parse_iso, to_iso
 from .break_glass import BreakGlassService
@@ -78,6 +79,8 @@ class Daemon:
             self.db, self.config, self.clock, self.ledger)
         self.aftermath = AftermathService(
             self.db, self.config, self.clock, self.ledger)
+        self.parking = ParkingLotService(self.db, self.clock, self.ledger)
+        self.review = ColdReviewService(self.db, self.clock, self.ledger)
         self.policy_engine = PolicyEngine(self.db, self.clock)
         self.profiles = load_profiles(self.home)
         # D-050 (configuration immutability): the running daemon never
@@ -485,6 +488,12 @@ class Daemon:
         """Full DRAFT -> SEALED -> ARMING -> ACTIVE flow with the arming
         gate. Returns the session row (or raises StateError)."""
         self._check_config_drift()   # D-050: drift visible, never hot-loaded
+        # Bug 5 (Phase 0): refuse a second concurrent session. The state
+        # machine allows many ACTIVE rows; the daemon must not.
+        if self.sessions.active() is not None:
+            raise RuntimeError(
+                "a session is already ACTIVE — end it (dhriti session end) "
+                "before starting another")
         today = self._local_today()
         day = self.days.ensure_day(today)
         if day["state"] != "OPEN":
@@ -512,15 +521,35 @@ class Daemon:
         builder_cfg = self.config.get("builder_clause", {})
         if builder_cfg.get("enabled") and builder_cfg.get("blocked_domains"):
             if not self.days.targets_met(day):
-                extra_blocked = list(builder_cfg["blocked_domains"])
-                self.ledger.record(
-                    "builder_clause_applied",
-                    session_id=session["id"],
-                    observed_payload={
-                        "domains": extra_blocked,
-                        "reason": "day targets unmet"},
-                    action_taken="builder domains blocked until targets met",
-                    telemetry_quality="OK")
+                raw_blocked = list(builder_cfg["blocked_domains"])
+                # Bug 7 (Phase 0): the profile allowlist wins over the
+                # builder clause. If github.com is an allowed work domain
+                # for the profile, blocking it because the day's targets
+                # are unmet would block the work that meets the targets.
+                # The override is recorded, never silent.
+                allow = set(profile.get("allowed_domains", [])
+                            + contract["payload"].get("allowed_tools", []))
+                overridden = [d for d in raw_blocked if d in allow]
+                extra_blocked = [d for d in raw_blocked if d not in allow]
+                if overridden:
+                    self.ledger.record(
+                        "builder_clause_overridden_by_allowlist",
+                        session_id=None,
+                        observed_payload={
+                            "domains": overridden,
+                            "reason": "profile allowlist wins (L-6 note)"},
+                        action_taken="builder block skipped for allowlisted "
+                                    "domains",
+                        telemetry_quality="OK")
+                if extra_blocked:
+                    self.ledger.record(
+                        "builder_clause_applied",
+                        session_id=session["id"],
+                        observed_payload={
+                            "domains": extra_blocked,
+                            "reason": "day targets unmet"},
+                        action_taken="builder domains blocked until targets met",
+                        telemetry_quality="OK")
         suppress = bool(self.config.get("surface_suppression", {})
                         .get("enabled", True))
         policy = self.policy_engine.build_snapshot(

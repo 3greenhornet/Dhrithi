@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Pre-commit gate: full suite + surface lint must pass before a commit
+# ships (operator toolkit #8). Install once:
+#   cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+set -e
+cd "$(dirname "$0")/.."
+python3 -m unittest discover -s tests
+python3 scripts/lint_surfaces.py

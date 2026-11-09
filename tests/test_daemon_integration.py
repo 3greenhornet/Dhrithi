@@ -1,5 +1,9 @@
 """Recovery + integration: daemon death, arming gate, full happy-path
 day, bridge round-trip. These are the 'fail proof' tests."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import unittest
 
 import json
 import urllib.request
@@ -198,3 +202,61 @@ class TestResearchPass(DhritiTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDoubleActiveSession(DhritiTestCase):
+    def test_double_active_session_refused(self):
+        """Bug 5 (Phase 0): the daemon refuses a second concurrent
+        session instead of leaving two ACTIVE rows."""
+        daemon = self.make_daemon()
+        try:
+            payload = daily_payload()
+            cid = daemon.days.contracts.create_draft(
+                __import__("dhriti.models", fromlist=["ContractKind"])
+                .ContractKind.DAILY, self.today.isoformat(), payload)
+            daemon.days.contracts.seal(cid)
+            daemon._tick()
+            first = daemon.start_session("task one", "")
+            self.assertEqual(first["state"], SessionState.ACTIVE.value)
+            with self.assertRaises(RuntimeError) as ctx:
+                daemon.start_session("task two", "")
+            self.assertIn("already ACTIVE", str(ctx.exception))
+        finally:
+            daemon.release_lock()
+            daemon.db.close()
+
+
+class TestBuilderClauseAllowlist(DhritiTestCase):
+    def test_allowlist_wins_over_builder_clause(self):
+        """Bug 7 (Phase 0): a builder-clause domain that is also in the
+        profile allowlist is NOT blocked; the override is recorded as
+        builder_clause_overridden_by_allowlist."""
+        daemon = self.make_daemon(
+            builder_clause={"enabled": True,
+                            "blocked_domains": ["github.com",
+                                                "example-distraction.com"]})
+        try:
+            payload = daily_payload()
+            # github.com is allowed work surface for this contract
+            payload["allowed_tools"] = ["github.com"]
+            cid = daemon.days.contracts.create_draft(
+                __import__("dhriti.models", fromlist=["ContractKind"])
+                .ContractKind.DAILY, self.today.isoformat(), payload)
+            daemon.days.contracts.seal(cid)
+            daemon._tick()
+            session = daemon.start_session("task", "")
+            # the override event exists
+            events = daemon.ledger.events(
+                event_type="builder_clause_overridden_by_allowlist")
+            self.assertEqual(len(events), 1)
+            import json as _json
+            observed = _json.loads(events[0]["observed_payload"])
+            self.assertEqual(observed["domains"], ["github.com"])
+            # and the policy snapshot blocks only the residual domain
+            snap = daemon.policy_engine.current_snapshot()
+            self.assertIn("example-distraction.com",
+                          snap["blocked_domains"])
+            self.assertNotIn("github.com", snap["blocked_domains"])
+        finally:
+            daemon.release_lock()
+            daemon.db.close()

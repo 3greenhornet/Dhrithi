@@ -1,5 +1,9 @@
 """Deterministic policy engine: allowlists, categories, modes, research
 bounds, taper scaling. No model, no network — rules only."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import unittest
 
 import json
 

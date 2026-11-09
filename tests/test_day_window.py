@@ -8,6 +8,10 @@ Invariants under test (docs/RESOLUTIONS.md R1):
   * a day that never got a contract closes INCOMPLETE at window_end;
   * an open day left behind by a dead daemon is RECOVERED honestly.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import unittest
 
 from dhriti.models import DayState
 

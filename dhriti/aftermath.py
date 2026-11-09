@@ -201,8 +201,19 @@ class AftermathService:
         sessions = self.db.query(
             "SELECT * FROM session WHERE started_at>=? AND started_at<? "
             "ORDER BY started_at", (week_start_iso, end))
-        evidence = self.db.query(
-            "SELECT COUNT(*) AS n, verdict FROM evidence GROUP BY verdict")
+        # Bug 1 (Phase 0): the old grouped COUNT query lost class/kind and
+        # crashed the renderers (KeyError 'class'). Group in Python so the
+        # rows keep every field the renderers read.
+        evidence_rows = self.db.query(
+            "SELECT e.class AS class, e.kind AS kind, e.verdict AS verdict "
+            "FROM evidence e JOIN session s ON e.session_id=s.id "
+            "WHERE s.started_at>=? AND s.started_at<?", (week_start_iso, end))
+        evidence = {}
+        for row in evidence_rows:
+            key = (row["verdict"], row["class"], row["kind"])
+            evidence[key] = evidence.get(key, 0) + 1
+        evidence = [{"verdict": v, "class": c, "kind": k, "n": n}
+                    for (v, c, k), n in sorted(evidence.items())]
         breaks = self.db.query(
             "SELECT * FROM break_glass WHERE confirmed_at>=? AND "
             "confirmed_at<?", (week_start_iso, end))
@@ -498,7 +509,9 @@ class AftermathService:
             return "_(no evidence submitted)_"
         lines = []
         for e in rows:
-            lines.append(f"- [{e['verdict']}] {e['class']}/{e['kind']}: "
+            count = f" ×{e['n']}" if "n" in e else ""
+            lines.append(f"- [{e['verdict']}] {e['class']}/{e['kind']}"
+                         f"{count}: "
                          f"{e.get('verdict_reason') or ''}")
         return "\n".join(lines)
 
@@ -603,7 +616,8 @@ class AftermathService:
             if drows else "<p class='muted'>(nothing observed)</p>"
 
     def _html_proof(self, data):
-        rows = [(e["verdict"], f"{e['class']}/{e['kind']}",
+        rows = [(e["verdict"], f"{e['class']}/{e['kind']}"
+                 + (f" ×{e['n']}" if "n" in e else ""),
                  e.get("verdict_reason") or "")
                 for e in data.get("evidence") or []]
         return self._rows_table(("verdict", "class/kind", "reason"), rows) \

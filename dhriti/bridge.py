@@ -215,11 +215,15 @@ def handle_extension_event(ledger, event: dict, session_resolver=None):
     title = (event.get("title") or "")[:500]
     observed = {"url": url, "title": title}
     action_taken = "observed"
-    if event_type in ("surface_suppressed", "blocked_tabs_closed"):
+    if event_type in ("surface_suppressed", "blocked_tabs_closed",
+                      "surface_rule_stale"):
         observed = {"site": url, "rule": (event.get("rule") or "")[:100]}
         action_taken = ("springboard removed" if event_type ==
                         "surface_suppressed" else
-                        "tabs closed at arming")
+                        "tabs closed at arming" if event_type ==
+                        "blocked_tabs_closed" else
+                        "selector no longer matches — rule needs "
+                        "cold-state maintenance")
     ledger.record(
         event_type,
         source_adapter="extension",

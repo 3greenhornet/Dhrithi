@@ -5,6 +5,14 @@ with well-made placeholders wherever something needs manual
 download/integration. This is that build. Read this page, then you
 are oriented.
 
+## v0.4 — the stabilization and operator batch (one screen)
+
+Phase 0 closed the eight bugs found in the base audit; the
+operator QoL toolkit arrived (health, explain, backup,
+journal, config, pre-commit lint, surface lint, golden-day
+fixture, CI matrix). The base is now observable before
+anything is added to it.
+
 ## v0.3 — the behavioral-reference batch (one screen)
 
 You asked whether the procrastination attempt had been considered as

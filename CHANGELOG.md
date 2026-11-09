@@ -5,6 +5,48 @@ test suite, and each release line states the decision-register rows
 (`docs/DECISIONS_PROPOSED.md`) it implements. Formats follow the
 project's own rules — facts and dates, no spin.
 
+## v0.4.0 — 2026-11-09 — the stabilization and operator batch
+
+> Rebuilt 2026-11-09 from the v0.3.0 bundle (upload/dhrithi.md) after
+> the working tree was lost to a sandbox recycle. Same scope as the
+> original v0.4.0: Phase 0 (the eight audit bugs) + the operator QoL
+> toolkit, part one.
+
+### Fixed — Phase 0 (the eight audit bugs)
+- Bug 1: week report crashed on evidence (grouped COUNT lost
+  class/kind); `_week_data` now groups in Python, renderers show counts
+- Bug 2: the seven test files missing `import unittest` (and the
+  sys.path bootstrap for standalone runs)
+- Bug 3: `make_daemon` left stale service handles on the closed db;
+  every handle is now reassigned
+- Bug 4: bootcamp `evidence_summary` counted all history; filtered to
+  the bootcamp's own window
+- Bug 5: a second concurrent ACTIVE session was allowed; refused now
+- Bug 6: suppress.js promised `surface_rule_stale` and never emitted
+  it; stale selectors are now reported (60s no-match, once per load)
+- Bug 7: builder clause vs allowlist — the allowlist wins, recorded as
+  `builder_clause_overridden_by_allowlist` (L-6 note added)
+- Bug 8: the WAL-quarantine test passed trivially; strengthened to
+  require quarantine-or-removal
+
+### Added — operator QoL toolkit (part one)
+- `dhriti health` — one screen, exit code 0 only when OK
+- `dhriti explain` — trace an event/id/chain to its ledger rows
+- `dhriti backup [--dest]` — manifest + sha256 + chain verify before
+  and after (dhriti/backup.py)
+- `dhriti journal add|list|export` — separate sqlite, the ledger
+  records only the fact (dhriti/journal.py)
+- `dhriti config validate|show|get|set` — cold-state set refuses while
+  the daemon holds the lock
+- `scripts/lint_surfaces.py` — L-1 affordance lint + L-2/L-7 phrase
+  lint + version-pin check on the extension surfaces
+- `scripts/pre-commit` — full suite + surface lint
+- `.github/workflows/tests.yml` — ubuntu/windows/macos × 3.11/3.12
+- `tests/test_golden_day.py` — the demo must run clean as a subprocess
+
+### Tests
+- Suite: 116 → 128, all green (exact count at ship)
+
 ## v0.3.0 — 2026-11-03 — the behavioral-reference batch
 
 **The question this release answers:** *"did you consider the

@@ -203,7 +203,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true; // async response
   }
-  if (msg && msg.type === "surface_suppressed") {
+  if (msg && (msg.type === "surface_suppressed"
+             || msg.type === "surface_rule_stale")) {
     postTypedEvent(msg);
     sendResponse({ ok: true });
     return false;
