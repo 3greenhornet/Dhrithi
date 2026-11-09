@@ -23,6 +23,7 @@ Startup recovery (dossier 3.4, PDF 3.4):
 """
 
 import datetime as _dt
+from datetime import timedelta
 import hashlib
 import json
 import os
@@ -43,6 +44,7 @@ from .evidence import EvidenceService
 from .errors import BreakGlassError
 from .ledger import Ledger
 from .models import SessionState, WorkMode
+from .migrations import run_migrations
 from .policy import PolicyEngine
 from .profiles import CATEGORY_DOMAINS, load_profiles
 from .research_pass import ResearchService
@@ -51,6 +53,7 @@ from .session import SessionService
 from .timeutil import Clock, RealClock, local_tz, parse_iso, to_iso
 from .break_glass import BreakGlassService
 from .aftermath import AftermathService
+from .vidura import ViduraService
 
 
 class Daemon:
@@ -71,18 +74,23 @@ class Daemon:
                 "anchor_interval_events", 100)))
         self.contracts = None  # set after services init
         self.days = DayService(self.db, self.config, self.clock)
+        self.contracts = self.days.contracts
         self.sessions = SessionService(self.db, self.clock)
-        self.evidence = EvidenceService(self.db, self.clock)
-        self.research = ResearchService(self.db, self.config, self.clock)
+        self.evidence = EvidenceService(self.db, self.clock, home=self.home)
+        self.passes = ResearchService(self.db, self.config, self.clock)
         self.bootcamp = BootcampService(self.db, self.config, self.clock)
-        self.break_glass = BreakGlassService(
+        self.breaks = BreakGlassService(
             self.db, self.config, self.clock, self.ledger)
         self.aftermath = AftermathService(
             self.db, self.config, self.clock, self.ledger)
         self.parking = ParkingLotService(self.db, self.clock, self.ledger)
         self.review = ColdReviewService(self.db, self.clock, self.ledger)
+        self.vidura = ViduraService(self.db, self.config, self.clock,
+                                     self.ledger)
         self.policy_engine = PolicyEngine(self.db, self.clock)
         self.profiles = load_profiles(self.home)
+        # lazy migration (backup-first, additive, idempotent)
+        self._migrate()
         # D-050 (configuration immutability): the running daemon never
         # hot-reloads config or profiles. The loaded rules are
         # fingerprinted at start; a config/profile file that changes on
@@ -93,6 +101,7 @@ class Daemon:
         self._disk_fingerprint_at_start = self._disk_fingerprint()
         self._evening_marker_date = None    # D-048 dedupe
         self._earned_marker_date = None     # D-049 dedupe
+        self._heartbeat_prune_date = None   # v0.5.0: once per day
 
         self._bridge_state = BridgeState()
         self._policy_provider = self._current_extension_policy
@@ -102,6 +111,27 @@ class Daemon:
         self.bridge = self._build_bridge()
         self._stop = False
         self._lock_path = self.home / "daemon.lock"
+
+    def _migrate(self):
+        """Lazy schema migration with a verified backup first (the
+        migration discipline, Part 5 §4)."""
+        from .migrations import current_version
+        from .constants import SCHEMA_VERSION
+        if current_version(self.db) >= SCHEMA_VERSION:
+            return
+
+        def _backup():
+            from .backup import BackupService
+            service = BackupService(self.home, self.db, self.ledger,
+                                    self.clock)
+            return service.create(self.home / "migrations")
+
+        report = run_migrations(self.db, self.home, self.ledger,
+                                self.clock, backup_runner=_backup)
+        if report.get("applied"):
+            print(f"[migration] schema {report['from']} -> "
+                  f"{report['to']} ({len(report['applied'])} steps; "
+                  f"backup: {report.get('backup')})")
 
     # -- bridge wiring ---------------------------------------------------------
     @staticmethod
@@ -131,7 +161,7 @@ class Daemon:
             return
         self.ledger.record(
             "config_drift_detected",
-            observed_payload={"at_start": self._disk_fingerprint_at_start,
+            observed={"at_start": self._disk_fingerprint_at_start,
                               "on_disk_now": disk_now},
             action_taken="no hot reload — change takes effect at "
                         "next daemon start (D-050)",
@@ -166,7 +196,7 @@ class Daemon:
                 daemon.ledger.record(
                     "browser_proof_submitted",
                     source_adapter="extension",
-                    observed_payload=event)
+                    observed=event)
                 return
             active = daemon.sessions.active()
             handle_extension_event(
@@ -208,7 +238,7 @@ class Daemon:
         rules["expires_at"] = to_iso(
             self.clock.now_utc() + timedelta(minutes=ttl_minutes))
         # fold in the current research pass sources (bounded allowance)
-        active_pass = self.research.active_for()
+        active_pass = self.passes.active_for()
         if active_pass:
             rules["research_sources"] = active_pass["sources"]
             rules["research_expires_at"] = active_pass["expires_at"]
@@ -245,7 +275,7 @@ class Daemon:
             self._earned_marker_date = day["date"]
             self.ledger.record(
                 "earned_evening_applied",
-                observed_payload={"date": day["date"],
+                observed={"date": day["date"],
                                   "categories": categories,
                                   "until": to_iso(until),
                                   "targets_met": False},
@@ -260,7 +290,7 @@ class Daemon:
             if row:
                 try:
                     contract_line = (json.loads(row["payload_json"])
-                                     .get("mandatory_task") or "")
+                                     .get("contract_line") or "")
                 except Exception:
                     contract_line = ""
         return {
@@ -309,13 +339,13 @@ class Daemon:
                 self.ledger.record(
                     "session_recovered_interrupted",
                     session_id=sess["id"],
-                    observed_payload={"prior_state": sess["state"]},
+                    observed={"prior_state": sess["state"]},
                     action_taken="marked INTERRUPTED")
                 notes.append(f"session {sess['id'][:8]} -> INTERRUPTED")
         recovered_days = self.days.recover_open_days()
         for day_id in recovered_days:
             self.ledger.record(
-                "day_recovered", observed_payload={"day": day_id},
+                "day_recovered", observed={"day": day_id},
                 action_taken="marked RECOVERED")
             notes.append(f"day {day_id[:8]} -> RECOVERED")
         return notes
@@ -329,7 +359,7 @@ class Daemon:
         if recovery:
             for note in recovery:
                 print(f"[recovery] {note}")
-        self.ledger.record("daemon_started", observed_payload={
+        self.ledger.record("daemon_started", observed={
             "pid": os.getpid(), "host": socket.gethostname(),
             "config_fingerprint": self._loaded_fingerprint})
         self.bridge.start()
@@ -353,7 +383,7 @@ class Daemon:
         self._stop = True
 
     def _shutdown(self):
-        self.ledger.record("daemon_stopping", observed_payload={
+        self.ledger.record("daemon_stopping", observed={
             "clean": True})
         day = self.days.get(self._local_today())
         if not (day and day["state"] == "OPEN"):
@@ -372,6 +402,7 @@ class Daemon:
         self.db.insert("heartbeat", {
             "at_utc": to_iso(now), "pid": os.getpid(),
             "host": socket.gethostname()})
+        self._prune_heartbeats()
         today = self._local_today()
         self.days.ensure_day(today)
         day = self.days.get(today)
@@ -387,7 +418,7 @@ class Daemon:
             if new_day["state"] != day["state"]:
                 self.ledger.record(
                     "day_state_changed",
-                    observed_payload={"date": new_day["date"],
+                    observed={"date": new_day["date"],
                                       "from": day["state"],
                                       "to": new_day["state"]})
                 day = new_day
@@ -395,10 +426,10 @@ class Daemon:
                     self._disarm_adapters()
 
         # 3. research pass expiry
-        for pass_id in self.research.expire_overdue():
+        for pass_id in self.passes.expire_overdue():
             self.ledger.record(
                 "research_pass_expired",
-                observed_payload={"pass": pass_id},
+                observed={"pass": pass_id},
                 action_taken="sources no longer allowed")
 
         # 3b. evening observation marker (D-048), once per day
@@ -407,7 +438,7 @@ class Daemon:
             self._evening_marker_date = today
             self.ledger.record(
                 "evening_observation_active",
-                observed_payload={
+                observed={
                     "date": today.isoformat(),
                     "until": to_iso(self._observation_end(today))},
                 action_taken="observation continues past window_end; "
@@ -426,10 +457,33 @@ class Daemon:
                     self.ledger.record(
                         "observer_poll_failed",
                         source_adapter=adapter.name,
-                        observed_payload={"error": str(exc)},
+                        observed={"error": str(exc)},
                         telemetry_quality="DEGRADED")
 
         self._publish()
+
+    def _prune_heartbeats(self, keep_hours: int = 48):
+        """Heartbeats older than keep_hours are deleted, once per day.
+        v0.5.0: the guard is per-daemon-instance (`_heartbeat_prune_date`)
+        — a restarting daemon prunes again on the same day (idempotent,
+        but the "once per day" claim is only per-instance). v0.6.0
+        Part 1 §9.1 persists the guard in meta."""
+        today = self.clock.now_utc().strftime("%Y-%m-%d")
+        if self._heartbeat_prune_date == today:
+            return
+        self._heartbeat_prune_date = today
+        cutoff = (self.clock.now_utc()
+                  - timedelta(hours=keep_hours)).strftime(
+                      "%Y-%m-%dT%H:%M:%SZ")
+        cur = self.db.execute("DELETE FROM heartbeat WHERE at_utc < ?",
+                              (cutoff,))
+        if cur.rowcount:
+            self.ledger.record(
+                "heartbeat_pruned",
+                observed={"cutoff": cutoff,
+                          "deleted": cur.rowcount},
+                action_taken="heartbeats older than "
+                            f"{keep_hours}h pruned")
 
     def _disarm_adapters(self):
         keep_observing = self._evening_observation_active()
@@ -442,7 +496,7 @@ class Daemon:
             except Exception:
                 pass
         # bridge serves dormant policy (enforce=false) -> extension unlocks
-        self.ledger.record("adapters_disarmed", observed_payload={
+        self.ledger.record("adapters_disarmed", observed={
             "observation_continues": keep_observing})
 
     def _publish(self):
@@ -455,6 +509,7 @@ class Daemon:
             "daemon": "running",
             "now_utc": self.clock.iso(),
             "today": today.isoformat(),
+            "day": day["state"] if day else "none",
             "day_state": day["state"] if day else "none",
             "active_session": (active["id"] if active else None),
             "evening": {
@@ -500,15 +555,14 @@ class Daemon:
             raise RuntimeError(
                 f"day is {day['state']}; the wall is only up while the "
                 "day is OPEN")
-        self.break_glass.check_session_start_allowed()
-        session = self.sessions.start(
-            day["id"], task, evidence_spec, condition)
+        self.breaks.check_session_start_allowed()
+        contract = self.days.contracts.require_sealed_daily(today)
+        session = self.sessions.create(day["id"], contract["id"], task)
         session = self.sessions.seal(session["id"])
 
         # policy snapshot: contract + profile + mode + research sources
-        contract = self.days.contracts.require_sealed_daily(today)
         profile = self.profiles.get(profile_name, {})
-        active_pass = self.research.active_for(session["id"])
+        active_pass = self.passes.active_for(session["id"])
         bootcamp = self.bootcamp.active()
         taper_stage = bootcamp["taper_stage"] if bootcamp else 1
         mode = (WorkMode.BOUNDED_RESEARCH
@@ -535,7 +589,7 @@ class Daemon:
                     self.ledger.record(
                         "builder_clause_overridden_by_allowlist",
                         session_id=None,
-                        observed_payload={
+                        observed={
                             "domains": overridden,
                             "reason": "profile allowlist wins (L-6 note)"},
                         action_taken="builder block skipped for allowlisted "
@@ -545,7 +599,7 @@ class Daemon:
                     self.ledger.record(
                         "builder_clause_applied",
                         session_id=session["id"],
-                        observed_payload={
+                        observed={
                             "domains": extra_blocked,
                             "reason": "day targets unmet"},
                         action_taken="builder domains blocked until targets met",
@@ -563,7 +617,7 @@ class Daemon:
         self.ledger.record(
             "policy_sealed", session_id=session["id"],
             policy_version=str(policy["version"]),
-            observed_payload={"mode": mode.value,
+            observed={"mode": mode.value,
                               "taper_stage": taper_stage},
             action_taken="snapshot frozen for session")
 
@@ -577,14 +631,14 @@ class Daemon:
                 session["id"], report.disclosure())
             self.ledger.record(
                 "session_arming_failed", session_id=session["id"],
-                observed_payload={"failed": report.failed},
+                observed={"failed": report.failed},
                 action_taken="disclosed")
             raise RuntimeError(
                 f"arming failed — session NOT active. {report.disclosure()}")
         session = self.sessions.activate(session["id"])
         self.ledger.record(
             "session_active", session_id=session["id"],
-            observed_payload={"task": task},
+            observed={"task": task},
             action_taken="wall up; disclosure: " + report.disclosure())
         return session
 
@@ -596,16 +650,21 @@ class Daemon:
         if accepted < 1:
             raise RuntimeError(
                 "no accepted evidence for this session — submit proof "
-                "first (dhriti proof ...) or end it INCOMPLETE")
-        result = self.sessions.end_success(session_id, note)
+                "first (dhriti evidence machine ...) or end it INCOMPLETE")
+        day = self.days.get_by_id(sess["day_id"])
+        targets_met = self.days.targets_met(day) if day else True
+        result = self.sessions.finish(
+            session_id, SessionState.SUCCESS,
+            targets_met=targets_met, note=note)
         self.ledger.record(
             "session_success", session_id=session_id,
-            observed_payload={"accepted_evidence": accepted},
+            observed={"accepted_evidence": accepted},
             action_taken="wall stays up until day release")
         return result
 
     def end_session_incomplete(self, session_id: str, note: str = "") -> dict:
-        result = self.sessions.end_incomplete(session_id, note)
+        result = self.sessions.finish(
+            session_id, SessionState.INCOMPLETE, note=note)
         self.ledger.record("session_incomplete", session_id=session_id)
         return result
 
@@ -614,12 +673,12 @@ class Daemon:
             "SELECT * FROM day WHERE date=?", (day_date_iso,))
         if not day:
             raise RuntimeError("no such day")
-        report = self.aftermath.day_report(day)
+        report = self.aftermath.day_report(day["date"])
         out_dir = self.home / self.config.get("report", {}).get(
             "dir", "reports")
         paths = self.aftermath.write(report, out_dir, f"aftermath-{day_date_iso}")
         self.ledger.record(
-            "aftermath_generated", observed_payload={
+            "aftermath_generated", observed={
                 "day": day_date_iso, "paths": paths})
         return paths
 

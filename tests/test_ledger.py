@@ -12,14 +12,14 @@ from test_plumbing import DhritiTestCase
 class TestLedgerChain(DhritiTestCase):
     def test_chain_verifies_clean(self):
         for i in range(10):
-            self.ledger.record("test_event", observed_payload={"i": i})
+            self.ledger.record("test_event", observed={"i": i})
         result = self.ledger.verify_chain()
         self.assertTrue(result["ok"])
         self.assertEqual(result["checked"], 10)
 
     def test_row_edit_detected(self):
         for i in range(5):
-            self.ledger.record("test_event", observed_payload={"i": i})
+            self.ledger.record("test_event", observed={"i": i})
         # bypass our wrapper and the triggers via a raw connection:
         # drop trigger, tamper, restore trigger (an owner could do this)
         raw = sqlite3.connect(str(self.home / "dhriti.sqlite3"))
@@ -37,7 +37,7 @@ class TestLedgerChain(DhritiTestCase):
 
     def test_row_deletion_detected(self):
         for i in range(5):
-            self.ledger.record("test_event", observed_payload={"i": i})
+            self.ledger.record("test_event", observed={"i": i})
         raw = sqlite3.connect(str(self.home / "dhriti.sqlite3"))
         raw.execute("DROP TRIGGER trg_event_no_delete")
         raw.execute("DELETE FROM event WHERE seq=2")
@@ -56,7 +56,7 @@ class TestLedgerChain(DhritiTestCase):
 
     def test_anchors_written(self):
         for i in range(12):  # anchor_interval is 5 in the test plumbing
-            self.ledger.record("test_event", observed_payload={"i": i})
+            self.ledger.record("test_event", observed={"i": i})
         anchors = self.db.query(
             "SELECT * FROM anchor ORDER BY rowid")
         self.assertGreaterEqual(len(anchors), 2)
@@ -65,7 +65,7 @@ class TestLedgerChain(DhritiTestCase):
         self.assertEqual(self.ledger.head()["seq"], 12)
 
     def test_export_json_and_csv(self):
-        self.ledger.record("test_event", observed_payload={"a": 1})
+        self.ledger.record("test_event", observed={"a": 1})
         json_path = self.ledger.export(str(self.home / "e.json"))
         csv_path = self.ledger.export(str(self.home / "e.csv"), fmt="csv")
         self.assertTrue(json_path.exists() and csv_path.exists())

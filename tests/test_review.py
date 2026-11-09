@@ -1,6 +1,6 @@
-"""Schema v2 + cold-state mechanisms: main-belief contracts, emergency
-path, parking lot, cold review, digest, suppression flag, builder
-clause, specimen coder."""
+"""Cold-state mechanisms: contracts schema, emergency path, parking
+lot, cold review, digest, suppression flag, builder clause, specimen
+coder."""
 
 import json
 import subprocess
@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis"
 
 from dhriti.db import Database, resolve_journal_mode
 from dhriti.errors import BreakGlassError, ContractError
-from dhriti.ledger import Ledger
 from dhriti.models import ContractKind
 from dhriti.review import (ColdReviewService, ParkingLotService,
                            REVIEW_QUESTIONS, build_digest)
@@ -39,11 +38,8 @@ class TestJournalMode(unittest.TestCase):
         (tmp / "dhriti.sqlite3-wal").write_bytes(b"garbage")
         db2 = Database(db_path, journal_mode="delete")
         db2.close()
-        # Bug 8 (Phase 0): the old assertion passed trivially (it only
-        # checked names of files that contain 'corrupt'). The strengthened
-        # contract: the database opens, AND either the suspect sidecar was
-        # quarantined as *.corrupt-* or no -wal file remains — garbage
-        # must never silently survive under its old name.
+        # Bug 8 (Phase 0): the database opens, AND either the suspect
+        # sidecar was quarantined as *.corrupt-* or no -wal file remains.
         self.assertTrue(db_path.exists())
         corrupt = [p.name for p in tmp.iterdir() if "corrupt" in p.name]
         wal = [p.name for p in tmp.iterdir() if p.name.endswith("-wal")]
@@ -56,17 +52,13 @@ class TestJournalMode(unittest.TestCase):
 
 
 class TestContractSchemaV2(DhritiTestCase):
-    def test_main_belief_group_required(self):
+    def test_main_belief_requires_label(self):
         payload = daily_payload()
-        for field in ("main_belief", "main_belief_metric",
-                      "main_belief_current_state", "substitute_activities",
-                      "substitute_budget"):
-            broken = dict(payload)
-            broken.pop(field)
-            with self.assertRaises(ContractError) as ctx:
-                self.contracts.create_draft(
-                    ContractKind.DAILY, self.today.isoformat(), broken)
-            self.assertIn("D-030", str(ctx.exception))
+        payload["main_belief"] = "compiler practice"   # not an object
+        with self.assertRaises(ContractError) as ctx:
+            self.contracts.create_draft(
+                ContractKind.DAILY, self.today.isoformat(), payload)
+        self.assertIn("main_belief", str(ctx.exception))
 
     def test_if_then_group_is_all_or_nothing(self):
         payload = daily_payload()
@@ -79,7 +71,7 @@ class TestContractSchemaV2(DhritiTestCase):
         self.assertTrue(cid)
         # partial group -> refused
         partial = daily_payload()
-        partial.pop("if_then_response")
+        partial["expected_obstacle"] = "the loop throws"
         with self.assertRaises(ContractError) as ctx:
             self.contracts.create_draft(
                 ContractKind.DAILY, self.today.isoformat(), partial)
@@ -102,38 +94,34 @@ class TestContractSchemaV2(DhritiTestCase):
 
 class TestEmergencyPath(DhritiTestCase):
     def test_emergency_is_immediate_logged_and_cooldown_free(self):
-        result = self.break_glass.emergency(
-            "family emergency, had to leave the desk now")
-        self.assertTrue(result["emergency"])
-        row = self.break_glass._last_confirmed()
-        self.assertEqual(row["id"], result["handle"])
+        result = self.breaks.emergency(
+            None, "family emergency, had to leave the desk now")
+        self.assertEqual(result["kind"], "emergency")
+        row = self.breaks._last_confirmed()
+        self.assertEqual(row["id"], result["id"])
         self.assertIsNone(row["cooldown_until"])
         # the emergency never blocks the next session
-        self.assertIsNone(self.break_glass.cooldown_active())
+        self.assertIsNone(self.breaks.cooldown_active())
         # and it is its own event type in the ledger
         events = self.ledger.events(event_type="emergency_exception")
         self.assertEqual(len(events), 1)
 
     def test_emergency_still_requires_typed_reason(self):
         with self.assertRaises(BreakGlassError):
-            self.break_glass.emergency("too short")
+            self.breaks.emergency(None, "too short")
         with self.assertRaises(BreakGlassError):
-            self.break_glass.emergency("   ")
+            self.breaks.emergency(None, "   ")
 
 
 class TestParkingLot(DhritiTestCase):
-    def setUp(self):
-        super().setUp()
-        self.parking = ParkingLotService(self.db, self.clock, self.ledger)
-
     def test_park_and_dispose(self):
         row = self.parking.park("why does the JVM verify bytecode",
-                                origin="curiosity while coding")
+                                source="curiosity while coding")
         self.assertEqual(row["disposition"], "parked")
         self.assertIn("curiosity_topic_parked",
                       [e["event_type"] for e in self.ledger.events()])
         done = self.parking.dispose(row["id"], "approved",
-                                    "add to allowed research")
+                                    note="add to allowed research")
         self.assertEqual(done["disposition"], "approved")
         # double disposition refused
         with self.assertRaises(ValueError):
@@ -157,15 +145,13 @@ class TestParkingLot(DhritiTestCase):
 
 
 class TestColdReview(DhritiTestCase):
-    def setUp(self):
-        super().setUp()
-        self.review = ColdReviewService(self.db, self.clock, self.ledger)
-
     def test_six_fixed_questions_exist(self):
-        for key in ("competence_source", "faking_it", "wall_or_choice",
-                    "out_of_scope_device", "evidence_quality",
-                    "surveillance_comfort"):
-            self.assertIn(key, REVIEW_QUESTIONS)
+        keys = {k for k, _ in REVIEW_QUESTIONS}
+        self.assertEqual(len(REVIEW_QUESTIONS), 6)
+        for key in ("competence_source", "targets_honest",
+                    "toll_worth_it",
+                    "what_would_make_tomorrow_sealable"):
+            self.assertIn(key, keys)
 
     def test_answers_stored_outside_ledger_payload(self):
         self.review.record("week:2026-11-02", "competence_source",
@@ -183,16 +169,24 @@ class TestColdReview(DhritiTestCase):
         with self.assertRaises(ValueError):
             self.review.record("week:2026-11-02", "how_great_am_i", "very")
 
+    def test_leisure_question_conditional(self):
+        qs = self.review.questions_for(leisure_declared=False)
+        self.assertEqual(len(qs), 6)
+        qs = self.review.questions_for(leisure_declared=True)
+        self.assertEqual(len(qs), 7)
+        self.assertIn("leisure_honored", {k for k, _ in qs})
+
 
 class TestDigest(DhritiTestCase):
     def test_digest_contains_facts_and_chain_head(self):
         self.seal_today()
         # one break with a reason
-        handle = self.break_glass.initiate()["handle"]
-        self.break_glass.confirm(handle, "needed docs that were blocked "
-                                     "for the task")
+        record = self.breaks.initiate(None)
+        self.breaks.confirm(record["id"],
+                            "needed docs that were blocked for the task")
         text = build_digest(self.db, self.ledger,
-                            self.today.isoformat(), clock=self.clock)
+                            self.today.isoformat(), config=self.config,
+                            clock=self.clock)
         self.assertIn("DHRITI WEEKLY DIGEST", text)
         self.assertIn("chain head:", text)
         self.assertIn("needed docs that were blocked", text)
@@ -257,30 +251,17 @@ class TestDaemonBuilderClause(DhritiTestCase):
 
 
 class TestAftermathNewBlocks(DhritiTestCase):
-    def setUp(self):
-        super().setUp()
-        from dhriti.aftermath import AftermathService
-        self.aftermath = AftermathService(
-            self.db, self.config, self.clock, self.ledger)
-
-    def test_day_report_shows_exchange_parking_review_and_breaks(self):
-        parking = ParkingLotService(self.db, self.clock, self.ledger)
-        review = ColdReviewService(self.db, self.clock, self.ledger)
-        self.seal_today()
-        day = self.days.ensure_day(self.today)
-        parking.park("why does JIT deopt", day_id=day["id"])
-        review.record(f"day:{self.today.isoformat()}",
-                      "wall_or_choice", "the wall was up")
-        self.break_glass.emergency("laptop on fire, literally",
-                                   day_id=day["id"])
-        report = self.aftermath.day_report(self.days.get(self.today))
+    def test_day_report_shows_parking_review_and_breaks(self):
+        self.parking.park("why does JIT deopt")
+        self.review.record(f"day:{self.today.isoformat()}",
+                           "targets_honest", "the wall was up")
+        self.breaks.emergency(None, "laptop on fire, literally")
+        report = self.aftermath.day_report(self.today.isoformat())
         md = report["markdown"]
-        self.assertIn("The exchange", md)
-        self.assertIn("I want to be a software engineer", md)
         self.assertIn("why does JIT deopt", md)
-        self.assertIn("wall_or_choice: the wall was up", md)
-        self.assertIn("EMERGENCY", md)
+        self.assertIn("targets_honest: the wall was up", md)
         self.assertIn("Consumption facts", md)
+        self.assertIn("## Breaks", md)
 
 
 class TestSpecimenCoder(unittest.TestCase):

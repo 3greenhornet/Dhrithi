@@ -43,16 +43,16 @@ class TestBootcamp(DhritiTestCase):
         self.db.update("day", day["id"], {
             "state": DayState.CLOSED_COMPLETE.value, "targets_met": 1})
         # a successful session with accepted evidence
-        sess = self.sessions.start(day["id"], "t", "")
-        self.sessions.seal(sess["id"])
-        self.sessions.arming(sess["id"])
-        self.sessions.activate(sess["id"])
+        contract = self.contracts.for_day(self.today.isoformat())
+        sess = self.sessions.create(day["id"], contract["id"], "t")
+        self.walk_to_active(sess["id"])
         self.db.insert("evidence", {
             "id": "ev1", "session_id": sess["id"], "class": "SUBMITTED",
             "kind": "file", "submitted_at": self.clock.iso(),
             "detail_json": "{}", "verdict": "ACCEPTED",
             "verdict_reason": "test", "checked_at": self.clock.iso()})
-        self.sessions.end_success(sess["id"])
+        from dhriti.models import SessionState
+        self.sessions.finish(sess["id"], SessionState.SUCCESS)
         self.clock.advance(days=31)
         rec = self.bootcamp.compute_taper()
         self.assertEqual(rec["reason"], "evidence thresholds met")
@@ -64,10 +64,10 @@ class TestBootcamp(DhritiTestCase):
         # two confirmed breaks in the last week (cooldown respected:
         # 3h passes between them, both stay inside the 7-day window)
         for i in range(2):
-            handle = self.break_glass.initiate()
+            record = self.breaks.initiate(None)
             self.clock.advance(minutes=1)
-            self.break_glass.confirm(handle["handle"],
-                                     f"reason number {i} is long enough")
+            self.breaks.confirm(record["id"],
+                                f"reason number {i} is long enough")
             self.clock.advance(hours=3)
         rec = self.bootcamp.compute_taper()
         self.assertEqual(rec["reason"],
@@ -87,11 +87,11 @@ class TestBootcampRestart(DhritiTestCase):
         self.seal_today()
         day = self.days.ensure_day(self.today)
         self.days.try_open(day)
-        session = self.sessions.start(day["id"], "t1", "")
-        self.sessions.seal(session["id"])
-        self.sessions.arming(session["id"])
-        self.sessions.activate(session["id"])
-        self.sessions.end_success(session["id"])
+        contract = self.contracts.for_day(self.today.isoformat())
+        session = self.sessions.create(day["id"], contract["id"], "t1")
+        self.walk_to_active(session["id"])
+        from dhriti.models import SessionState
+        self.sessions.finish(session["id"], SessionState.SUCCESS)
         self.clock.advance(days=40)
         self.bootcamp.graduate()
         # bootcamp 2 starts fresh: zero days inside its window

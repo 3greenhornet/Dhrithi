@@ -15,7 +15,7 @@ from test_plumbing import DhritiTestCase
 class TestBackup(DhritiTestCase):
     def test_backup_creates_manifest_and_verifies(self):
         self.ledger.record("something_happened",
-                           observed_payload={"a": 1})
+                           observed={"a": 1})
         service = BackupService(self.home, self.db, self.ledger,
                                 self.clock)
         manifest = service.create()
@@ -52,7 +52,7 @@ class TestJournal(DhritiTestCase):
             # the ledger records the FACT only
             self.ledger.record(
                 "journal_entry_added",
-                observed_payload={"at": row["at_utc"]})
+                observed={"at": row["at_utc"]})
             events = self.ledger.events(event_type="journal_entry_added")
             self.assertEqual(len(events), 1)
             self.assertNotIn("mirror works",
@@ -90,10 +90,14 @@ class TestConfigCli(DhritiTestCase):
         from dhriti import cli
         (self.home / "dhriti.config.json").write_text(
             "{}", encoding="utf-8")
-        ctx = argparse.Namespace(sub="validate", home=str(self.home))
+        ns = argparse.Namespace(sub="validate", home=str(self.home))
+        ctx = self.make_cli_context()
         out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            cli.cmd_config(ctx)
+        try:
+            with contextlib.redirect_stdout(out):
+                cli.cmd_config(ns, ctx)
+        finally:
+            ctx.close()
         self.assertIn("[ok  ] config valid", out.getvalue())
 
 

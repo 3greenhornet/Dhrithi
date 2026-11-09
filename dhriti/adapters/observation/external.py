@@ -72,7 +72,7 @@ class SysmonAdapter(Adapter):
                             "process_event",
                             source_adapter="sysmon",
                             process_instance_id=row.get("ProcessGuid"),
-                            observed_payload={
+                            observed={
                                 "event_id": row.get("EventID"),
                                 "image": row.get("Image"),
                                 "parent": row.get("ParentImage"),

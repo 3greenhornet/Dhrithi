@@ -5,6 +5,16 @@ with well-made placeholders wherever something needs manual
 download/integration. This is that build. Read this page, then you
 are oriented.
 
+## v0.5 — the surface rebuild + Vidura (one screen)
+
+The CLI became a Context architecture (every command wired the same
+way tests wire them); contracts moved to the identity / contract-line /
+targets-with-evidence schema; the research pass became the bounded,
+topic-locked AI pass (declared question, minute budget, sources gone
+at expiry); Vidura arrived — the spaced-review scheduler for your own
+answers (SM-2 variant, off by default); migrations are lazy, additive
+and backed-up; the bridge binds ephemeral ports and serves a `day` key.
+
 ## v0.4 — the stabilization and operator batch (one screen)
 
 Phase 0 closed the eight bugs found in the base audit; the

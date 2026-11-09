@@ -15,7 +15,7 @@ from test_plumbing import DhritiTestCase, daily_payload
 class TestContracts(DhritiTestCase):
     def test_draft_requires_fields(self):
         payload = daily_payload()
-        payload.pop("core_belief")
+        payload.pop("contract_line")
         with self.assertRaises(ContractError):
             self.contracts.create_draft(
                 ContractKind.DAILY, self.today.isoformat(), payload)
@@ -23,9 +23,10 @@ class TestContracts(DhritiTestCase):
     def test_seal_and_immutability(self):
         contract = self.seal_today()
         self.assertEqual(contract["state"], ContractState.SEALED.value)
-        # sealing twice refuses
+        # sealing twice for the same day refuses (commitment is not
+        # double-written)
         with self.assertRaises(ContractError):
-            self.contracts.seal(contract["id"])
+            self.contracts.seal(self.days.today(), daily_payload())
 
     def test_sealed_contract_survives_direct_sql_update(self):
         contract = self.seal_today()
@@ -42,7 +43,7 @@ class TestContracts(DhritiTestCase):
         payload = daily_payload()
         first = self.contracts.create_draft(
             ContractKind.DAILY, self.today.isoformat(), payload)
-        payload["mandatory_task"] = "write the failing test first"
+        payload["contract_line"] = "write the failing test first"
         second = self.contracts.create_draft(
             ContractKind.DAILY, self.today.isoformat(), payload)
         self.assertEqual(

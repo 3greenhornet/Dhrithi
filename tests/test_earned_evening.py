@@ -58,7 +58,7 @@ class TestEarnedEvening(DhritiTestCase):
         self.assertNotIn("google.com", policy["blocked_domains"])
         # the wall page still speaks only the user's own contract line
         self.assertEqual(policy["contract_line"],
-                         "reverse the array in Java")
+                         daily_payload()["contract_line"])
         # the event fires exactly once per day
         daemon._current_extension_policy()
         daemon._current_extension_policy()
@@ -84,7 +84,8 @@ class TestEarnedEvening(DhritiTestCase):
         daemon._tick()
         sess = daemon.start_session("reverse the array")
         daemon.evidence.machine_check_command(
-            sess["id"], "python3 -c \"print('sorted')\"")
+            sess["id"], "reversal passes its test",
+            daily_payload()["targets"][0]["evidence"]["command"])
         daemon.end_session_success(sess["id"])
         self.clock.advance(hours=10, minutes=2)   # day_close, targets met
         daemon._tick()
@@ -119,11 +120,12 @@ class TestEveningObservation(DhritiTestCase):
         self.clock.advance(minutes=30)
         daemon.ledger.record(
             "browser_navigation", source_adapter="extension",
-            observed_payload={"url": "https://www.youtube.com/watch?v=x",
+            observed={"url": "https://www.youtube.com/watch?v=x",
                               "title": ""})
         aftermath = AftermathService(daemon.db, daemon.config, daemon.clock,
                                      daemon.ledger)
-        md = aftermath.day_report(daemon.days.get(self.today))["markdown"]
+        md = aftermath.day_report(
+            daemon.days.get(self.today)["date"])["markdown"]
         self.assertIn("video: 1", md)
         self.assertIn("after window_end (evening)", md)
         self.assertIn("1 after window_end", md)

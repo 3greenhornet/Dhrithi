@@ -89,7 +89,7 @@ class ActivityWatchAdapter(Adapter):
                     event_type,
                     source_adapter="activitywatch",
                     source_version=str(meta.get("created", ""))[:40],
-                    observed_payload={
+                    observed={
                         "bucket": bucket_id,
                         "app": payload.get("app"),
                         "title": payload.get("title"),

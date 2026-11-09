@@ -6,11 +6,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import unittest
 
 import json
+import urllib.error
 import urllib.request
 
 from dhriti.models import DayState, SessionState
 
 from test_plumbing import DhritiTestCase, daily_payload
+
+
+def _seal(daemon, today, payload=None):
+    payload = payload or daily_payload()
+    return daemon.days.contracts.seal(today.isoformat(), payload)
 
 
 class TestDaemonIntegration(DhritiTestCase):
@@ -21,22 +27,18 @@ class TestDaemonIntegration(DhritiTestCase):
         # 1. bootcamp
         daemon.bootcamp.start(30)
         # 2. cold-state ritual (the one requirement: write something)
-        payload = daily_payload()
-        cid = daemon.days.contracts.create_draft(
-            __import__("dhriti.models", fromlist=["ContractKind"])
-            .ContractKind.DAILY, self.today.isoformat(), payload)
-        daemon.days.contracts.seal(cid)
+        _seal(daemon, self.today)
         # 3. daemon ticks: day should open exactly at window start
         daemon._tick()
         day = daemon.days.get(self.today)
         self.assertEqual(day["state"], DayState.OPEN.value)
         # 4. session start through the arming gate
-        sess = daemon.start_session(
-            "reverse the array", '[{"kind":"command"}]')
+        sess = daemon.start_session("reverse the array")
         self.assertEqual(sess["state"], SessionState.ACTIVE.value)
-        # 5. proof: a real machine-checked command
+        # 5. proof: the contract's declared command, machine-checked
         ev = daemon.evidence.machine_check_command(
-            sess["id"], "python3 -c \"print('sorted')\"")
+            sess["id"], "reversal passes its test",
+            daily_payload()["targets"][0]["evidence"]["command"])
         self.assertEqual(ev["verdict"], "ACCEPTED")
         # 6. session success
         daemon.end_session_success(sess["id"])
@@ -44,7 +46,7 @@ class TestDaemonIntegration(DhritiTestCase):
         daemon.ledger.record("browser_navigation",
                              source_adapter="extension",
                              session_id=sess["id"],
-                             observed_payload={
+                             observed={
                                  "url": "https://youtube.com/watch?v=x"})
         # 8. day_close passes with targets met -> early release
         self.clock.advance(hours=10, minutes=2)
@@ -53,7 +55,7 @@ class TestDaemonIntegration(DhritiTestCase):
         self.assertEqual(day["state"], DayState.RELEASED_EARLY.value)
         # 9. aftermath + verification
         paths = daemon.run_aftermath(self.today.isoformat())
-        self.assertTrue(paths["html"].endswith(".html"))
+        self.assertTrue(str(paths["html"]).endswith(".html"))
         result = daemon.ledger.verify_chain()
         self.assertTrue(result["ok"])
         daemon.release_lock()
@@ -64,12 +66,7 @@ class TestDaemonIntegration(DhritiTestCase):
             enforcement={"required_adapters": ["extension_bridge"],
                          "level": "E1"},
             bridge={"port": 0})
-        # no daemon bridge started -> policy provider returns None-ish
-        payload = daily_payload()
-        cid = daemon.days.contracts.create_draft(
-            __import__("dhriti.models", fromlist=["ContractKind"])
-            .ContractKind.DAILY, self.today.isoformat(), payload)
-        daemon.days.contracts.seal(cid)
+        _seal(daemon, self.today)
         daemon._tick()
         # force arming failure by pointing required at a dead adapter
         daemon.config["enforcement"]["required_adapters"] = ["focusme"]
@@ -94,13 +91,9 @@ class TestDaemonIntegration(DhritiTestCase):
     def test_dead_daemon_sessions_recovered(self):
         daemon = self.make_daemon()
         daemon.bootcamp.start(30)
-        payload = daily_payload()
-        cid = daemon.days.contracts.create_draft(
-            __import__("dhriti.models", fromlist=["ContractKind"])
-            .ContractKind.DAILY, self.today.isoformat(), payload)
-        daemon.days.contracts.seal(cid)
+        _seal(daemon, self.today)
         daemon._tick()
-        sess = daemon.start_session("task", "")
+        sess = daemon.start_session("task")
         self.assertEqual(sess["state"], SessionState.ACTIVE.value)
         # daemon dies (no shutdown ran); a new daemon boots next day
         self.clock.advance(days=1)
@@ -119,18 +112,20 @@ class TestDaemonIntegration(DhritiTestCase):
     def test_bridge_serves_policy_and_ingests_events(self):
         daemon = self.make_daemon()
         daemon.bootcamp.start(30)
-        payload = daily_payload()
-        cid = daemon.days.contracts.create_draft(
-            __import__("dhriti.models", fromlist=["ContractKind"])
-            .ContractKind.DAILY, self.today.isoformat(), payload)
-        daemon.days.contracts.seal(cid)
+        _seal(daemon, self.today)
         daemon._tick()
-        sess = daemon.start_session("task", "")
+        sess = daemon.start_session("task")
         daemon._publish()
         daemon.bridge.start()
-        port = daemon.bridge._httpd.server_address[1]
+        port = daemon.bridge.port_bound
         token = (daemon.home / "bridge_token").read_text().strip()
         base = f"http://127.0.0.1:{port}"
+        # authorized status fetch (the /status payload carries "day")
+        request = urllib.request.Request(
+            base + "/status", headers={"X-Dhriti-Token": token})
+        with urllib.request.urlopen(request, timeout=5) as resp:
+            status = json.loads(resp.read().decode())
+        self.assertIn("day", status)
         # authorized policy fetch
         request = urllib.request.Request(
             base + "/policy", headers={"X-Dhriti-Token": token})
@@ -172,36 +167,37 @@ class TestDaemonIntegration(DhritiTestCase):
 
 class TestResearchPass(DhritiTestCase):
     def test_pass_expiry_removes_allowance(self):
-        rp = self.research.start(
-            "JWT validation unknown",
-            ["docs.spring.io"], "rerun the failing test")
+        session = self.start_session()
+        rp = self.passes.open(session["id"], "JWT validation unknown",
+                              minutes=20,
+                              sources=["docs.spring.io"])
         self.assertEqual(rp["state"], "OPEN")
-        active = self.research.active_for()
+        active = self.passes.active()
         self.assertEqual(active["id"], rp["id"])
-        self.clock.advance(minutes=25)  # default 20 min pass
-        expired = self.research.expire_overdue()
+        self.assertEqual(self.passes.active_sources(), ["docs.spring.io"])
+        self.clock.advance(minutes=25)
+        expired = self.passes.expire_overdue()
         self.assertIn(rp["id"], expired)
-        self.assertIsNone(self.research.active_for())
+        self.assertIsNone(self.passes.active())
+        self.assertEqual(self.passes.active_sources(), [])
 
-    def test_return_records_notes(self):
-        rp = self.research.start(
-            "syntax unknown", ["docs.oracle.com"], "write the loop")
-        self.research.return_to_task(rp["id"], "found the overload")
-        row = self.db.query_one(
-            "SELECT * FROM research_pass WHERE id=?", (rp["id"],))
+    def test_return_records_answer(self):
+        session = self.start_session()
+        rp = self.passes.open(session["id"], "syntax unknown",
+                              minutes=5)
+        row = self.passes.return_pass("found the overload")
         self.assertEqual(row["state"], "RETURNED")
-        self.assertEqual(row["notes"], "found the overload")
+        self.assertEqual(row["answer"], "found the overload")
 
-    def test_pass_requires_sources_and_return_condition(self):
+    def test_pass_requires_question_and_finite_minutes(self):
         from dhriti.research_pass import ResearchPassError
+        session = self.start_session()
         with self.assertRaises(ResearchPassError):
-            self.research.start("dep", [], "back to work")
+            self.passes.open(session["id"], "  ")
         with self.assertRaises(ResearchPassError):
-            self.research.start("dep", ["a.com"], "")
-
-
-if __name__ == "__main__":
-    unittest.main()
+            self.passes.open(session["id"], "q", minutes=0)
+        with self.assertRaises(ResearchPassError):
+            self.passes.open(session["id"], "q", minutes=500)
 
 
 class TestDoubleActiveSession(DhritiTestCase):
@@ -210,16 +206,12 @@ class TestDoubleActiveSession(DhritiTestCase):
         session instead of leaving two ACTIVE rows."""
         daemon = self.make_daemon()
         try:
-            payload = daily_payload()
-            cid = daemon.days.contracts.create_draft(
-                __import__("dhriti.models", fromlist=["ContractKind"])
-                .ContractKind.DAILY, self.today.isoformat(), payload)
-            daemon.days.contracts.seal(cid)
+            _seal(daemon, self.today)
             daemon._tick()
-            first = daemon.start_session("task one", "")
+            first = daemon.start_session("task one")
             self.assertEqual(first["state"], SessionState.ACTIVE.value)
             with self.assertRaises(RuntimeError) as ctx:
-                daemon.start_session("task two", "")
+                daemon.start_session("task two")
             self.assertIn("already ACTIVE", str(ctx.exception))
         finally:
             daemon.release_lock()
@@ -239,12 +231,9 @@ class TestBuilderClauseAllowlist(DhritiTestCase):
             payload = daily_payload()
             # github.com is allowed work surface for this contract
             payload["allowed_tools"] = ["github.com"]
-            cid = daemon.days.contracts.create_draft(
-                __import__("dhriti.models", fromlist=["ContractKind"])
-                .ContractKind.DAILY, self.today.isoformat(), payload)
-            daemon.days.contracts.seal(cid)
+            daemon.days.contracts.seal(self.today.isoformat(), payload)
             daemon._tick()
-            session = daemon.start_session("task", "")
+            session = daemon.start_session("task")
             # the override event exists
             events = daemon.ledger.events(
                 event_type="builder_clause_overridden_by_allowlist")
@@ -260,3 +249,7 @@ class TestBuilderClauseAllowlist(DhritiTestCase):
         finally:
             daemon.release_lock()
             daemon.db.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

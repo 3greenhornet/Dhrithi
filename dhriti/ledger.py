@@ -59,7 +59,7 @@ class Ledger:
         case_id: Optional[str] = None,
         parent_event_id: Optional[str] = None,
         process_instance_id: Optional[str] = None,
-        observed_payload: Optional[dict] = None,
+        observed: Optional[dict] = None,
         raw_payload_reference: Optional[str] = None,
         inference_payload: Optional[dict] = None,
         model_id_or_rule_version: Optional[str] = None,
@@ -68,7 +68,11 @@ class Ledger:
         telemetry_quality: str = TelemetryQuality.OK.value,
         occurred_at_utc: Optional[str] = None,
     ) -> str:
-        """Append one normalized event; returns its event_id."""
+        """Append one normalized event; returns its event_id.
+
+        `observed` is the observed payload (v0.5.0 name; the column is
+        still observed_payload — the dossier 7.2 schema is frozen).
+        """
         event_id = str(uuid.uuid4())
         occurred = occurred_at_utc or self.clock.iso()
         mono = self.clock.monotonic_ms()
@@ -83,7 +87,7 @@ class Ledger:
             "event_type": event_type,
             "parent_event_id": parent_event_id,
             "process_instance_id": process_instance_id,
-            "observed_payload": json.dumps(observed_payload or {}, default=str),
+            "observed_payload": json.dumps(observed or {}, default=str),
             "raw_payload_reference": raw_payload_reference,
             "inference_payload": json.dumps(inference_payload or {}, default=str),
             "model_id_or_rule_version": model_id_or_rule_version,

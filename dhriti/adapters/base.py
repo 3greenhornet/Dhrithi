@@ -156,7 +156,7 @@ class ArmingGate:
                 if self.ledger:
                     self.ledger.record(
                         "adapter_arm_failed", source_adapter=adapter.name,
-                        observed_payload={"error": str(exc)},
+                        observed={"error": str(exc)},
                         action_taken="disclosed")
             if armed:
                 report.armed.append(adapter.name)
@@ -167,7 +167,7 @@ class ArmingGate:
         if self.ledger:
             self.ledger.record(
                 "adapters_armed",
-                observed_payload={"armed": report.armed,
+                observed={"armed": report.armed,
                                   "failed": report.failed,
                                   "skipped": report.skipped},
                 action_taken="disclosed")

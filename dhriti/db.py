@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS day(
 CREATE TABLE IF NOT EXISTS session(
   id TEXT PRIMARY KEY,
   day_id TEXT NOT NULL,
+  contract_id TEXT,
   started_at TEXT NOT NULL,
   state TEXT NOT NULL,
   task TEXT NOT NULL,
@@ -124,14 +125,14 @@ CREATE TABLE IF NOT EXISTS research_pass(
   id TEXT PRIMARY KEY,
   session_id TEXT,
   day_id TEXT,
-  started_at TEXT NOT NULL,
+  question TEXT NOT NULL,
+  sources_json TEXT NOT NULL,
+  opened_at TEXT NOT NULL,
   expires_at TEXT NOT NULL,
-  dependency TEXT NOT NULL,
-  allowed_sources_json TEXT NOT NULL,
-  return_condition TEXT NOT NULL,
   state TEXT NOT NULL,
   returned_at TEXT,
-  notes TEXT);
+  answer TEXT,
+  expired_at TEXT);
 
 CREATE TABLE IF NOT EXISTS event(
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,16 +185,18 @@ CREATE TABLE IF NOT EXISTS policy_state(
 -- Curiosity parking lot (plan Part 1 §5.9 + "under-utilized mechanisms"
 -- note): the wall's mail slot. A branch is captured in one line and
 -- deferred to cold state instead of being followed or silently lost.
+-- v0.5.0 shape: source / disposed_at / note (renamed from
+-- origin / disposition_at / disposition_note by migration v3).
 CREATE TABLE IF NOT EXISTS parking_lot(
   id TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,
   session_id TEXT,
   day_id TEXT,
   question TEXT NOT NULL,
-  origin TEXT,
+  source TEXT,
   disposition TEXT NOT NULL DEFAULT 'parked',  -- parked|approved|dropped|explored
-  disposition_at TEXT,
-  disposition_note TEXT);
+  disposed_at TEXT,
+  note TEXT);
 
 -- Cold-state review answers (D-031 competence source, graduation
 -- meta-metric, evidence quality, surveillance comfort, out-of-scope
@@ -232,6 +235,29 @@ CREATE INDEX IF NOT EXISTS idx_parking_lot_disposition
   ON parking_lot(disposition);
 CREATE INDEX IF NOT EXISTS idx_event_type_session
   ON event(event_type, session_id);
+
+-- Vidura (v0.5.0): the spaced-review scheduler for the user's own
+-- answers. See dhriti/vidura.py and docs/VIDURA.md.
+CREATE TABLE IF NOT EXISTS vidura_item(
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  front TEXT NOT NULL,
+  back TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  day_date TEXT,
+  reps INTEGER NOT NULL DEFAULT 0,
+  lapses INTEGER NOT NULL DEFAULT 0,
+  ease_factor REAL NOT NULL DEFAULT 2.5,
+  interval_days REAL NOT NULL DEFAULT 0,
+  due_at TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS vidura_review(
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES vidura_item(id),
+  reviewed_at TEXT NOT NULL,
+  grade TEXT NOT NULL,
+  interval_days REAL NOT NULL,
+  ease_factor REAL NOT NULL);
 """
 
 # Append-only guards. An owner can drop these with enough effort — that is
@@ -319,10 +345,12 @@ class Database:
             self.conn = None
 
     # -- helpers -----------------------------------------------------------
-    def execute(self, sql: str, params=()) -> None:
+    def execute(self, sql: str, params=()):
+        """Run a write statement; returns the cursor (for rowcount)."""
         with self._lock:
-            self.conn.execute(sql, params)
+            cur = self.conn.execute(sql, params)
             self.conn.commit()
+            return cur
 
     def query(self, sql: str, params=()) -> list:
         with self._lock:

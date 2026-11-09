@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 APP_NAME = "dhriti"
 HOMEDIR_ENV = "DHRITI_HOME"
@@ -138,6 +138,11 @@ DEFAULT_CONFIG = {
     },
     "research_pass": {
         "default_max_minutes": 20,         # bounded research allowance
+    },
+    "vidura": {
+        # L-6: Vidura is off by default; enabling is a cold-state act.
+        "enabled": False,
+        "max_items": 5000,
     },
     "database": {
         # Plan §4.10 / R-007: null = auto (DELETE on Windows, WAL

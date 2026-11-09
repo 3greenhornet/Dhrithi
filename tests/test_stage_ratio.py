@@ -70,7 +70,7 @@ class TestWholeDayProfile(DhritiTestCase):
             self.ledger.record(
                 "browser_navigation", source_adapter="extension",
                 occurred_at_utc=when,
-                observed_payload={"url": url, "title": ""})
+                observed={"url": url, "title": ""})
         profile = profile_navigation(self.db, self.config, self.today, day)
         self.assertEqual(profile["total"], 4)
         self.assertEqual(profile["consumption"], 2)
@@ -86,7 +86,7 @@ class TestWholeDayProfile(DhritiTestCase):
         self.ledger.record(
             "browser_navigation", source_adapter="extension",
             occurred_at_utc="2026-11-05T05:00:00Z",
-            observed_payload={"url": "https://www.youtube.com"})
+            observed={"url": "https://www.youtube.com"})
         profile = profile_navigation(self.db, self.config, self.today, day)
         self.assertEqual(profile["total"], 0)
 
@@ -103,12 +103,12 @@ class TestAftermathAndDigestBlocks(DhritiTestCase):
             self.ledger.record(
                 "browser_navigation", source_adapter="extension",
                 occurred_at_utc=when,
-                observed_payload={"url": url, "title": ""})
+                observed={"url": url, "title": ""})
         clock = SimulatedClock()
         clock.set(self.clock.now_utc())
         aftermath = AftermathService(self.db, self.config, clock,
                                      self.ledger)
-        md = aftermath.day_report(day)["markdown"]
+        md = aftermath.day_report(day["date"])["markdown"]
         self.assertIn("Stage ratio", md)
         self.assertIn("Audience share of observed navigation", md)
         self.assertIn("(3 of 4 navigations)", md)
@@ -125,7 +125,7 @@ class TestAftermathAndDigestBlocks(DhritiTestCase):
         self.ledger.record(
             "browser_navigation", source_adapter="extension",
             occurred_at_utc="2026-11-02T05:00:00Z",
-            observed_payload={"url": "https://www.youtube.com"})
+            observed={"url": "https://www.youtube.com"})
         text = build_digest(self.db, self.ledger,
                             self.today.isoformat(), clock=self.clock,
                             config=self.config)

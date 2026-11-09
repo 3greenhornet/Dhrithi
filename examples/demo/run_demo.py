@@ -2,11 +2,11 @@
 """A fully simulated Dhriti day — the shipped proof that the core works.
 
 Runs against a SimulatedClock in <home> (default: examples/demo/out):
-bootcamp start -> cold ritual -> day opens at 10:00 -> session with
-arming gate -> a bounded research pass -> real machine-checked proof
-(compile + run a Java-ish snippet with python) -> a blocked-URL event
--> session SUCCESS -> day released early at day_close -> aftermath
-report -> chain verification -> PM4Py-style sequence analysis.
+bootcamp start -> cold ritual (contract file + seal) -> day opens at
+10:00 -> session with arming gate -> a bounded, topic-locked research
+pass -> real machine-checked proof -> a blocked-URL event -> session
+SUCCESS -> day released early at day_close -> Vidura ingest of the
+pass answer -> aftermath report -> backup -> chain verification.
 
 Every artifact lands in <home> (ledger DB + reports) so you can open
 the aftermath HTML and see exactly what a day looks like.
@@ -25,37 +25,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from dhriti.constants import DEFAULT_CONFIG  # noqa: E402
 from dhriti.daemon import Daemon  # noqa: E402
-from dhriti.models import ContractKind  # noqa: E402
 from dhriti.timeutil import SimulatedClock  # noqa: E402
 
 UTC = _dt.timezone.utc
 START = _dt.datetime(2026, 11, 2, 4, 30, tzinfo=UTC)  # 10:00 IST
 
 CONTRACT = {
-    "mandatory_task": "Reverse an array in Java (in-place, then print)",
-    "smallest_next_action":
-        "open ReverseArray.java and write the swap loop header",
-    "evidence": [{"kind": "command"},
-                 {"kind": "file", "accept_nonzero_exit": False}],
-    "targets": [{"kind": "session_count", "count": 1},
-                {"kind": "evidence_accepted", "count": 1}],
-    "allowed_tools": ["docs.oracle.com"],
-    "blocked_tools": [],
-    "core_belief": "I am becoming a backend engineer",
     "identity_statement": "I am someone who ships code daily",
-    "work_mode": "closed_world",
-    # D-030 main-belief group + IF-THEN plan (schema v2)
-    "main_belief": "I want to be a software engineer",
-    "main_belief_metric": "pass the CS course; ship a working project",
-    "main_belief_current_state": "I am behind on the course and avoiding "
-                                 "the compiler",
-    "substitute_activities": ["guitar practice", "multiplayer games"],
-    "substitute_budget": "3 hours per week",
+    "contract_line": "reverse the array in Java, in place",
+    "main_belief": {"label": "compiler practice"},
+    "profile": "coding",
+    "targets": [
+        {"label": "reversal passes its test",
+         "evidence": {"class": "machine",
+                      "command": "python3 -c \"print('5 4 3 2 1')\""}},
+        {"label": "notes written",
+         "evidence": {"class": "file", "path": "notes.md"}},
+    ],
+    "allowed_tools": ["docs.oracle.com"],
+    # IF-THEN obstacle plan (optional group; complete when present)
     "expected_obstacle": "the reverse loop throws IndexOutOfBounds",
-    "if_then_response": "check the loop bounds against the array length "
-                        "before the swap",
+    "if_then_response": "check the loop bounds against the array "
+                        "length before the swap",
     "return_condition": "rerun the test after the fix",
-    "emergency_policy": "medical, family, or the laptop is on fire",
 }
 
 
@@ -82,45 +74,44 @@ def main():
 
     daemon = Daemon(home, config=config, clock=clock, tick_seconds=0.0)
 
-    banner("1/9  bootcamp start (30 days, no ordinary rule changes)")
+    banner("1/10  bootcamp start (30 days, no ordinary rule changes)")
     daemon.bootcamp.start(30)
 
-    banner("2/9  cold-state ritual: seal today's contract")
-    cid = daemon.days.contracts.create_draft(
-        ContractKind.DAILY, daemon._local_today().isoformat(), CONTRACT)
-    daemon.days.contracts.seal(cid)
-    print(f"sealed contract {cid[:8]}: {CONTRACT['mandatory_task']}")
+    banner("2/10  cold-state ritual: write + seal today's contract")
+    today = daemon._local_today().isoformat()
+    contract_path = home / f"contract-{today}.json"
+    contract_path.write_text(json.dumps(CONTRACT, indent=2),
+                             encoding="utf-8")
+    sealed = daemon.days.contracts.seal(today, CONTRACT)
+    print(f"sealed contract {sealed['id'][:8]}: {CONTRACT['contract_line']}")
 
-    banner("3/9  daemon tick at 10:00 — the day opens, wall up")
+    banner("3/10  daemon tick at 10:00 — the day opens, wall up")
     daemon._tick()
     day = daemon.days.get(daemon._local_today())
     print(f"day state: {day['state']}  window "
           f"{day['window_start_at']} .. {day['window_end_at']} "
           f"(day_close {day['day_close_at']})")
 
-    banner("4/9  session start through the arming gate")
-    sess = daemon.start_session(
-        "reverse the array", '[{"kind":"command"}]',
-        profile_name="coding", condition="D")
+    banner("4/10  session start through the arming gate")
+    sess = daemon.start_session("reverse the array",
+                                profile_name="coding")
     print(f"session {sess['id'][:8]}: {sess['state']}")
     policy = daemon.policy_engine.current_snapshot()
     print(f"policy v{policy['version']} frozen: "
           f"mode={policy['work_mode']} "
           f"taper={policy['taper_stage']}")
 
-    banner("5/9  an obstacle appears -> bounded research pass")
-    rp = daemon.research.start(
-        dependency="unsure whether Arrays.asList reverses in place",
-        sources=["docs.oracle.com"],
-        return_condition="back to ReverseArray.java, write the swap "
-                         "loop manually",
-        session_id=sess["id"], day_id=day["id"], max_minutes=20)
+    banner("5/10  an obstacle appears -> bounded, topic-locked pass")
+    rp = daemon.passes.open(
+        sess["id"],
+        "does Arrays.asList reverse in place, or do I write the loop?",
+        minutes=20, sources=["docs.oracle.com"])
     print(f"pass {rp['id'][:8]} open until {rp['expires_at']} "
-          f"(sources: {', '.join(rp['sources'])})")
-    daemon.research.return_to_task(rp["id"], "it does not; writing "
-                                             "the loop myself")
+          f"(question: {rp['question'][:50]}...)")
+    daemon.passes.return_pass(
+        "it does not; writing the swap loop myself, bounds checked")
 
-    banner("6/9  work happens; the browser posts a navigation event")
+    banner("6/10  work happens; the browser posts a navigation event")
     code = ("arr = [1, 2, 3, 4, 5]\n"
             "i, j = 0, len(arr) - 1\n"
             "while i < j:\n"
@@ -130,25 +121,31 @@ def main():
     workdir = home / "work"
     workdir.mkdir(exist_ok=True)
     (workdir / "reverse_array.py").write_text(code, encoding="utf-8")
-    # the extension would POST this to the bridge; demo writes it
-    # through the same normalization path:
+    (workdir / "notes.md").write_text(
+        "swap loop: bounds checked against length before each swap\n",
+        encoding="utf-8")
     daemon.ledger.record(
         "browser_navigation", source_adapter="extension",
         session_id=sess["id"],
-        observed_payload={"url": "https://docs.oracle.com/en/java/",
-                          "title": "Java docs"})
+        observed={"url": "https://docs.oracle.com/en/java/",
+                  "title": "Java docs"})
 
-    banner("7/9  proof: machine-checked command (exit code is the fact)")
+    banner("7/10  proof: machine-checked command (exit code is the fact)")
     ev = daemon.evidence.machine_check_command(
-        sess["id"], f"python3 {workdir / 'reverse_array.py'}")
+        sess["id"], "reversal passes its test",
+        f"python3 {workdir / 'reverse_array.py'}")
     print(f"evidence [{ev['verdict']}] {ev['class']}/{ev['kind']}: "
           f"{ev['verdict_reason']}")
     print(f"  stdout: {ev['detail']['stdout_tail'].strip()}")
+    ev2 = daemon.evidence.submit_file(
+        sess["id"], "notes written", str(workdir / "notes.md"))
+    print(f"evidence [{ev2['verdict']}] {ev2['class']}/{ev2['kind']}: "
+          f"{ev2['verdict_reason']}")
     daemon.end_session_success(sess["id"])
     print(f"session ended: SUCCESS (accepted evidence = "
           f"{daemon.sessions.accepted_evidence_count(sess['id'])})")
 
-    banner("8/9  20:01 — targets met, day releases early (bounded)")
+    banner("8/10  20:01 — targets met, day releases early (bounded)")
     clock.advance(hours=10, minutes=1)
     daemon._tick()
     day = daemon.days.get(daemon._local_today())
@@ -156,7 +153,7 @@ def main():
     stats = daemon.bootcamp.evidence_summary()
     print(f"bootcamp stats: {json.dumps(stats)}")
 
-    banner("8b/9  the evening: declared rest, and one drift (D-046/D-047)")
+    banner("8b/10  the evening: declared rest, and one drift (D-046/D-047)")
     from dhriti.leisure import LeisureService
     clock.set(_dt.datetime(2026, 11, 2, 15, 45, tzinfo=UTC))  # 21:15 IST
     LeisureService(daemon.db, clock, daemon.ledger).declare(
@@ -165,18 +162,32 @@ def main():
     clock.set(_dt.datetime(2026, 11, 2, 16, 0, tzinfo=UTC))
     daemon.ledger.record(
         "browser_navigation", source_adapter="extension",
-        observed_payload={"url": "https://www.youtube.com/watch?v=x",
-                          "title": ""})
+        observed={"url": "https://www.youtube.com/watch?v=x",
+                  "title": ""})
     # 23:00 IST — outside it: drift
     clock.set(_dt.datetime(2026, 11, 2, 17, 30, tzinfo=UTC))
     daemon.ledger.record(
         "browser_navigation", source_adapter="extension",
-        observed_payload={"url": "https://www.reddit.com", "title": ""})
+        observed={"url": "https://www.reddit.com", "title": ""})
     print("declared: one episode (45 min); observed: 1 rest, 1 drift")
 
-    banner("9/9  aftermath + verification + sequence analysis")
+    banner("9/10  Vidura: the day's pass answer becomes a spaced item")
+    from dhriti.vidura import ViduraService
+    vidura = ViduraService(daemon.db, daemon.config, clock,
+                           daemon.ledger)
+    items = vidura.ingest_pass_answers("2026-11-02")
+    for item in items:
+        print(f"vidura: [{item['kind']}] {item['front'][:60]}")
+        print(f"         due {item['due_at']}")
+
+    banner("10/10  aftermath + backup + verification")
     paths = daemon.run_aftermath(daemon._local_today().isoformat())
     print(f"report: {paths['markdown']}")
+    from dhriti.backup import BackupService
+    backup = BackupService(home, daemon.db, daemon.ledger, clock)
+    manifest = backup.create(home / "backups")
+    print(f"backup: {manifest['dest']} "
+          f"(chain verified: {manifest.get('chain_verified_after')})")
     verify = daemon.ledger.verify_chain()
     print(f"ledger chain: ok={verify['ok']} events={verify['checked']}")
     anchor = daemon.ledger.write_anchor(note="demo end")
@@ -188,7 +199,6 @@ def main():
     daemon.release_lock()
     daemon.db.close()
 
-    # sequence analysis on the demo ledger
     seq = Path(__file__).resolve().parents[2] / "analysis" / "sequence.py"
     if seq.exists():
         import subprocess
@@ -198,8 +208,7 @@ def main():
         print("\n" + proc.stdout)
     print("DEMO COMPLETE — open "
           f"{home / 'reports'}/aftermath-2026-11-02.html in a browser")
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

@@ -80,12 +80,12 @@ class TestAftermathLeisureBlock(DhritiTestCase):
             self.ledger.record(
                 "browser_navigation", source_adapter="extension",
                 occurred_at_utc=when,
-                observed_payload={"url": url, "title": ""})
+                observed={"url": url, "title": ""})
         clock = SimulatedClock()
         clock.set(self.clock.now_utc())
         aftermath = AftermathService(self.db, self.config, clock,
                                      self.ledger)
-        md = aftermath.day_report(day)["markdown"]
+        md = aftermath.day_report(day["date"])["markdown"]
         self.assertIn("Declared rest vs drift", md)
         self.assertIn("one episode, chosen", md)
         self.assertIn("Declared rest: 1", md)
@@ -98,20 +98,19 @@ class TestAftermathLeisureBlock(DhritiTestCase):
         clock.set(self.clock.now_utc())
         aftermath = AftermathService(self.db, self.config, clock,
                                      self.ledger)
-        md = aftermath.day_report(day)["markdown"]
+        md = aftermath.day_report(day["date"])["markdown"]
         self.assertIn("no leisure declared", md)
         self.assertIn("Drift: 0", md)
 
 
 class TestConditionalReviewQuestion(unittest.TestCase):
     def test_question_exists_and_the_six_core_stay(self):
-        self.assertIn("leisure_honored", REVIEW_QUESTIONS)
-        for key in ("competence_source", "faking_it", "wall_or_choice",
-                    "out_of_scope_device", "evidence_quality",
-                    "surveillance_comfort"):
-            self.assertIn(key, REVIEW_QUESTIONS)
+        from dhriti.review import CONDITIONAL_QUESTIONS
+        self.assertIn("leisure_honored", CONDITIONAL_QUESTIONS)
+        keys = {k for k, _ in REVIEW_QUESTIONS}
+        self.assertIn("competence_source", keys)
         # the question states the distinction, not a verdict
-        prompt = REVIEW_QUESTIONS["leisure_honored"][0]
+        prompt = CONDITIONAL_QUESTIONS["leisure_honored"]
         self.assertIn("declared", prompt.lower())
 
 

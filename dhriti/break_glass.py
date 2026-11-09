@@ -10,10 +10,11 @@ Flow (deliberately boring, no commentary, no guilt):
                    not pretend it could stop you (tamper-evident, not
                    tamper-proof).
   3. The declared cold-state penalty is recorded as DECLARED, never
-                   auto-executed (dossier: consequences never depend on
-                   destructive actions; the system does not claim to
-                   impose what it merely logs).
+                   auto-executed (the system does not claim to impose
+                   what it merely logs).
   4. cooldown_until is set — new sessions cannot start until it passes.
+
+The emergency path (D-019) is separate and immediate.
 """
 
 import json
@@ -33,7 +34,7 @@ class BreakGlassService:
         self.db = db
         self.config = config.get("break_glass", {})
         self.clock = clock or RealClock()
-        self.ledger = ledger  # optional: Ledger for tamper-evident events
+        self.ledger = ledger
 
     @property
     def delay_seconds(self) -> int:
@@ -56,21 +57,20 @@ class BreakGlassService:
             return last["cooldown_until"]
         return None
 
-    def initiate(self, session_id: Optional[str] = None,
-                 day_id: Optional[str] = None) -> dict:
+    def initiate(self, session_id: Optional[str] = None) -> dict:
         """The button press. Returns the handle + confirm deadline."""
         if self.cooldown_active():
             until = self.cooldown_active()
             raise BreakGlassError(
                 f"cooldown active until {until}; no new break-glass or "
                 "session may start")
-        handle = str(uuid.uuid4())
+        record_id = str(uuid.uuid4())
         pressed_at = self.clock.now_utc()
         deadline = pressed_at + timedelta(seconds=self.delay_seconds)
         self.db.insert("break_glass", {
-            "id": handle,
+            "id": record_id,
             "session_id": session_id,
-            "day_id": day_id,
+            "day_id": None,
             "pressed_at": to_iso(pressed_at),
             "confirmed_at": None,
             "reason": None,
@@ -80,18 +80,21 @@ class BreakGlassService:
                 self.config.get("penalties", [])),
         })
         return {
-            "handle": handle,
+            "id": record_id,
             "confirm_not_before": to_iso(deadline),
             "delay_seconds": self.delay_seconds,
             "instruction": "wait, then confirm with a typed reason",
         }
 
-    def confirm(self, handle: str, reason: str,
-                session_service=None) -> dict:
-        """The toll booth. Enforces the typed reason and records whether
-        the delay was honored."""
+    def confirm(self, record_id: str, reason: str,
+                session_finish=None,
+                parked_item_id: Optional[str] = None) -> dict:
+        """The toll booth. Enforces the typed reason, records whether
+        the delay was honored, and finishes the session through the
+        caller's session_finish callable (the service never guesses
+        which terminal state a break implies)."""
         row = self.db.query_one(
-            "SELECT * FROM break_glass WHERE id=?", (handle,))
+            "SELECT * FROM break_glass WHERE id=?", (record_id,))
         if not row:
             raise BreakGlassError("unknown break-glass handle")
         if row["confirmed_at"]:
@@ -106,52 +109,58 @@ class BreakGlassService:
         pressed = parse_iso(row["pressed_at"])
         deadline = pressed + timedelta(seconds=self.delay_seconds)
         honored = int(now >= deadline)
-        if not honored:
-            # Bypassing the wait is possible (owner of the machine); it is
-            # recorded through the ledger, not prevented-and-pretended.
-            if self.ledger is not None:
-                self.ledger.record(
-                    "break_glass_delay_bypassed",
-                    session_id=row["session_id"],
-                    observed_payload={
-                        "handle": handle,
-                        "seconds_early": int((deadline - now).total_seconds()),
-                    },
-                    action_taken="logged", telemetry_quality="OK")
+        if not honored and self.ledger is not None:
+            self.ledger.record(
+                "break_glass_delay_bypassed",
+                session_id=row["session_id"],
+                observed={"handle": record_id,
+                          "seconds_early": int(
+                              (deadline - now).total_seconds())},
+                action_taken="logged")
         cooldown_until = to_iso(now + timedelta(hours=self.cooldown_hours))
-        self.db.update("break_glass", handle, {
+        penalties = json.loads(row["penalty_declared"] or "[]")
+        self.db.update("break_glass", record_id, {
             "confirmed_at": to_iso(now),
             "reason": reason,
             "honored_delay": honored,
             "cooldown_until": cooldown_until,
         })
-        result = {"handle": handle, "honored_delay": bool(honored),
-                  "cooldown_until": cooldown_until,
-                  "penalty_declared": json.loads(row["penalty_declared"] or "[]")}
-        # end the session if one was attached and still active
-        if session_service and row["session_id"]:
-            sess = session_service.get(row["session_id"])
+        if self.ledger is not None:
+            self.ledger.record(
+                "break_glass_confirmed",
+                session_id=row["session_id"],
+                observed={
+                    "reason": reason,
+                    "honored_delay": bool(honored),
+                    "kind": "ordinary",
+                    "penalty_declared": penalties,
+                    "cooldown_until": cooldown_until,
+                    "parked_item_id": parked_item_id,
+                },
+                action_taken="session released; penalty declared, "
+                             "not executed")
+        if session_finish is not None and row["session_id"]:
+            sess = self.db.query_one(
+                "SELECT state FROM session WHERE id=?",
+                (row["session_id"],))
             if sess and sess["state"] == SessionState.ACTIVE.value:
-                session_service.end_break_glass(row["session_id"], reason)
-        return result
+                session_finish(row["session_id"])
+        return {"id": record_id, "kind": "ordinary",
+                "honored_delay": bool(honored),
+                "cooldown_until": cooldown_until,
+                "penalty_declared": penalties}
 
-    # -- emergency path (D-019) ------------------------------------------------
-    def emergency(self, reason: str, session_id: Optional[str] = None,
-                  day_id: Optional[str] = None,
-                  session_service=None) -> dict:
+    # -- emergency path (D-019) ---------------------------------------------
+    def emergency(self, session_id: Optional[str], reason: str,
+                  session_finish=None) -> dict:
         """The immediate emergency exit — distinct from the ordinary toll.
 
-        D-019: there is always an immediate path for genuine emergencies
-        (medical, family, system on fire). It is NOT a cheaper break-glass:
-          * a typed reason is still required (shorter minimum — urgency
-            is real, but the log entry is not optional);
-          * no cooldown is set, because a real emergency must not lock
-            the user out of starting work again;
-          * it is recorded as `emergency_exception`, never as SUCCESS,
-            and the aftermath shows it separately from break-glass so a
-            pattern of "emergencies" is visible in cold review.
-        The system does not judge whether it was a real emergency. It
-        records the claim; the cold review reads the pattern.
+        D-019: there is always an immediate path for genuine emergencies.
+        It is NOT a cheaper break-glass: the reason is still typed, no
+        cooldown is set, and it is recorded as `emergency_exception`,
+        never as SUCCESS. The system does not judge whether it was a
+        real emergency; it records the claim, the cold review reads the
+        pattern.
         """
         reason = (reason or "").strip()
         min_chars = int(self.config.get("emergency_min_reason_chars", 10))
@@ -160,11 +169,11 @@ class BreakGlassService:
                 f"emergency reason required ({len(reason)}/{min_chars} "
                 "chars) — one honest sentence for the log")
         now = self.clock.now_utc()
-        handle = str(uuid.uuid4())
+        record_id = str(uuid.uuid4())
         self.db.insert("break_glass", {
-            "id": handle,
+            "id": record_id,
             "session_id": session_id,
-            "day_id": day_id,
+            "day_id": None,
             "pressed_at": to_iso(now),
             "confirmed_at": to_iso(now),
             "reason": reason,
@@ -178,15 +187,14 @@ class BreakGlassService:
             self.ledger.record(
                 "emergency_exception",
                 session_id=session_id,
-                observed_payload={"reason": reason},
-                action_taken="immediate release; logged for cold review",
-                telemetry_quality="OK")
-        if session_service and session_id:
-            sess = session_service.get(session_id)
+                observed={"reason": reason},
+                action_taken="immediate release; logged for cold review")
+        if session_finish is not None and session_id:
+            sess = self.db.query_one(
+                "SELECT state FROM session WHERE id=?", (session_id,))
             if sess and sess["state"] == SessionState.ACTIVE.value:
-                session_service.end_break_glass(session_id, reason)
-        return {"handle": handle, "emergency": True,
-                "reason": reason}
+                session_finish(session_id)
+        return {"id": record_id, "kind": "emergency", "reason": reason}
 
     def history(self, limit: int = 50) -> list:
         return self.db.query(

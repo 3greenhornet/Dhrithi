@@ -104,7 +104,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self.ledger.record(
                 "bridge_token_rejected",
                 source_adapter="bridge",
-                observed_payload={
+                observed={
                     "client": self.client_address[0],
                     "path": self.path[:100]},
                 action_taken="401 returned; connection logged",
@@ -170,6 +170,7 @@ class BridgeServer:
         self.on_event = on_event
         self._httpd = None
         self._thread = None
+        self.port_bound = None      # set by start(); real bound port
 
     def start(self):
         if self._httpd is not None:
@@ -183,6 +184,9 @@ class BridgeServer:
             "ledger": self.ledger,
         })
         self._httpd = ThreadingHTTPServer((self.host, self.port), handler)
+        # port 0 = ephemeral: record what the OS actually assigned so
+        # tests and the health probe can find the bridge.
+        self.port_bound = self._httpd.server_address[1]
         self._thread = threading.Thread(
             target=self._httpd.serve_forever, daemon=True,
             name="dhriti-bridge")
@@ -194,6 +198,7 @@ class BridgeServer:
             self._httpd.server_close()
             self._httpd = None
             self._thread = None
+            self.port_bound = None
 
     @property
     def running(self) -> bool:
@@ -229,7 +234,7 @@ def handle_extension_event(ledger, event: dict, session_resolver=None):
         source_adapter="extension",
         source_version=str(event.get("ext_version", "")),
         session_id=(session_resolver() if session_resolver else None),
-        observed_payload=observed,
+        observed=observed,
         action_taken=action_taken,
         telemetry_quality="OK",
     )

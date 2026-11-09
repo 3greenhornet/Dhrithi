@@ -74,8 +74,10 @@ class DayService:
         self.contracts = ContractService(db, clock)
 
     # -- create / fetch ------------------------------------------------------
-    def ensure_day(self, local_date: _dt.date,
+    def ensure_day(self, local_date,
                    bootcamp_id: Optional[str] = None) -> dict:
+        if isinstance(local_date, str):
+            local_date = _dt.date.fromisoformat(local_date)
         row = self.get(local_date)
         if row:
             return row
@@ -106,28 +108,40 @@ class DayService:
         })
         return self.get(local_date)
 
-    def get(self, local_date: _dt.date) -> Optional[dict]:
+    def get(self, local_date) -> Optional[dict]:
+        if isinstance(local_date, str):
+            local_date = _dt.date.fromisoformat(local_date)
         return self.db.query_one(
             "SELECT * FROM day WHERE date=?", (local_date.isoformat(),))
+
+    def today(self) -> dict:
+        """Ensure + return today's day row."""
+        tz = local_tz(self.config.get("timezone", "UTC"))
+        return self.ensure_day(
+            self.clock.now_utc().astimezone(tz).date())
 
     def get_by_id(self, day_id: str) -> Optional[dict]:
         return self.db.query_one("SELECT * FROM day WHERE id=?", (day_id,))
 
     # -- transitions ----------------------------------------------------------
-    def try_open(self, day: dict) -> dict:
-        """Open the wall at/after window_start. Requires a sealed contract."""
+    def try_open(self, day: dict, contract: Optional[dict] = None) -> dict:
+        """Open the wall at/after window_start. Requires a sealed
+        contract (passed in or looked up). Opens from PLANNED, and
+        from NO_CONTRACT when a contract was sealed after the row was
+        created (the daemon's order: contract cold, then day)."""
         now = self.clock.now_utc()
         current = DayState(day["state"])
-        if current is not DayState.PLANNED:
+        if current not in (DayState.PLANNED, DayState.NO_CONTRACT):
             return day
         win = resolve_window(_dt.date.fromisoformat(day["date"]), self.config)
         if now < win.window_start:
             return day
-        try:
-            contract = self.contracts.require_sealed_daily(
-                _dt.date.fromisoformat(day["date"]))
-        except ContractError:
-            return day  # stays NO_CONTRACT / PLANNED until a contract seals
+        if contract is None:
+            try:
+                contract = self.contracts.require_sealed_daily(
+                    _dt.date.fromisoformat(day["date"]))
+            except ContractError:
+                return day  # stays NO_CONTRACT / PLANNED until a contract seals
         state_machine.assert_transition("day", current, DayState.OPEN)
         self.db.update("day", day["id"], {
             "state": DayState.OPEN.value,
@@ -135,8 +149,7 @@ class DayService:
             "targets_json": json.dumps(
                 contract["payload"].get("targets") or []),
         })
-        updated = self.get_by_id(day["id"])
-        return updated
+        return self.get_by_id(day["id"])
 
     def evaluate(self, day: dict, targets_met_now: bool) -> dict:
         """Clock-driven evaluation; the daemon calls this every tick.
@@ -185,28 +198,56 @@ class DayService:
 
     # -- targets ----------------------------------------------------------------
     def targets_met(self, day: dict) -> bool:
-        """Targets are honest and simple: N successful sessions, or
-        'accepted evidence' when no count target exists. The day's
-        contract defines them; the software does not judge content."""
+        """Targets are honest and simple: each target names an evidence
+        class; a target is met when evidence of that class was ACCEPTED
+        for a session on this day. No targets: any accepted evidence
+        counts. The day's contract defines the targets; the software
+        does not judge content."""
         targets = json.loads(day.get("targets_json") or "[]")
-        sessions = self.db.query(
-            "SELECT state FROM session WHERE day_id=?", (day["id"],))
-        successes = [s for s in sessions
-                     if s["state"] in ("SUCCESS",)]
-        accepted_evidence = self.db.query(
-            "SELECT COUNT(*) AS n FROM evidence e JOIN session s "
-            "ON e.session_id=s.id WHERE s.day_id=? AND e.verdict='ACCEPTED'",
-            (day["id"],))[0]["n"]
+        accepted = self.db.query(
+            "SELECT e.class AS class, e.kind AS kind, e.detail_json AS "
+            "detail FROM evidence e JOIN session s ON e.session_id=s.id "
+            "WHERE s.day_id=? AND e.verdict='ACCEPTED'", (day["id"],))
         if not targets:
-            return bool(successes) or accepted_evidence > 0
+            return len(accepted) > 0
         for target in targets:
-            kind = target.get("kind")
-            if kind == "session_count":
-                if len(successes) < int(target.get("count", 1)):
-                    return False
-            elif kind == "evidence_accepted":
-                if accepted_evidence < int(target.get("count", 1)):
-                    return False
+            ev = target.get("evidence") or {}
+            ev_class = ev.get("class")
+            wanted = "machine" if ev_class == "machine" else ev_class
+            if not any(self._matches_target(a, ev) for a in accepted):
+                return False
+        return True
+
+    @staticmethod
+    def _matches_target(accepted_row: dict, ev_spec: dict) -> bool:
+        """Does one accepted evidence row satisfy one target's
+        evidence spec? class must match; command/path match when the
+        target names one."""
+        ev_class = ev_spec.get("class")
+        row_class = {"machine": "MACHINE_CHECKED",
+                     "file": "SUBMITTED",
+                     "manual": "SUBMITTED"}.get(ev_class, ev_class)
+        if accepted_row["class"] != row_class:
+            return False
+        if ev_class == "manual":
+            # manual claims are never accepted as proof — a manual
+            # target can only be met by review, i.e. never by the
+            # machine; honest default.
+            return False
+        try:
+            detail = json.loads(accepted_row.get("detail") or "{}")
+        except Exception:
+            detail = {}
+        if ev_class == "machine":
+            wanted_cmd = (ev_spec.get("command") or "").strip()
+            if wanted_cmd:
+                return (detail.get("command") or "").strip() == wanted_cmd
+            return accepted_row["kind"] != "manual"
+        if ev_class == "file":
+            wanted_path = (ev_spec.get("path") or "").strip()
+            if wanted_path:
+                return detail.get("path", "").endswith(wanted_path)
+            return accepted_row["kind"] == "file"
         return True
 
     # -- recovery ------------------------------------------------------------

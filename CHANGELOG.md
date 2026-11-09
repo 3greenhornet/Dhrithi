@@ -5,6 +5,46 @@ test suite, and each release line states the decision-register rows
 (`docs/DECISIONS_PROPOSED.md`) it implements. Formats follow the
 project's own rules — facts and dates, no spin.
 
+## v0.5.0 — 2026-11-09 — the surface rebuild + Vidura
+
+> Rebuilt 2026-11-09 from the v0.3.0 bundle after the sandbox recycle;
+> same scope as the original v0.5.0. This version is the base the
+> v0.6.0 specification was written against.
+
+### Changed — the surface rebuild
+- CLI: every command now takes (args, ctx); `Context` is the one wired
+  bundle (home + config + db + services), built the same way in tests
+- Contract schema: identity_statement / contract_line /
+  main_belief {label} / targets [{label, evidence{class,...}}];
+  `seal(day, payload)`, `for_day`, `payload_of`, `validate` (raises)
+- Sessions: `create(day, contract)`, `finish(id, state, targets_met)`;
+  contract_id on the session row
+- Break-glass: `initiate(session)` -> id, `confirm(id, reason,
+  session_finish, parked_item_id)`; the service records the
+  break_glass_confirmed event itself
+- Research pass -> the topic-locked pass: open(session, question,
+  minutes), return_pass(answer), active_sources(), hard expiry
+- Parking lot: columns renamed (source / disposed_at / note)
+- Ledger.record kwarg: `observed=` (the column stays observed_payload)
+- Aftermath: rebuilt around `_common_blocks`; day_report/week_report
+  take a date string and return {markdown, html, md}
+- Day targets: a target is met by ACCEPTED evidence of its declared
+  class (command/path matched when named)
+
+### Added
+- dhriti/vidura.py — the SM-2-variant spaced-review scheduler
+  (docs/VIDURA.md); identity_line items ingested (the Bug B mistake,
+  removed in v0.6.0)
+- dhriti/migrations.py — lazy, additive, backup-first; schema v1 -> v3
+- Bridge: ephemeral port support + port_bound; /status carries "day"
+- Daemon: heartbeat pruning (48h, once per day, per-instance guard)
+- Commands: contract write/seal, evidence file/machine/manual,
+  research open/return, vidura ingest/due/review, parking list
+
+### Tests
+- Suite: 128 -> 151, all green (the v0.5.0 target in the wild was
+  234; the rebuild's honest count is recorded here)
+
 ## v0.4.0 — 2026-11-09 — the stabilization and operator batch
 
 > Rebuilt 2026-11-09 from the v0.3.0 bundle (upload/dhrithi.md) after

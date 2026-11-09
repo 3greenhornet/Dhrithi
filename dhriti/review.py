@@ -1,37 +1,29 @@
 """Cold-state surfaces: the parking lot, the review protocol, the digest.
 
-Three mechanisms the plan names but had not wired into the lifecycle
-("under-utilized mechanisms", plan Part 4 appendix):
+Three mechanisms (v0.5.0 shape):
 
-  ParkingLotService — the wall's mail slot. A curiosity branch that fires
-    mid-session is captured in ONE line and deferred. Not blocked-and-
-    resented, not followed into the loop: parked. Dispositions happen in
-    cold state only (approved -> next contract's allowed resources,
-    dropped, explored deliberately later).
+  ParkingLotService — the wall's mail slot. A curiosity branch that
+    fires mid-session is captured in ONE line and deferred. Not
+    blocked-and-resented, not followed into the loop: parked.
+    Dispositions happen in cold state only.
 
-  ColdReviewService — the fixed question protocol (D-031 competence
-    source, D-029 faking-it check, the graduation meta-metric, evidence
-    quality, surveillance comfort, out-of-scope devices). Answers are
-    SUBMITTED evidence: recorded, never judged. Answer text stays in the
-    cold_review table (bootcamp-scoped per the deletion model); only the
-    question key touches the ledger.
+  ColdReviewService — the fixed question protocol. Answers are
+    SUBMITTED evidence: recorded, never judged. Answer text stays in
+    the cold_review table; only the question key touches the ledger.
 
   build_digest — the minimal E4 "dead man's switch": a weekly one-page
     summary (facts + chain head) meant to be sent to the one human who
-    cares whether the subject actually grows. If the digest stops
-    arriving, that human knows the experiment is off the rails —
-    tamper-evident by absence, which is the strongest boundary available
-    to a single-user system that defers real E4 enforcement.
+    cares whether the subject actually grows.
 """
 
 import json
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
 from .db import Database
 from .timeutil import Clock, RealClock, parse_iso, to_iso
-from datetime import timedelta
 
 
 # -- parking lot ------------------------------------------------------------
@@ -43,7 +35,7 @@ class ParkingLotService:
         self.clock = clock or RealClock()
         self.ledger = ledger
 
-    def park(self, question: str, origin: str = "",
+    def park(self, question: str, source: str = "cli",
              session_id: Optional[str] = None,
              day_id: Optional[str] = None) -> dict:
         """One line, one glance, back to work. The wall takes mail; it
@@ -60,23 +52,29 @@ class ParkingLotService:
             "session_id": session_id,
             "day_id": day_id,
             "question": question,
-            "origin": (origin or "")[:200],
+            "source": (source or "cli")[:200],
             "disposition": "parked",
-            "disposition_at": None,
-            "disposition_note": None,
+            "disposed_at": None,
+            "note": None,
         })
         if self.ledger is not None:
             self.ledger.record(
                 "curiosity_topic_parked",
                 session_id=session_id,
-                observed_payload={"origin": (origin or "")[:100]},
-                action_taken="deferred to cold review",
-                telemetry_quality="OK")
+                observed={"question": question,
+                          "source": (source or "cli")[:100]},
+                action_taken="curiosity captured; not followed "
+                             "in-session")
         return self.get(row_id)
 
     def get(self, row_id: str) -> Optional[dict]:
         return self.db.query_one(
             "SELECT * FROM parking_lot WHERE id=?", (row_id,))
+
+    def open_items(self) -> list:
+        return self.db.query(
+            "SELECT * FROM parking_lot WHERE disposition='parked' "
+            "ORDER BY created_at")
 
     def list(self, disposition: Optional[str] = None) -> list:
         if disposition:
@@ -89,7 +87,8 @@ class ParkingLotService:
     def pending(self) -> list:
         return self.list("parked")
 
-    def dispose(self, row_id: str, disposition: str, note: str = "") -> dict:
+    def dispose(self, row_id: str, disposition: str,
+                note: str = "") -> dict:
         if disposition not in ("approved", "dropped", "explored"):
             raise ValueError(
                 "disposition must be approved | dropped | explored "
@@ -102,18 +101,18 @@ class ParkingLotService:
                 f"already dispositioned as {row['disposition']}")
         self.db.update("parking_lot", row_id, {
             "disposition": disposition,
-            "disposition_at": self.clock.iso(),
-            "disposition_note": (note or "")[:500],
+            "disposed_at": self.clock.iso(),
+            "note": (note or "")[:500],
         })
         if self.ledger is not None:
             self.ledger.record(
                 "parking_lot_disposition",
-                observed_payload={"disposition": disposition},
-                action_taken="cold-state decision recorded",
-                telemetry_quality="OK")
+                observed={"disposition": disposition,
+                          "question": row["question"][:100]},
+                action_taken="cold-state decision recorded")
         return self.get(row_id)
 
-    def for_day(self, day_id: str) -> list:
+    def for_day_id(self, day_id: str) -> list:
         return self.db.query(
             "SELECT * FROM parking_lot WHERE day_id=? ORDER BY created_at",
             (day_id,))
@@ -127,47 +126,30 @@ class ParkingLotService:
 
 # -- cold review ------------------------------------------------------------
 
-REVIEW_QUESTIONS = {
-    # key: (prompt, why it exists — the prompt is shown to the user)
-    "competence_source": (
-        "Where did your feeling of competence come from since the last "
-        "review? (name the activity, not the feeling)",
-        "D-031: the source is the signal. Guitar-competence while the "
-        "main belief fails is the exchange the mirror must show."),
-    "faking_it": (
-        "You said you were managing. Were you?",
-        "D-029: productive substitution check. The answer is submitted "
-        "evidence; the pattern across sessions is the signal."),
-    "wall_or_choice": (
-        "Did you do the work because the wall was up, or because you "
-        "chose to? (one honest sentence)",
-        "Graduation meta-metric: a compliant-but-dependent user has not "
-        "graduated. This answer decides taper direction as much as the "
-        "compliance rate does."),
-    "out_of_scope_device": (
-        "Did you use an out-of-scope device (phone/tablet/other machine) "
-        "to reach the audience during the window?",
-        "Evasion matrix honest boundary: the laptop wall has a phone "
-        "door. Only you can report it."),
-    "evidence_quality": (
-        "Was your accepted evidence substantive or superficial? Name the "
-        "weakest one.",
-        "Recognition mechanism 12: proof quality drift is reviewed in "
-        "cold state, not judged in-session."),
-    "surveillance_comfort": (
-        "Is what the system captures still acceptable? What should be "
-        "narrowed?",
-        "Recognition mechanism 11: the observation stack runs on consent "
-        "re-confirmed in cold state."),
-    # D-047: conditional question — asked only for a day scope on which
-    # at least one leisure declaration exists. Six fixed questions plus
-    # this one when it applies; absent otherwise (never a nag).
+# v0.5.0 questions. The rebuild replaced five of the base's six with
+# its own; only competence_source survived. (v0.6.0 Part 1 §6 restores
+# the base six — that correction is deliberate and recorded.)
+REVIEW_QUESTIONS = [
+    ("competence_source",
+     "Where did the feeling of competence come from — the task, "
+     "or talk about the task?"),
+    ("targets_honest",
+     "Were the targets honest — could they be met on a normal day?"),
+    ("toll_worth_it",
+     "If the toll was paid: was it worth the declared penalty?"),
+    ("what_would_make_tomorrow_sealable",
+     "What would make tomorrow's contract sealable by 10:00?"),
+    ("substitute_time",
+     "Where did the substitute budget actually go since the last "
+     "review?"),
+    ("window_held",
+     "Did the window hold — did the work stay inside it?"),
+]
+
+CONDITIONAL_QUESTIONS = {
     "leisure_honored": (
-        "Did your declared leisure hold its declared shape (the "
-        "activity and the length you typed)?",
-        "D-047: chosen rest is honest; undeclared drift is avoidance. "
-        "The declaration is a label — this answer checks the label "
-        "against the evening's facts."),
+        "Was the declared leisure honored as declared — same label, "
+        "same length, no drift past it? (D-047)"),
 }
 
 
@@ -178,18 +160,23 @@ class ColdReviewService:
         self.clock = clock or RealClock()
         self.ledger = ledger
 
+    def questions_for(self, leisure_declared: bool) -> list:
+        qs = list(REVIEW_QUESTIONS)
+        if leisure_declared:
+            qs.append(("leisure_honored",
+                       CONDITIONAL_QUESTIONS["leisure_honored"]))
+        return qs
+
     def record(self, scope: str, question_key: str, answer: str,
                day_date: Optional[str] = None) -> dict:
-        if question_key not in REVIEW_QUESTIONS:
+        valid = {k for k, _ in REVIEW_QUESTIONS} \
+            | set(CONDITIONAL_QUESTIONS)
+        if question_key not in valid:
             raise ValueError(f"unknown question key: {question_key}")
         answer = (answer or "").strip()
         if not answer:
             raise ValueError("an empty answer is not an answer")
         row_id = str(uuid.uuid4())
-        # The answer text lives in cold_review (bootcamp-scoped, deleted
-        # with the bootcamp per the deletion model). The ledger records
-        # only THAT the question was answered — the chain must survive
-        # the deletion model without carrying personal text forever.
         self.db.insert("cold_review", {
             "id": row_id,
             "created_at": self.clock.iso(),
@@ -201,10 +188,9 @@ class ColdReviewService:
         if self.ledger is not None:
             self.ledger.record(
                 "cold_review_answer",
-                observed_payload={"scope": scope,
-                                  "question_key": question_key},
-                action_taken="submitted evidence recorded",
-                telemetry_quality="OK")
+                observed={"scope": scope,
+                          "question_key": question_key},
+                action_taken="submitted evidence recorded")
         return self.get(row_id)
 
     def get(self, row_id: str) -> Optional[dict]:
@@ -225,14 +211,15 @@ class ColdReviewService:
 # -- weekly digest (minimal E4) ----------------------------------------------
 
 def build_digest(db: Database, ledger, week_start_iso: str,
-                 clock: Optional[Clock] = None,
-                 config: Optional[dict] = None) -> str:
+                 config: Optional[dict] = None,
+                 clock: Optional[Clock] = None) -> str:
     """A plain-text, one-page week summary anchored to the chain head.
 
     Intended use (config digest.recipient_label): the user sends this
     file to their accountability human every week. The human does not
-    need to understand the system — they need to notice (a) the numbers
-    and (b) whether the file stops arriving. Tamper-evident by absence.
+    need to understand the system — they need to notice (a) the
+    numbers and (b) whether the file stops arriving. Tamper-evident by
+    absence.
     """
     import datetime as _dt
     from . import stage_ratio as _sr
@@ -262,9 +249,6 @@ def build_digest(db: Database, ledger, week_start_iso: str,
         "SELECT question_key, answer FROM cold_review WHERE scope=? "
         "ORDER BY created_at", (f"week:{week_start_iso}",))
 
-    # D-046/D-051: the stage ratio and top consumption categories —
-    # the exchange, in the subject's own vocabulary, for the E4 human.
-    # Counts only; no verdicts (the digest tone stays factual, P-05).
     consumption_counts = {}
     total_navs = 0
     consumption_navs = 0
@@ -280,7 +264,6 @@ def build_digest(db: Database, ledger, week_start_iso: str,
         consumption_navs += prof["consumption"]
         for cat, n in prof["counts"].items():
             consumption_counts[cat] = consumption_counts.get(cat, 0) + n
-        # D-047: consumption outside declared windows, week-wide
         split = _sr.drift_split(prof["consumption_events"], leisure_rows)
         drift_total += split["drift"]
 
@@ -306,8 +289,8 @@ def build_digest(db: Database, ledger, week_start_iso: str,
         lines.append("  none")
     for b in breaks:
         lines.append(f"  - {b['reason']}")
-    lines.append(
-        f"emergency exceptions: {emergency[0]['n'] if emergency else 0}")
+    emergency_count = emergency[0]["n"] if emergency else 0
+    lines.append(f"emergency exceptions: {emergency_count}")
     lines.append("")
     lines.append("== parking lot ==")
     if not parked:

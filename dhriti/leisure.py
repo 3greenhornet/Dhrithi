@@ -71,7 +71,7 @@ class LeisureService:
         if self.ledger is not None:
             self.ledger.record(
                 "leisure_declared",
-                observed_payload={
+                observed={
                     "activity": activity[:100],
                     "planned_minutes": minutes,
                     "day_date": day_date,

@@ -26,17 +26,18 @@ class SessionService:
         self.db = db
         self.clock = clock or RealClock()
 
-    def start(self, day_id: str, task: str, evidence_spec: str = "",
-              experiment_condition: Optional[str] = None) -> dict:
+    def create(self, day_id: str, contract_id: str,
+               task: str = "") -> dict:
         session_id = str(uuid.uuid4())
         self.db.insert("session", {
             "id": session_id,
             "day_id": day_id,
+            "contract_id": contract_id,
             "started_at": self.clock.iso(),
             "state": SessionState.DRAFT.value,
             "task": task,
-            "evidence_spec": evidence_spec,
-            "experiment_condition": experiment_condition,
+            "evidence_spec": None,
+            "experiment_condition": None,
             "ended_at": None,
             "outcome_json": None,
         })
@@ -62,7 +63,7 @@ class SessionService:
         self.db.update("session", session_id, updates)
         return self.get(session_id)
 
-    # -- lifecycle helpers used by the daemon/CLI -----------------------------
+    # -- lifecycle ------------------------------------------------------------
     def seal(self, session_id: str) -> dict:
         return self._transition(session_id, SessionState.SEALED)
 
@@ -77,13 +78,21 @@ class SessionService:
                                 {"outcome_json": json.dumps(
                                     {"arming_failure": reason})})
 
-    def end_success(self, session_id: str, note: str = "") -> dict:
-        return self._transition(session_id, SessionState.SUCCESS,
-                                {"outcome_json": json.dumps({"note": note})})
-
-    def end_incomplete(self, session_id: str, note: str = "") -> dict:
-        return self._transition(session_id, SessionState.INCOMPLETE,
-                                {"outcome_json": json.dumps({"note": note})})
+    def finish(self, session_id: str, state: SessionState,
+               targets_met: Optional[bool] = None,
+               note: str = "") -> dict:
+        """Finish a session into one of the three honest terminal
+        states. targets_met=True (SUCCESS) also marks the day's targets
+        met — a finished proof is what the day was for."""
+        extra = {"outcome_json": json.dumps({"note": note})}
+        result = self._transition(session_id, state, extra)
+        if state is SessionState.SUCCESS and targets_met:
+            row = self.get(session_id)
+            if row and row.get("day_id"):
+                self.db.execute(
+                    "UPDATE day SET targets_met=1 WHERE id=?",
+                    (row["day_id"],))
+        return result
 
     def end_break_glass(self, session_id: str, reason: str) -> dict:
         return self._transition(session_id, SessionState.BREAK_GLASS,

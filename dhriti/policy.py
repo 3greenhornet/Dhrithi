@@ -75,7 +75,7 @@ class PolicyEngine:
             "work_mode": work_mode.value,
             "profile": profile,
             "contract": {
-                "mandatory_task": contract_payload.get("mandatory_task", ""),
+                "contract_line": contract_payload.get("contract_line", ""),
                 "core_belief": contract_payload.get("core_belief", ""),
                 "identity_statement":
                     contract_payload.get("identity_statement", ""),
@@ -214,6 +214,6 @@ class PolicyEngine:
             "allowed_domains": sorted(set(policy.get("allowed_domains", []))),
             "suppress_surfaces": bool(policy.get("suppress_surfaces", True)),
             "contract_line": (policy.get("contract", {})
-                              .get("mandatory_task", "")),
+                              .get("contract_line", "")),
             "expires_at": policy.get("expires_at"),
         }

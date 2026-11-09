@@ -1,13 +1,19 @@
-"""Dhriti command line.
+"""Dhriti command line (v0.5.0 Context architecture).
 
 Wall Principle in the CLI: during an ACTIVE session, `dhriti status`
 shows state, task and elapsed time. No coaching copy, no philosophy, no
 "return to task!", no shame. The user's own contract is the only voice.
+
+Every command receives (args, ctx) where ctx is a Context — one wired
+bundle of home + config + db + services, closed after the command
+returns. Tests build Contexts the same way the CLI does.
 """
 
 import argparse
 import datetime as _dt
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -28,12 +34,49 @@ from .policy import PolicyEngine
 from .profiles import DEFAULT_PROFILES, load_profiles
 from .research_pass import ResearchService
 from .review import (ParkingLotService, ColdReviewService,
-                     REVIEW_QUESTIONS, build_digest)
+                     REVIEW_QUESTIONS, CONDITIONAL_QUESTIONS, build_digest)
 from .leisure import LeisureService
 from .session import SessionService
-from .timeutil import Clock, RealClock, local_tz, to_iso
-from .contract import ContractService
+from .timeutil import Clock, RealClock, local_tz, parse_iso, to_iso
+from .contract import ContractService, ContractError
 from .aftermath import AftermathService
+from .vidura import ViduraService
+
+
+# ---------------------------------------------------------------- context
+class Context:
+    """One wired bundle of home + config + db + services. The CLI
+    builds one per command; tests build them the same way."""
+
+    def __init__(self, home: Path, config: dict = None,
+                 clock: Clock = None, db: Database = None):
+        self.home = Path(home)
+        self.config = config or load_config(self.home)
+        self.clock = clock or RealClock()
+        self.db = db or Database(self.home / "dhriti.sqlite3")
+        self.ledger = Ledger(self.db, self.clock, int(
+            self.config.get("ledger", {}).get(
+                "anchor_interval_events", 100)))
+        self.contracts = ContractService(self.db, self.clock)
+        self.days = DayService(self.db, self.config, self.clock)
+        self.sessions = SessionService(self.db, self.clock)
+        self.evidence = EvidenceService(self.db, self.clock,
+                                        home=self.home)
+        self.passes = ResearchService(self.db, self.config, self.clock)
+        self.bootcamp = BootcampService(self.db, self.config, self.clock)
+        self.breaks = BreakGlassService(
+            self.db, self.config, self.clock, self.ledger)
+        self.aftermath = AftermathService(
+            self.db, self.config, self.clock, self.ledger)
+        self.parking = ParkingLotService(self.db, self.clock, self.ledger)
+        self.review = ColdReviewService(self.db, self.clock, self.ledger)
+        self.leisure = LeisureService(self.db, self.clock, self.ledger)
+        self.vidura = ViduraService(self.db, self.config, self.clock,
+                                    self.ledger)
+        self.policy = PolicyEngine(self.db, self.clock)
+
+    def close(self):
+        self.db.close()
 
 
 def _home(args) -> Path:
@@ -41,48 +84,677 @@ def _home(args) -> Path:
         else default_home()
 
 
-def _open_core(home: Path, clock: Clock = None):
-    """Lightweight wiring for non-daemon commands."""
-    clock = clock or RealClock()
-    config = load_config(home)
-    db = Database(home / "dhriti.sqlite3")
-    ledger = Ledger(db, clock, int(
-        config.get("ledger", {}).get("anchor_interval_events", 100)))
-    services = {
-        "config": config, "db": db, "ledger": ledger, "clock": clock,
-        "contracts": ContractService(db, clock),
-        "days": DayService(db, config, clock),
-        "sessions": SessionService(db, clock),
-        "evidence": EvidenceService(db, clock),
-        "research": ResearchService(db, config, clock),
-        "bootcamp": BootcampService(db, config, clock),
-        "break_glass": BreakGlassService(db, config, clock, ledger),
-        "aftermath": AftermathService(db, config, clock, ledger),
-        "policy": PolicyEngine(db, clock),
-        "parking": ParkingLotService(db, clock, ledger),
-        "review": ColdReviewService(db, clock, ledger),
-        "leisure": LeisureService(db, clock, ledger),
-    }
-    return services
+def _make_ctx(args, clock: Clock = None) -> Context:
+    return Context(_home(args), clock=clock)
+
+
+# ---------------------------------------------------------------- helpers
+_CONTRACT_FILE_RE = re.compile(r"contract-(\d{4}-\d{2}-\d{2})")
+
+
+def _parse_date_arg(value) -> str:
+    if not value:
+        return None
+    return _dt.date.fromisoformat(str(value)).isoformat()
+
+
+def _local_today(ctx: Context) -> str:
+    tz = local_tz(ctx.config.get("timezone", "UTC"))
+    return ctx.clock.now_utc().astimezone(tz).date().isoformat()
+
+
+def _ask(prompt: str, default: str = "") -> str:
+    suffix = f" [{default}]" if default else ""
+    value = input(f"{prompt}{suffix}: ").strip()
+    return value or default
+
+
+def _ask_list(prompt: str) -> list:
+    raw = _ask(prompt + " (enter for none)")
+    return [x.strip() for x in raw.split(",") if x.strip()]
 
 
 # ---------------------------------------------------------------- commands
-def cmd_health(args):
+def cmd_init(args, ctx):
+    home = ctx.home
+    home.mkdir(parents=True, exist_ok=True)
+    config_path = home / "dhriti.config.json"
+    if not config_path.exists():
+        config_path.write_text(json.dumps(ctx.config, indent=2),
+                               encoding="utf-8")
+        print(f"config written: {config_path}")
+    (home / "profiles").mkdir(exist_ok=True)
+    from .bridge import ensure_token
+    ensure_token(home)
+    print(f"dhriti home ready: {home}")
+    print(f"bridge token: {home / 'bridge_token'} "
+          f"(paste into extension/config.js)")
+    print("next: dhriti ritual   # write today's contract, cold")
+
+
+def cmd_ritual(args, ctx):
+    """The cold-state ritual. Interactive, or fully scripted via --set.
+    Writes contract-<date>.json; sealing is a separate act."""
+    today = _local_today(ctx)
+    if args.set:
+        payload = json.loads(args.set)
+    else:
+        print("--- cold-state ritual (no session is active) ---")
+        payload = {
+            "identity_statement": _ask(
+                "identity statement (one sentence)"),
+            "contract_line": _ask(
+                "the contract line — today's goal, one line"),
+            "main_belief": {"label": _ask(
+                "main belief (e.g. compiler practice)")},
+            "targets": [],
+        }
+        while True:
+            label = _ask("target label (enter to finish targets)")
+            if not label:
+                break
+            ev_class = _ask(
+                "evidence class (machine|file|manual)", "machine")
+            target = {"label": label, "evidence": {"class": ev_class}}
+            if ev_class == "machine":
+                target["evidence"]["command"] = _ask("the command")
+            elif ev_class == "file":
+                target["evidence"]["path"] = _ask("the file path")
+            payload["targets"].append(target)
+        payload["profile"] = _ask("profile", "coding")
+        if_then = _ask("likely first obstacle (enter to skip the group)")
+        if if_then:
+            payload["expected_obstacle"] = if_then
+            payload["if_then_response"] = _ask("planned response")
+            payload["return_condition"] = _ask("when to return")
+    from .contract import validate
+    validate(payload)
+    out = ctx.home / f"contract-{today}.json"
+    out.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
+                   encoding="utf-8")
+    print(f"draft written: {out}")
+    print(f"seal it cold: dhriti contract seal {out.name}")
+    ctx.ledger.record(
+        "contract_draft_written",
+        observed={"date": today, "path": str(out),
+                  "sha256": hashlib.sha256(
+                      out.read_bytes()).hexdigest()},
+        action_taken="draft written")
+
+
+def cmd_contract_write(args, ctx):
+    cmd_ritual(args, ctx)
+
+
+def _seal_target_date(args, ctx) -> str:
+    """v0.5.0 behaviour (Bug C, fixed in v0.6.0 Part 1 §3): an explicit
+    --date wins over the file's own date, silently."""
+    explicit = _parse_date_arg(getattr(args, "date", None))
+    if explicit:
+        return explicit
+    file_match = _CONTRACT_FILE_RE.match(Path(args.file).name)
+    if file_match:
+        return file_match.group(1)
+    return ctx.days.today()["date"]
+
+
+def cmd_contract_seal(args, ctx):
+    path = Path(args.file).expanduser()
+    if not path.is_file():
+        raise SystemExit(f"no such file: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    date = _seal_target_date(args, ctx)
+    ctx.days.ensure_day(date)
+    contract = ctx.contracts.seal(date, payload)
+    ctx.ledger.record(
+        "contract_sealed",
+        case_id=f"day-{date}",
+        observed={"date": date, "file": str(path),
+                  "contract_id": contract["id"]},
+        action_taken="sealed cold; the day may open")
+    print(f"sealed: {contract['id'][:8]} for {date}")
+    win = resolve_window(_dt.date.fromisoformat(date), ctx.config)
+    print(f"day window: {win.window_start.astimezone(local_tz(ctx.config.get('timezone', 'UTC'))):%H:%M} .. "
+          f"{win.window_end.astimezone(local_tz(ctx.config.get('timezone', 'UTC'))):%H:%M} "
+          f"(day_close "
+          f"{win.day_close.astimezone(local_tz(ctx.config.get('timezone', 'UTC'))):%H:%M})")
+
+
+def cmd_day(args, ctx):
+    today = _local_today(ctx)
+    day = ctx.days.ensure_day(today)
+    if args.sub == "status":
+        win = resolve_window(_dt.date.fromisoformat(day["date"]),
+                             ctx.config)
+        sessions = ctx.sessions.sessions_for_day(day["id"])
+        print(f"date         {day['date']}")
+        print(f"state        {day['state']}")
+        print(f"window       {win.window_start} .. {win.window_end}")
+        print(f"day_close    {win.day_close}")
+        print(f"targets_met  {'yes' if day['targets_met'] else 'no'}")
+        print(f"sessions     {len(sessions)}")
+        for sess in sessions:
+            print(f"  {sess['id'][:8]} [{sess['state']}] {sess['task']}")
+
+
+def cmd_session(args, ctx):
+    if args.sub == "start":
+        daemon = Daemon(ctx.home, config=ctx.config, clock=ctx.clock)
+        try:
+            sess = daemon.start_session(args.task)
+            print(f"active: {sess['id']}")
+            print(f"task: {args.task}")
+        finally:
+            daemon.release_lock()
+            daemon.db.close()
+        return
+    active = ctx.sessions.active() if args.sub in ("end", "status") \
+        else None
+    if args.sub == "status":
+        if active:
+            print(f"ACTIVE {active['id'][:8]}")
+            print(f"task   {active['task']}")
+            print(f"since  {active['started_at']}")
+        else:
+            print("no active session")
+    elif args.sub == "end":
+        if not active:
+            print("no active session")
+        elif args.outcome == "success":
+            daemon = Daemon(ctx.home, config=ctx.config, clock=ctx.clock)
+            try:
+                result = daemon.end_session_success(active["id"],
+                                                    args.note)
+                print(f"ended: {result['state']}")
+            except RuntimeError as exc:
+                print(str(exc))
+                sys.exit(1)
+            finally:
+                daemon.release_lock()
+                daemon.db.close()
+        else:
+            result = ctx.sessions.finish(
+                active["id"],
+                __import__("dhriti.models",
+                           fromlist=["SessionState"]).SessionState
+                .INCOMPLETE, note=args.note)
+            print(f"ended: {result['state']}")
+
+
+def cmd_break_initiate(args, ctx):
+    active = ctx.sessions.active()
+    handle = ctx.breaks.initiate(active["id"] if active else None)
+    print(f"pressed. confirm not before {handle['confirm_not_before']}")
+    print(f"handle: {handle['id']}")
+    if args.yes:
+        ctx.clock.sleep(handle["delay_seconds"])
+        print(f"waited {handle['delay_seconds']}s (the toll)")
+
+
+def cmd_break_confirm(args, ctx):
+    from .models import SessionState
+
+    def finish(session_id):
+        ctx.sessions.finish(session_id, SessionState.BREAK_GLASS)
+
+    try:
+        row = ctx.breaks.confirm(args.id, args.reason,
+                                 session_finish=finish)
+    except BreakGlassError as exc:
+        raise SystemExit(f"not confirmed: {exc}")
+    print(f"break confirmed ({row['kind']}); "
+          f"honored_delay={row['honored_delay']} "
+          f"cooldown_until={row['cooldown_until']}")
+    if row["penalty_declared"]:
+        print("declared penalties (yours, from the cold state): "
+              + "; ".join(row["penalty_declared"]))
+
+
+def cmd_break_emergency(args, ctx):
+    from .models import SessionState
+    active = ctx.sessions.active()
+
+    def finish(session_id):
+        ctx.sessions.finish(session_id, SessionState.BREAK_GLASS)
+
+    reason = args.reason or _ask("emergency reason (one honest sentence)")
+    ctx.breaks.emergency(active["id"] if active else None, reason,
+                         session_finish=finish)
+    print("emergency exception logged. The cold review will read it.")
+
+
+def _workspace_for_session(session, ctx) -> Path:
+    contract = ctx.contracts.get(session["contract_id"]) \
+        if session.get("contract_id") else None
+    payload = ctx.contracts.payload_of(contract)
+    workspace = payload.get("workspace_dir")
+    return Path(workspace).expanduser() if workspace else None
+
+
+def cmd_evidence_file(args, ctx):
+    active = ctx.sessions.active()
+    if not active:
+        print("no active session — evidence belongs to a session")
+        sys.exit(1)
+    ev = ctx.evidence.submit_file(
+        active["id"], args.target, args.path,
+        note=args.note or "",
+        workspace=_workspace_for_session(active, ctx))
+    print(f"[{ev['verdict']}] {ev['class']}/{ev['kind']}: "
+          f"{ev.get('verdict_reason')}")
+    ctx.ledger.record(
+        "evidence_submitted", session_id=active["id"],
+        observed={"kind": ev["kind"], "verdict": ev["verdict"]})
+
+
+def cmd_evidence_machine(args, ctx):
+    active = ctx.sessions.active()
+    if not active:
+        print("no active session — evidence belongs to a session")
+        sys.exit(1)
+    ev = ctx.evidence.machine_check_command(
+        active["id"], args.target, args.command,
+        accept_nonzero_exit=args.accept_nonzero,
+        workspace=_workspace_for_session(active, ctx))
+    print(f"[{ev['verdict']}] {ev['class']}/{ev['kind']}: "
+          f"{ev.get('verdict_reason')}")
+    ctx.ledger.record(
+        "evidence_submitted", session_id=active["id"],
+        observed={"kind": ev["kind"], "verdict": ev["verdict"]})
+
+
+def cmd_evidence_manual(args, ctx):
+    active = ctx.sessions.active()
+    if not active:
+        print("no active session — evidence belongs to a session")
+        sys.exit(1)
+    ev = ctx.evidence.submit_manual(active["id"], args.target,
+                                    args.note or "")
+    print(f"[{ev['verdict']}] {ev['class']}/{ev['kind']}: "
+          f"{ev.get('verdict_reason')}")
+
+
+def cmd_research(args, ctx):
+    active = ctx.sessions.active()
+    if args.sub == "open":
+        if not active:
+            print("research passes belong to an active session")
+            sys.exit(1)
+        rp = ctx.passes.open(active["id"], args.question,
+                             minutes=args.minutes)
+        print(f"pass open: {rp['id']}")
+        print(f"question: {rp['question']}")
+        print(f"sources allowed until {rp['expires_at']}: "
+              f"{', '.join(rp['sources'])}")
+        ctx.ledger.record(
+            "research_pass_opened",
+            session_id=active["id"],
+            observed={"question": rp["question"],
+                      "sources": rp["sources"],
+                      "expires_at": rp["expires_at"]},
+            action_taken="sources temporarily allowed")
+    elif args.sub == "return":
+        rp = ctx.passes.return_pass(args.answer,
+                                    pass_id=args.pass_id or None)
+        print(f"returned: {rp['state']}")
+        ctx.ledger.record(
+            "research_pass_returned",
+            observed={"pass": rp["id"],
+                      "answer_length": len(rp.get("answer") or "")},
+            action_taken="back to the task; answer kept for review")
+
+
+def cmd_report(args, ctx):
+    today = _local_today(ctx)
+    if args.scope == "week":
+        monday = (_dt.date.fromisoformat(today)
+                  - _dt.timedelta(
+                      days=_dt.date.fromisoformat(today).weekday()))
+        report = ctx.aftermath.week_report(monday.isoformat())
+        stem = f"review-week-{monday.isoformat()}"
+    else:
+        date = args.date or today
+        report = ctx.aftermath.day_report(date)
+        stem = f"aftermath-{date}"
+    out = ctx.aftermath.write(
+        report, ctx.home / ctx.config.get("report", {}).get("dir",
+                                                            "reports"),
+        stem)
+    print(f"markdown: {out['markdown']}")
+    print(f"html:     {out['html']}")
+
+
+def cmd_bootcamp(args, ctx):
+    if args.sub == "start":
+        bc = ctx.bootcamp.start(args.days)
+        print(f"bootcamp: {bc['id']}")
+        print(f"planned_days: {bc['planned_days']} — no ordinary rule "
+              f"changes inside the period")
+        ctx.ledger.record("bootcamp_started",
+                          observed={"planned_days": args.days})
+    elif args.sub == "status":
+        bc = ctx.bootcamp.active()
+        if not bc:
+            print("no active bootcamp")
+        else:
+            stats = ctx.bootcamp.evidence_summary()
+            print(f"state        {bc['state']} (taper stage "
+                  f"{bc['taper_stage']})")
+            print(f"days_elapsed {stats['days_elapsed']}")
+            print(f"compliance   {stats['compliance_rate']}")
+            print(f"proof_rate   {stats['proof_rate']}")
+            print(f"breaks_7d    {stats['break_glass_7d']}")
+    elif args.sub == "taper":
+        rec = ctx.bootcamp.compute_taper()
+        print(f"recommended stage: {rec['recommended_stage']} "
+              f"({rec['reason']})")
+        if args.apply:
+            updated = ctx.bootcamp.apply_taper(
+                rec["recommended_stage"], rec["reason"])
+            print(f"applied. stage now {updated['taper_stage']}")
+    elif args.sub == "graduate":
+        bc = ctx.bootcamp.graduate()
+        print(f"graduated: {bc['state']} — the tool is now optional")
+
+
+def cmd_verify(args, ctx):
+    result = ctx.ledger.verify_chain()
+    print(f"chain ok: {result['ok']} ({result['checked']} events checked)")
+    if not result["ok"]:
+        print(f"first bad seq: {result['first_bad_seq']} "
+              f"({result['reason']})")
+        sys.exit(1)
+    integrity = ctx.db.integrity_check()
+    print(f"sqlite integrity: {'ok' if integrity else 'FAILED'}")
+    head = ctx.ledger.head()
+    print(f"head: {head['row_hash']}")
+    print("write this hash somewhere off-machine to anchor the ledger")
+
+
+def cmd_status(args, ctx):
+    today = _local_today(ctx)
+    day = ctx.days.get(today)
+    active = ctx.sessions.active()
+    bc = ctx.bootcamp.active()
+    print(f"now        {ctx.clock.iso()} ({today} local)")
+    print(f"bootcamp   " + (f"{bc['state']} stage {bc['taper_stage']} "
+                           f"since {bc['started_at']}" if bc else "none"))
+    print(f"day        " + (day["state"] if day else "none"))
+    if day and day["state"] == "OPEN":
+        print(f"targets    {'met' if day['targets_met'] else 'unmet'}")
+    print(f"session    " + (f"ACTIVE {active['id'][:8]} — {active['task']}"
+                           if active else "none"))
+
+
+def cmd_events(args, ctx):
+    rows = ctx.ledger.events(
+        event_type=args.type, session_id=args.session,
+        since_utc=args.since, limit=args.limit)
+    if args.json:
+        print(json.dumps(rows, indent=2, default=str))
+    else:
+        for row in rows:
+            print(f"{row['seq']:>5} {row['occurred_at_utc']} "
+                  f"{row['event_type']:<32} "
+                  f"{row['source_adapter']:<16} "
+                  f"{row['action_taken'] or '-'}")
+
+
+def cmd_adapter(args, ctx):
+    daemon = Daemon(ctx.home, config=ctx.config, clock=ctx.clock)
+    try:
+        if args.sub == "status":
+            for adapter in daemon.adapters:
+                info = adapter.status()
+                line = f"{adapter.name:<18} {info['probe']:<14} " \
+                       f"armed={info['armed']}"
+                print(line)
+                if args.verbose and info.get("disclosure"):
+                    print(f"{'':18} -> {info['disclosure']}")
+                if args.verbose:
+                    m = adapter.manifest()
+                    print(f"{'':18} capabilities: "
+                          f"{', '.join(m['capabilities'])}")
+    finally:
+        daemon.release_lock()
+        daemon.db.close()
+
+
+def cmd_daemon(args, ctx):
+    daemon = Daemon(ctx.home, config=ctx.config, clock=ctx.clock,
+                    tick_seconds=args.tick)
+    try:
+        daemon.run()
+    except KeyboardInterrupt:
+        pass
+
+
+def cmd_ignite(args, ctx):
+    profiles = load_profiles(ctx.home)
+    profile = profiles.get(args.profile)
+    if not profile:
+        print(f"unknown profile '{args.profile}' "
+              f"(available: {', '.join(profiles)})")
+        sys.exit(1)
+    plan_path = ctx.home / "profiles" / f"ignite.{args.profile}.json"
+    print(f"workspace ignition profile: {args.profile}")
+    if plan_path.exists():
+        print(f"plan file: {plan_path}")
+        print("run: powershell -File launcher/ignite.ps1 "
+              f"-Profile {plan_path}")
+    else:
+        print(f"no ignite plan found at {plan_path}")
+        print("create one by copying launcher/profiles/ignite.example.json")
+
+
+def cmd_park(args, ctx):
+    active = ctx.sessions.active()
+    row = ctx.parking.park(
+        args.question, source=args.source or "cli",
+        session_id=active["id"] if active else None)
+    print(f"parked ({row['id'][:8]}): {row['question']}")
+    print("(deferred to cold review; back to the task)")
+
+
+def cmd_parking(args, ctx):
+    if args.sub == "list":
+        for row in ctx.parking.open_items():
+            spark = (f" (sparked by: {row['source']})"
+                     if row.get("source") else "")
+            print(f"- [{row['id'][:8]}] {row['question']}{spark}")
+        if not ctx.parking.open_items():
+            print("(the parking lot is empty)")
+
+
+def cmd_parking_dispose(args, ctx):
+    row = ctx.parking.dispose(args.id, args.disposition,
+                              note=args.note or "")
+    print(f"{row['disposition']}: {row['question']}")
+    if row["disposition"] == "approved":
+        print("add it to the next contract's allowed_tools or research "
+              "fallback, cold")
+
+
+def cmd_review(args, ctx):
+    """The cold review: the fixed question protocol."""
+    today = _local_today(ctx)
+    if args.scope == "week":
+        monday = (_dt.date.fromisoformat(today)
+                  - _dt.timedelta(
+                      days=_dt.date.fromisoformat(today).weekday()))
+        scope = f"week:{monday.isoformat()}"
+        day_date = None
+    else:
+        scope = f"day:{args.date or today}"
+        day_date = args.date or today
+    answered = {r["question_key"] for r in
+                ctx.review.answers_for(scope)}
+    pending = ctx.parking.pending()
+    leisure_declared = bool(
+        args.scope == "day" and ctx.leisure.for_day(day_date or today))
+    questions = ctx.review.questions_for(leisure_declared)
+    print("--- cold review (no session is active) ---")
+    print(f"scope: {scope}")
+    if pending and args.ask_parking:
+        print("\nparking lot first (cold-state dispositions):")
+        for p in pending:
+            mark = _ask(f"[{p['question'][:60]}] "
+                        "approved|dropped|explored (enter=keep parked)")
+            if mark in ("approved", "dropped", "explored"):
+                ctx.parking.dispose(p["id"], mark)
+    for key, prompt in questions:
+        if key in answered and not args.redo:
+            continue
+        print("\n" + prompt)
+        answer = _ask("answer")
+        if answer:
+            ctx.review.record(scope, key, answer, day_date=day_date)
+    done = ctx.review.answers_for(scope)
+    print(f"\n{len(done)}/{len(questions)} questions answered "
+          f"for {scope}")
+    missing = {k for k, _ in questions} - {r["question_key"]
+                                           for r in done}
+    for key in missing:
+        print(f"  unanswered: {key}")
+
+
+def cmd_digest(args, ctx):
+    """The weekly digest (dead-man's switch)."""
+    today = _local_today(ctx)
+    monday = (_dt.date.fromisoformat(today)
+              - _dt.timedelta(
+                  days=_dt.date.fromisoformat(today).weekday()))
+    text = build_digest(ctx.db, ctx.ledger, monday.isoformat(),
+                        config=ctx.config, clock=ctx.clock)
+    out_dir = ctx.home / ctx.config.get("report", {}).get("dir",
+                                                          "reports")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"digest-{monday.isoformat()}.txt"
+    out.write_text(text, encoding="utf-8")
+    recipient = ctx.config.get("digest", {}).get("recipient_label")
+    ctx.ledger.record(
+        "digest_generated",
+        observed={"week": monday.isoformat(), "path": str(out)},
+        action_taken="ready to send" + (
+            f" to {recipient}" if recipient
+            else " (no recipient configured)"))
+    print(f"digest written: {out}")
+    print("send it to your accountability human. If a week's digest "
+          "does not arrive, that absence is the signal.")
+
+
+def cmd_token(args, ctx):
+    from .bridge import ensure_token
+    if args.sub == "show":
+        token = ensure_token(ctx.home)
+        print(f"token: {token}")
+        print("paste into extension/config.js (bridgeToken)")
+    elif args.sub == "rotate":
+        token_file = ctx.home / "bridge_token"
+        if token_file.exists():
+            stamp = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+            token_file.rename(Path(str(token_file) + f".old-{stamp}"))
+        token = ensure_token(ctx.home)
+        print(f"new token: {token}")
+        print("paste into extension/config.js now (cold state), then "
+              "reload the extension. Old token invalid.")
+
+
+def cmd_declare(args, ctx):
+    active = ctx.sessions.active()
+    if args.sub == "leisure":
+        activity = (args.activity or "").strip()
+        if not activity:
+            print("--activity is required: what rest did you choose?")
+            sys.exit(1)
+        today = _local_today(ctx)
+        try:
+            row = ctx.leisure.declare(
+                activity, args.minutes, note=args.note or "",
+                day_date=today)
+        except ValueError as exc:
+            print(f"not declared: {exc}")
+            sys.exit(1)
+        print(f"declared rest: {row['activity']} "
+              f"({row['planned_minutes']} min, ends {row['ends_at']})")
+        print("(a label, not a permission — the aftermath will show it "
+              "next to drift; the review asks if it held)")
+        return
+    if not active:
+        print("declarations belong to an active session "
+              "(except leisure, which belongs to rest)")
+        sys.exit(1)
+    if args.sub == "dependency":
+        if not (args.what or "").strip():
+            print("--what is required: which obstacle revealed this "
+                  "dependency")
+            sys.exit(1)
+        ctx.ledger.record(
+            "unplanned_dependency_declared",
+            session_id=active["id"],
+            observed={"obstacle": args.what,
+                      "resource": args.resource or ""},
+            action_taken="declared; reviewed in aftermath")
+        print("declared. Use `dhriti research open` for the bounded "
+              "pass; the aftermath checks the return.")
+    elif args.sub == "essential-tool":
+        if not (args.tool or "").strip():
+            print("--tool is required")
+            sys.exit(1)
+        ctx.ledger.record(
+            "essential_tool_declared",
+            session_id=active["id"],
+            observed={"tool": args.tool, "why": args.why or ""},
+            action_taken="allowed for this session; aftermath checks "
+                         "whether it was essential")
+
+
+def cmd_vidura_ingest(args, ctx):
+    """Ingest a day's returned research-pass answers as spaced items."""
+    date = args.date or _local_today(ctx)
+    items = ctx.vidura.ingest_pass_answers(date)
+    if not items:
+        print(f"no returned research passes on {date} to ingest")
+        return
+    for item in items:
+        print(f"vidura item ({item['kind']}): {item['front'][:60]}")
+    print(f"{len(items)} item(s) scheduled; due tomorrow")
+
+
+def cmd_vidura_due(args, ctx):
+    date = args.date or ctx.clock.now_utc().strftime("%Y-%m-%d")
+    for item in ctx.vidura.due(date + "T23:59:59Z"):
+        print(f"[{item['kind']}] {item['front']}")
+        print(f"  due {item['due_at']}, reps {item['reps']}, "
+              f"interval {item['interval_days']}d")
+    if not ctx.vidura.due(date + "T23:59:59Z"):
+        print("nothing due")
+
+
+def cmd_vidura_review(args, ctx):
+    row = ctx.vidura.review(args.item, args.grade)
+    print(f"reviewed '{args.grade}': next due {row['due_at']} "
+          f"(interval {row['interval_days']}d, "
+          f"EF {row['ease_factor']})")
+
+
+def cmd_health(args, ctx):
     """Operational state, one screen, facts only (toolkit #1)."""
-    home = _home(args)
-    report = build_health(home)
+    report = build_health(ctx.home, ctx.config, ctx.clock,
+                          db=ctx.db, ledger=ctx.ledger)
     for line in report.lines:
         print(line)
     print(f"Overall: {report.overall}")
+    ctx.ledger.record(
+        "health_check_run",
+        observed={"overall": report.overall},
+        action_taken="health checked")
     if report.overall != "OK":
         sys.exit(1)
 
 
-def cmd_backup(args):
-    """Local backup with manifest + chain verification (toolkit #3)."""
-    home = _home(args)
-    s = _open_core(home)
-    service = BackupService(home, s["db"], s["ledger"], s["clock"])
+def cmd_backup(args, ctx):
+    service = BackupService(ctx.home, ctx.db, ctx.ledger, ctx.clock)
     dest = Path(args.dest).expanduser() if args.dest else None
     manifest = service.create(dest)
     print(f"backup: {manifest['dest']}")
@@ -91,22 +763,24 @@ def cmd_backup(args):
           f"({manifest['chain_events']} events)")
     for entry in manifest["files"]:
         print(f"backup: {entry['name']} sha256 {entry['sha256'][:16]}...")
-    s["db"].close()
+    ctx.ledger.record(
+        "backup_created",
+        observed={"dest": manifest["dest"],
+                  "chain_verified": manifest.get(
+                      "chain_verified_after")},
+        action_taken="local backup with manifest")
 
 
-def cmd_journal(args):
-    """The experimenter's own log — separate DB, never the chain (toolkit #7)."""
-    home = _home(args)
-    service = JournalService(home)
+def cmd_journal(args, ctx):
+    service = JournalService(ctx.home, ctx.clock)
     try:
         if args.sub == "add":
             row = service.add(args.text)
-            s = _open_core(home)
-            s["ledger"].record(
+            ctx.ledger.record(
                 "journal_entry_added",
-                observed_payload={"at": row["at_utc"]},
-                action_taken="fact recorded; content stays in the journal")
-            s["db"].close()
+                observed={"at": row["at_utc"]},
+                action_taken="fact recorded; content stays in the "
+                             "journal")
             print(f"journal entry added at {row['at_utc']}")
             print(f"stored in {service.path} (separate from the ledger)")
         elif args.sub == "list":
@@ -121,59 +795,49 @@ def cmd_journal(args):
         service.close()
 
 
-def cmd_explain(args):
-    """Trace a number or an id back to its events (toolkit #2)."""
-    home = _home(args)
-    s = _open_core(home)
+def cmd_explain(args, ctx):
     needle = (args.what or "").strip()
     if not needle:
         print("explain what? an event id prefix, 'chain', or a date")
         sys.exit(1)
-    rows = s["ledger"].events()
     if needle == "chain":
-        result = s["ledger"].verify_chain()
+        result = ctx.ledger.verify_chain()
         print(f"chain ok: {result['ok']} ({result['checked']} events)")
-        print(f"head: {s['ledger'].head()['row_hash']}")
-    else:
-        matched = [r for r in rows if r["event_id"].startswith(needle)
-                   or (r["session_id"] or "").startswith(needle)]
-        if not matched:
-            print(f"no events match {needle!r}")
-            sys.exit(1)
-        for row in matched[-10:]:
-            print(f"{row['seq']:>5} {row['occurred_at_utc']} "
-                  f"{row['event_type']:<28} "
-                  f"{row['observed_payload'][:160]}")
-        print(f"{len(matched)} event(s); newest shown; "
-              "every number in the reports derives from these rows")
-    s["db"].close()
+        print(f"head: {ctx.ledger.head()['row_hash']}")
+        return
+    rows = ctx.ledger.events()
+    matched = [r for r in rows if r["event_id"].startswith(needle)
+               or (r["session_id"] or "").startswith(needle)]
+    if not matched:
+        print(f"no events match {needle!r}")
+        sys.exit(1)
+    for row in matched[-10:]:
+        print(f"{row['seq']:>5} {row['occurred_at_utc']} "
+              f"{row['event_type']:<28} "
+              f"{row['observed_payload'][:160]}")
+    print(f"{len(matched)} event(s); newest shown; "
+          "every number in the reports derives from these rows")
 
 
-def cmd_config(args):
-    """Config validate/show/get/set/diff (toolkit #5, cold-state)."""
-    home = _home(args)
-    path = home / "dhriti.config.json"
+def cmd_config(args, ctx):
+    path = ctx.home / "dhriti.config.json"
     if args.sub == "show":
-        print(json.dumps(load_config(home), indent=2))
+        print(json.dumps(ctx.config, indent=2))
     elif args.sub == "validate":
-        try:
-            cfg = load_config(home)
-            problems = []
-            if not isinstance(cfg.get("day_window", {}).get("start"), str):
-                problems.append("day_window.start missing")
-            if not (cfg.get("enforcement", {}).get("required_adapters")):
-                problems.append("enforcement.required_adapters empty")
-            if problems:
-                for p in problems:
-                    print(f"[warn] {p}")
-                sys.exit(1)
-            print("[ok  ] config valid")
-        except Exception as exc:
-            print(f"[FAIL] config does not load: {exc}")
+        problems = []
+        if not isinstance(ctx.config.get("day_window", {})
+                          .get("start"), str):
+            problems.append("day_window.start missing")
+        if not (ctx.config.get("enforcement", {})
+                .get("required_adapters")):
+            problems.append("enforcement.required_adapters empty")
+        if problems:
+            for p in problems:
+                print(f"[warn] {p}")
             sys.exit(1)
+        print("[ok  ] config valid")
     elif args.sub == "get":
-        cfg = load_config(home)
-        node = cfg
+        node = ctx.config
         for part in args.key.split("."):
             if not isinstance(node, dict) or part not in node:
                 print(f"no such key: {args.key}")
@@ -182,7 +846,7 @@ def cmd_config(args):
         print(json.dumps(node, indent=2, default=str))
     elif args.sub == "set":
         # cold-state act: refuse while the daemon holds the lock
-        if (home / "daemon.lock").exists():
+        if (ctx.home / "daemon.lock").exists():
             print("refused: the daemon holds the lock. Stop it first — "
                   "config changes apply at next start (L-3/D-050).")
             sys.exit(1)
@@ -198,676 +862,9 @@ def cmd_config(args):
             node[parts[-1]] = args.value
         path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         print(f"set {args.key} (applies at next daemon start)")
-    s = None
-
-
-def cmd_init(args):
-    home = _home(args)
-    home.mkdir(parents=True, exist_ok=True)
-    config = load_config(home)
-    config_path = home / "dhriti.config.json"
-    if not config_path.exists():
-        config_path.write_text(json.dumps(config, indent=2),
-                               encoding="utf-8")
-        print(f"config written: {config_path}")
-    (home / "profiles").mkdir(exist_ok=True)
-    # bridge token is created lazily by the daemon; touch the DB now
-    services = _open_core(home)
-    from .bridge import ensure_token
-    token = ensure_token(home)
-    services["db"].close()
-    print(f"dhriti home ready: {home}")
-    print(f"bridge token: {home / 'bridge_token'} "
-          f"(paste into extension/config.js)")
-    print("next: dhriti ritual   # write today's contract, cold")
-
-
-def cmd_ritual(args):
-    """The cold-state ritual (PDF section 5.2). Interactive, or fully
-    scripted via --set for tests/simulations."""
-    home = _home(args)
-    s = _open_core(home)
-    clock: Clock = s["clock"]
-    tz = local_tz(s["config"].get("timezone", "UTC"))
-    today = clock.now_utc().astimezone(tz).date()
-
-    if args.set:
-        payload = json.loads(args.set)
-    else:
-        print("--- cold-state ritual (no session is active) ---")
-        prev = s["days"].get(today)
-        payload = {
-            "mandatory_task": _ask("mandatory task"),
-            "smallest_next_action": _ask("smallest next action"),
-            "evidence": [{"kind": _ask(
-                "evidence kind (command|file|manual|observed)")}],
-            "targets": [{"kind": "session_count", "count": int(
-                _ask("session target count for today", "1"))}],
-            "allowed_tools": _ask_list("allowed tools/domains "
-                                       "(comma separated)"),
-            "blocked_tools": _ask_list("extra blocked tools/domains"),
-            "core_belief": _ask("core belief (one sentence)"),
-            "identity_statement": _ask("identity statement (one sentence)"),
-            "work_mode": _ask("work mode (closed_world|bounded_research|"
-                              "open_exploration)", "closed_world"),
-        }
-        # D-030: the main belief and its exchange rate with substitutes.
-        print("--- the main belief (D-030; honest, cold, no audience) ---")
-        payload["main_belief"] = _ask("main belief "
-                                      "(e.g. I want to be a software "
-                                      "engineer)")
-        payload["main_belief_metric"] = _ask(
-            "what would prove the belief is becoming real")
-        payload["main_belief_current_state"] = _ask(
-            "current state, honest (e.g. I am failing the course)")
-        payload["substitute_activities"] = _ask_list(
-            "known substitute activities (comma separated)")
-        payload["substitute_budget"] = _ask(
-            "substitute budget when the main belief is healthy",
-            "3 hours per week")
-        # IF–THEN obstacle plan (optional group, all-or-nothing).
-        print("--- IF-THEN obstacle plan (enter to skip the whole group) ---")
-        obstacle = _ask("likely first obstacle")
-        if obstacle:
-            payload["expected_obstacle"] = obstacle
-            payload["if_then_response"] = _ask("planned response")
-            payload["return_condition"] = _ask(
-                "when to return to the main task")
-        payload["emergency_policy"] = _ask(
-            "what counts as an emergency (one sentence)",
-            "medical, family, or system on fire")
-    contract_id = s["contracts"].create_draft(
-        __import__("dhriti.models", fromlist=["ContractKind"]).ContractKind.DAILY,
-        today.isoformat(), payload)
-    sealed = s["contracts"].seal(contract_id)
-    s["ledger"].record("contract_sealed", observed_payload={
-        "kind": "daily", "scope": today.isoformat()})
-    print(f"sealed: {sealed['id']}")
-    print(f"day window: {s['config']['day_window']['start']} .. "
-          f"{s['config']['day_window']['end']} "
-          f"(day_close {s['config']['day_window']['day_close']})")
-    s["db"].close()
-
-
-def cmd_day(args):
-    home = _home(args)
-    s = _open_core(home)
-    clock: Clock = s["clock"]
-    tz = local_tz(s["config"].get("timezone", "UTC"))
-    today = clock.now_utc().astimezone(tz).date()
-    day = s["days"].ensure_day(today)
-    if args.sub == "status":
-        win = resolve_window(today, s["config"])
-        sessions = s["sessions"].sessions_for_day(day["id"])
-        print(f"date         {day['date']}")
-        print(f"state        {day['state']}")
-        print(f"window       {win.window_start} .. {win.window_end}")
-        print(f"day_close    {win.day_close}")
-        print(f"targets_met  {'yes' if day['targets_met'] else 'no'}")
-        print(f"sessions     {len(sessions)}")
-        for sess in sessions:
-            print(f"  {sess['id'][:8]} [{sess['state']}] {sess['task']}")
-    s["db"].close()
-
-
-def cmd_session(args):
-    home = _home(args)
-    if args.sub == "start":
-        daemon = Daemon(home)
-        try:
-            sess = daemon.start_session(
-                args.task, args.evidence_spec or "", args.profile,
-                condition=args.condition)
-            print(f"active: {sess['id']}")
-            print(f"task: {args.task}")
-        finally:
-            daemon.release_lock()
-            daemon.db.close()
-        return
-    s = _open_core(home)
-    active = s["sessions"].active() if args.sub in ("end", "status") else None
-    if args.sub == "status":
-        if active:
-            started = active["started_at"]
-            print(f"ACTIVE {active['id'][:8]}")
-            print(f"task   {active['task']}")
-            print(f"since  {started}")
-        else:
-            print("no active session")
-    elif args.sub == "end":
-        if not active:
-            print("no active session")
-        elif args.outcome == "success":
-            try:
-                result = s["sessions"].end_success(active["id"], args.note)
-                print(f"ended: {result['state']}")
-            except Exception:
-                accepted = s["sessions"].accepted_evidence_count(
-                    active["id"])
-                print(f"cannot end SUCCESS: accepted evidence = {accepted}")
-                sys.exit(1)
-        else:
-            result = s["sessions"].end_incomplete(active["id"], args.note)
-            print(f"ended: {result['state']}")
-    s["db"].close()
-
-
-def cmd_break_glass(args):
-    home = _home(args)
-    s = _open_core(home)
-    active = s["sessions"].active()
-    day = s["days"].get(s["clock"].now_utc().astimezone(
-        local_tz(s["config"]["timezone"])).date())
-    if args.emergency:
-        # D-019: the immediate emergency path — distinct event, no toll,
-        # no cooldown, still typed and still logged.
-        reason = args.reason or input(
-            "emergency reason (one honest sentence): ")
-        result = s["break_glass"].emergency(
-            reason, session_id=active["id"] if active else None,
-            day_id=day["id"] if day else None,
-            session_service=s["sessions"])
-        print("emergency exception logged. The cold review will read it.")
-        s["db"].close()
-        return
-    handle = s["break_glass"].initiate(
-        active["id"] if active else None,
-        day["id"] if day else None)
-    print(f"pressed. confirm not before {handle['confirm_not_before']}")
-    print(f"handle: {handle['handle']}")
-    if args.yes:
-        import time as _time
-        wait = handle["delay_seconds"]
-        print(f"waiting {wait}s ... (the toll; Ctrl-C to go back to work)")
-        _time.sleep(wait)
-        reason = input("typed reason (>= 20 chars): ")
-    else:
-        reason = args.reason or ""
-    try:
-        result = s["break_glass"].confirm(handle["handle"], reason,
-                                          s["sessions"])
-        print(f"confirmed. honored_delay={result['honored_delay']} "
-              f"cooldown_until={result['cooldown_until']}")
-        if result["penalty_declared"]:
-            print("declared penalties (yours, from the cold state): "
-                  + "; ".join(result["penalty_declared"]))
-        s["ledger"].record(
-            "break_glass_confirmed", session_id=active["id"] if active
-            else None,
-            observed_payload={"honored_delay": result["honored_delay"]},
-            action_taken="session ended; cooldown set")
-    except BreakGlassError as exc:
-        print(f"not confirmed: {exc}")
-        sys.exit(1)
-    finally:
-        s["db"].close()
-
-
-def cmd_proof(args):
-    home = _home(args)
-    s = _open_core(home)
-    active = s["sessions"].active()
-    if args.action == "mark-unreliable":
-        # Recognition mechanism 7: flag accepted-but-weak evidence in
-        # cold state. The verdict stays; the flag is the signal.
-        rows = s["evidence"].for_session(args.session) if args.session \
-            else []
-        if not rows:
-            print("no evidence rows for that session")
-            sys.exit(1)
-        target = None
-        for row in rows:
-            if row["id"].startswith(args.evidence_id or ""):
-                target = row
-        if not target:
-            print("evidence id not found (use a prefix)")
-            sys.exit(1)
-        detail = target.get("detail") or {}
-        detail["flagged_unreliable"] = True
-        detail["flag_note"] = args.note or ""
-        import json as _json
-        s["db"].update("evidence", target["id"], {
-            "detail_json": _json.dumps(detail, default=str)})
-        s["ledger"].record(
-            "evidence_flagged_unreliable",
-            session_id=target["session_id"],
-            observed_payload={"evidence": target["id"][:8],
-                              "note": (args.note or "")[:200]},
-            action_taken="flag recorded; verdict unchanged")
-        print(f"flagged: {target['id'][:8]} (verdict unchanged)")
-        s["db"].close()
-        return
-    if not active:
-        print("no active session — evidence belongs to a session")
-        sys.exit(1)
-    if args.action == "command":
-        ev = s["evidence"].machine_check_command(
-            active["id"], args.command, cwd=args.cwd)
-    elif args.action == "file":
-        ev = s["evidence"].submit_file(active["id"], args.path,
-                                       note=args.note or "")
-    elif args.action == "manual":
-        ev = s["evidence"].submit_manual(active["id"], args.note or "")
-    else:
-        print("kind must be command|file|manual")
-        sys.exit(1)
-    print(f"[{ev['verdict']}] {ev['class']}/{ev['kind']}: "
-          f"{ev.get('verdict_reason')}")
-    s["ledger"].record(
-        "evidence_submitted", session_id=active["id"],
-        observed_payload={"kind": ev["kind"], "verdict": ev["verdict"]})
-    s["db"].close()
-
-
-def cmd_research(args):
-    home = _home(args)
-    s = _open_core(home)
-    active = s["sessions"].active()
-    day = s["days"].get(s["clock"].now_utc().astimezone(
-        local_tz(s["config"]["timezone"])).date())
-    if args.sub == "start":
-        sources = [x.strip() for x in args.sources.split(",") if x.strip()]
-        rp = s["research"].start(
-            args.dependency, sources, args.return_condition,
-            session_id=active["id"] if active else None,
-            day_id=day["id"] if day else None,
-            max_minutes=args.minutes)
-        print(f"pass open: {rp['id']}")
-        print(f"sources allowed until {rp['expires_at']}: "
-              f"{', '.join(rp['sources'])}")
-        print(f"return condition: {rp['return_condition']}")
-        s["ledger"].record(
-            "research_pass_opened",
-            session_id=active["id"] if active else None,
-            observed_payload={"dependency": args.dependency,
-                              "sources": sources,
-                              "expires_at": rp["expires_at"]},
-            action_taken="sources temporarily allowed")
-    elif args.sub == "return":
-        rp = s["research"].return_to_task(args.pass_id, args.notes or "")
-        print(f"returned: {rp['state']}")
-        s["ledger"].record("research_pass_returned",
-                           observed_payload={"pass": args.pass_id})
-    s["db"].close()
-
-
-def cmd_report(args):
-    home = _home(args)
-    s = _open_core(home)
-    tz = local_tz(s["config"].get("timezone", "UTC"))
-    today = s["clock"].now_utc().astimezone(tz).date()
-    if args.scope == "week":
-        monday = today - _dt.timedelta(days=today.weekday())
-        report = s["aftermath"].week_report(monday.isoformat())
-        stem = f"review-week-{monday.isoformat()}"
-    else:
-        day = s["days"].get(
-            _dt.date.fromisoformat(args.date) if args.date else today)
-        if not day:
-            print("no such day")
-            sys.exit(1)
-        report = s["aftermath"].day_report(day)
-        stem = f"aftermath-{day['date']}"
-    out = s["aftermath"].write(
-        report, home / s["config"].get("report", {}).get("dir", "reports"),
-        stem)
-    print(f"markdown: {out['markdown']}")
-    print(f"html:     {out['html']}")
-    s["db"].close()
-
-
-def cmd_bootcamp(args):
-    home = _home(args)
-    s = _open_core(home)
-    if args.sub == "start":
-        bc = s["bootcamp"].start(args.days)
-        print(f"bootcamp: {bc['id']}")
-        print(f"planned_days: {bc['planned_days']} — no ordinary rule "
-              f"changes inside the period")
-        s["ledger"].record("bootcamp_started", observed_payload={
-            "planned_days": args.days})
-    elif args.sub == "status":
-        bc = s["bootcamp"].active()
-        if not bc:
-            print("no active bootcamp")
-        else:
-            stats = s["bootcamp"].evidence_summary()
-            print(f"state        {bc['state']} (taper stage "
-                  f"{bc['taper_stage']})")
-            print(f"days_elapsed {stats['days_elapsed']}")
-            print(f"compliance   {stats['compliance_rate']}")
-            print(f"proof_rate   {stats['proof_rate']}")
-            print(f"breaks_7d    {stats['break_glass_7d']}")
-    elif args.sub == "taper":
-        rec = s["bootcamp"].compute_taper()
-        print(f"recommended stage: {rec['recommended_stage']} "
-              f"({rec['reason']})")
-        if args.apply:
-            updated = s["bootcamp"].apply_taper(
-                rec["recommended_stage"], rec["reason"])
-            print(f"applied. stage now {updated['taper_stage']}")
-    elif args.sub == "graduate":
-        bc = s["bootcamp"].graduate()
-        print(f"graduated: {bc['state']} — the tool is now optional")
-    s["db"].close()
-
-
-def cmd_verify(args):
-    home = _home(args)
-    s = _open_core(home)
-    result = s["ledger"].verify_chain()
-    print(f"chain ok: {result['ok']} ({result['checked']} events checked)")
-    if not result["ok"]:
-        print(f"first bad seq: {result['first_bad_seq']} "
-              f"({result['reason']})")
-        sys.exit(1)
-    integrity = s["db"].integrity_check()
-    print(f"sqlite integrity: {'ok' if integrity else 'FAILED'}")
-    head = s["ledger"].head()
-    print(f"head: {head['row_hash']}")
-    print("write this hash somewhere off-machine to anchor the ledger")
-    s["db"].close()
-
-
-def cmd_status(args):
-    home = _home(args)
-    s = _open_core(home)
-    tz = local_tz(s["config"].get("timezone", "UTC"))
-    today = s["clock"].now_utc().astimezone(tz).date()
-    day = s["days"].get(today)
-    active = s["sessions"].active()
-    bc = s["bootcamp"].active()
-    print(f"now        {s['clock'].iso()} ({today} local)")
-    print(f"bootcamp   " + (f"{bc['state']} stage {bc['taper_stage']} "
-                           f"since {bc['started_at']}" if bc else "none"))
-    print(f"day        " + (day["state"] if day else "none"))
-    if day and day["state"] == "OPEN":
-        print(f"targets    {'met' if day['targets_met'] else 'unmet'}")
-    print(f"session    " + (f"ACTIVE {active['id'][:8]} — {active['task']}"
-                           if active else "none"))
-    s["db"].close()
-
-
-def cmd_events(args):
-    home = _home(args)
-    s = _open_core(home)
-    rows = s["ledger"].events(
-        event_type=args.type, session_id=args.session,
-        since_utc=args.since, limit=args.limit)
-    if args.json:
-        print(json.dumps(rows, indent=2, default=str))
-    else:
-        for row in rows:
-            print(f"{row['seq']:>5} {row['occurred_at_utc']} "
-                  f"{row['event_type']:<32} "
-                  f"{row['source_adapter']:<16} "
-                  f"{row['action_taken'] or '-'}")
-    s["db"].close()
-
-
-def cmd_adapter(args):
-    home = _home(args)
-    daemon = Daemon(home)
-    try:
-        if args.sub == "status":
-            for adapter in daemon.adapters:
-                info = adapter.status()
-                line = f"{adapter.name:<18} {info['probe']:<14} " \
-                       f"armed={info['armed']}"
-                print(line)
-                if args.verbose and info.get("disclosure"):
-                    print(f"{'':18} -> {info['disclosure']}")
-                if args.verbose and args.sub == "status":
-                    m = adapter.manifest()
-                    print(f"{'':18} capabilities: "
-                          f"{', '.join(m['capabilities'])}")
-    finally:
-        daemon.release_lock()
-        daemon.db.close()
-
-
-def cmd_daemon(args):
-    home = _home(args)
-    daemon = Daemon(home, tick_seconds=args.tick)
-    try:
-        daemon.run()
-    except KeyboardInterrupt:
-        pass
-
-
-def cmd_ignite(args):
-    home = _home(args)
-    s = _open_core(home)
-    profiles = load_profiles(home)
-    profile = profiles.get(args.profile)
-    if not profile:
-        print(f"unknown profile '{args.profile}' "
-              f"(available: {', '.join(profiles)})")
-        sys.exit(1)
-    plan_path = home / "profiles" / f"ignite.{args.profile}.json"
-    print(f"workspace ignition profile: {args.profile}")
-    if plan_path.exists():
-        print(f"plan file: {plan_path}")
-        print("run: powershell -File launcher/ignite.ps1 "
-              f"-Profile {plan_path}")
-    else:
-        print(f"no ignite plan found at {plan_path}")
-        print("create one by copying launcher/profiles/ignite.example.json")
-    s["db"].close()
-
-
-def cmd_park(args):
-    """The wall's mail slot: park a curiosity in one line, go back to
-    work. Dispositions happen cold (`dhriti park --list`, --dispose)."""
-    home = _home(args)
-    s = _open_core(home)
-    active = s["sessions"].active()
-    day = s["days"].get(s["clock"].now_utc().astimezone(
-        local_tz(s["config"]["timezone"])).date())
-    if args.dispose:
-        row = s["parking"].dispose(args.dispose, args.disposition,
-                                    args.note or "")
-        print(f"disposed [{row['disposition']}]: {row['question']}")
-        if row["disposition"] == "approved":
-            print("add it to the next contract's allowed_tools, cold")
-        s["db"].close()
-        return
-    if args.list:
-        rows = s["parking"].list(args.status or None)
-        if not rows:
-            print("(the parking lot is empty)")
-        for r in rows:
-            print(f"[{r['disposition']:8}] {r['created_at'][:16]} "
-                  f"{r['question']}")
-        s["db"].close()
-        return
-    if not (args.question or "").strip():
-        print("park a question: dhriti park 'why does JVM do X'")
-        sys.exit(1)
-    row = s["parking"].park(
-        args.question, origin=args.origin or "",
-        session_id=active["id"] if active else None,
-        day_id=day["id"] if day else None)
-    print(f"parked: {row['question']}")
-    print("(deferred to cold review; back to the task)")
-    s["db"].close()
-
-
-def cmd_review(args):
-    """The cold review: the fixed question protocol (D-031, graduation
-    meta-metric, evidence quality, surveillance comfort, devices)."""
-    home = _home(args)
-    s = _open_core(home)
-    tz = local_tz(s["config"].get("timezone", "UTC"))
-    today = s["clock"].now_utc().astimezone(tz).date()
-    if args.scope == "week":
-        monday = today - _dt.timedelta(days=today.weekday())
-        scope = f"week:{monday.isoformat()}"
-        day_date = None
-    else:
-        scope = f"day:{args.date or today.isoformat()}"
-        day_date = args.date or today.isoformat()
-    answered = {r["question_key"] for r in
-                s["review"].answers_for(scope)}
-    pending = s["parking"].pending()
-    # D-047: the leisure question is conditional — asked only for a day
-    # scope on which at least one declaration exists. Six fixed
-    # questions always; the seventh only when it applies.
-    questions = dict(REVIEW_QUESTIONS)
-    if not (args.scope == "day"
-            and s["leisure"].for_day(day_date or today.isoformat())):
-        questions.pop("leisure_honored", None)
-    print("--- cold review (no session is active) ---")
-    print(f"scope: {scope}")
-    if pending and args.ask_parking:
-        print("\nparking lot first (cold-state dispositions):")
-        for p in pending:
-            mark = _ask(f"[{p['question'][:60]}] "
-                        "approved|dropped|explored (enter=keep parked)")
-            if mark in ("approved", "dropped", "explored"):
-                s["parking"].dispose(p["id"], mark)
-    for key, (prompt, _why) in questions.items():
-        if key in answered and not args.redo:
-            continue
-        print("\n" + prompt)
-        print(f"  ({_why})")
-        answer = _ask("answer")
-        if answer:
-            s["review"].record(scope, key, answer, day_date=day_date)
-    done = s["review"].answers_for(scope)
-    print(f"\n{len(done)}/{len(questions)} questions answered "
-          f"for {scope}")
-    missing = set(questions) - {r["question_key"] for r in done}
-    for key in missing:
-        print(f"  unanswered: {key}")
-    s["db"].close()
-
-
-def cmd_digest(args):
-    """The weekly digest (dead-man's switch): plain facts + chain head,
-    meant to be sent to the one human who cares."""
-    home = _home(args)
-    s = _open_core(home)
-    tz = local_tz(s["config"].get("timezone", "UTC"))
-    today = s["clock"].now_utc().astimezone(tz).date()
-    monday = today - _dt.timedelta(days=today.weekday())
-    text = build_digest(s["db"], s["ledger"], monday.isoformat(),
-                        clock=s["clock"], config=s["config"])
-    out_dir = home / s["config"].get("report", {}).get("dir", "reports")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"digest-{monday.isoformat()}.txt"
-    out.write_text(text, encoding="utf-8")
-    recipient = s["config"].get("digest", {}).get("recipient_label")
-    s["ledger"].record(
-        "digest_generated",
-        observed_payload={"week": monday.isoformat(), "path": str(out)},
-        action_taken="ready to send" + (
-            f" to {recipient}" if recipient else " (no recipient configured)")
-    )
-    print(f"digest written: {out}")
-    print("send it to your accountability human. If a week's digest "
-          "does not arrive, that absence is the signal.")
-    s["db"].close()
-
-
-def cmd_token(args):
-    """Bridge token management (rotate in cold state, never mid-session)."""
-    home = _home(args)
-    from .bridge import ensure_token
-    if args.sub == "show":
-        token = ensure_token(home)
-        print(f"token: {token}")
-        print(f"paste into extension/config.js (bridgeToken)")
-        return
-    if args.sub == "rotate":
-        token_file = home / "bridge_token"
-        if token_file.exists():
-            stamp = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-            token_file.rename(Path(str(token_file) + f".old-{stamp}"))
-        token = ensure_token(home)
-        print(f"new token: {token}")
-        print("paste into extension/config.js now (cold state), then "
-              "reload the extension. Old token invalid.")
-
-
-def cmd_declare(args):
-    """Structured declarations (recognition mechanisms 1 & 6, D-047).
-    One-way inputs with consequences, not negotiations."""
-    home = _home(args)
-    s = _open_core(home)
-    active = s["sessions"].active()
-    if args.sub == "leisure":
-        # D-047: declared rest — one-way, typed, bounded. A label, not
-        # a permission: it unblocks nothing and needs no session (rest
-        # happens in the evening, when no session can exist). The
-        # aftermath shows it next to undeclared consumption ("drift").
-        activity = (args.activity or "").strip()
-        if not activity:
-            print("--activity is required: what rest did you choose?")
-            sys.exit(1)
-        tz = local_tz(s["config"].get("timezone", "UTC"))
-        today = s["clock"].now_utc().astimezone(tz).date()
-        try:
-            row = s["leisure"].declare(
-                activity, args.minutes, note=args.note or "",
-                day_date=today.isoformat())
-        except ValueError as exc:
-            print(f"not declared: {exc}")
-            sys.exit(1)
-        print(f"declared rest: {row['activity']} "
-              f"({row['planned_minutes']} min, ends {row['ends_at']})")
-        print("(a label, not a permission — the aftermath will show it "
-              "next to drift; the review asks if it held)")
-        s["db"].close()
-        return
-    if not active:
-        print("declarations belong to an active session "
-              "(except leisure, which belongs to rest)")
-        sys.exit(1)
-    if args.sub == "dependency":
-        if not (args.what or "").strip():
-            print("--what is required: which obstacle revealed this "
-                  "dependency")
-            sys.exit(1)
-        s["ledger"].record(
-            "unplanned_dependency_declared",
-            session_id=active["id"],
-            observed_payload={
-                "obstacle": args.what,
-                "resource": args.resource or ""},
-            action_taken="declared; reviewed in aftermath",
-            telemetry_quality="OK")
-        print("declared. Use `dhriti research start` for the bounded "
-              "pass; the aftermath checks the return.")
-    elif args.sub == "essential-tool":
-        if not (args.tool or "").strip():
-            print("--tool is required")
-            sys.exit(1)
-        s["ledger"].record(
-            "essential_tool_declared",
-            session_id=active["id"],
-            observed_payload={"tool": args.tool,
-                              "why": args.why or ""},
-            action_taken="allowed for this session; aftermath checks "
-                         "whether it was essential",
-            telemetry_quality="OK")
-        print("declared. The aftermath will check whether it was "
-              "actually essential.")
-    s["db"].close()
 
 
 # ---------------------------------------------------------------- plumbing
-def _ask(prompt: str, default: str = "") -> str:
-    suffix = f" [{default}]" if default else ""
-    value = input(f"{prompt}{suffix}: ").strip()
-    return value or default
-
-
-def _ask_list(prompt: str) -> list:
-    raw = _ask(prompt + " (enter for none)")
-    return [x.strip() for x in raw.split(",") if x.strip()]
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dhriti",
@@ -878,37 +875,22 @@ def build_parser() -> argparse.ArgumentParser:
                         version=f"dhriti {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("health", help="operational state, one screen")
-    p.set_defaults(func=cmd_health)
-
-    p = sub.add_parser("backup", help="local backup with manifest")
-    p.add_argument("--dest", default=None,
-                   help="backup root (default <home>/backups)")
-    p.set_defaults(func=cmd_backup)
-
-    p = sub.add_parser("journal", help="experimenter's log (separate DB)")
-    p.add_argument("sub", choices=["add", "list", "export"])
-    p.add_argument("text", nargs="?", default="",
-                   help="entry text (add)")
-    p.add_argument("--since", default=None, help="YYYY-MM-DD (list)")
-    p.set_defaults(func=cmd_journal)
-
-    p = sub.add_parser("explain", help="trace a number to its events")
-    p.add_argument("what", nargs="?", default="")
-    p.set_defaults(func=cmd_explain)
-
-    p = sub.add_parser("config", help="config validate/show/get/set")
-    p.add_argument("sub", choices=["validate", "show", "get", "set"])
-    p.add_argument("key", nargs="?", default="")
-    p.add_argument("value", nargs="?", default="")
-    p.set_defaults(func=cmd_config)
-
     p = sub.add_parser("init", help="initialize a Dhriti home")
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("ritual", help="cold-state daily contract wizard")
     p.add_argument("--set", help="JSON payload (non-interactive)")
     p.set_defaults(func=cmd_ritual)
+
+    p = sub.add_parser("contract", help="write / seal the contract")
+    csub = p.add_subparsers(dest="sub", required=True)
+    w = csub.add_parser("write", help="write today's contract file")
+    w.add_argument("--set", help="JSON payload (non-interactive)")
+    w.set_defaults(func=cmd_contract_write)
+    s = csub.add_parser("seal", help="seal a contract file, cold")
+    s.add_argument("file")
+    s.add_argument("--date", default=None, help="YYYY-MM-DD")
+    s.set_defaults(func=cmd_contract_seal)
 
     p = sub.add_parser("day", help="day window")
     p.add_argument("sub", choices=["status"])
@@ -917,10 +899,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("session", help="work sessions")
     p.add_argument("sub", choices=["start", "end", "status"])
     p.add_argument("--task", default="")
-    p.add_argument("--profile", default="coding",
-                   help="task profile (coding|study|research|writing)")
-    p.add_argument("--evidence-spec", default="",
-                   help='JSON list e.g. [{"kind":"command"}]')
+    p.add_argument("--profile", default="coding")
     p.add_argument("--condition", default=None,
                    help="experiment condition tag A-E")
     p.add_argument("--outcome", default="incomplete",
@@ -929,35 +908,46 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_session)
 
     p = sub.add_parser("break-glass", help="the only exit")
-    p.add_argument("--reason", default="", help="typed reason")
-    p.add_argument("--yes", action="store_true",
-                   help="interactive: wait the delay, then type reason")
-    p.add_argument("--emergency", action="store_true",
-                   help="D-019 immediate emergency path (logged, no toll)")
-    p.set_defaults(func=cmd_break_glass)
+    bsub = p.add_subparsers(dest="sub")
+    bi = bsub.add_parser("initiate", help="press; get the handle")
+    bi.add_argument("--yes", action="store_true",
+                    help="wait the delay interactively")
+    bi.set_defaults(func=cmd_break_initiate)
+    bc = bsub.add_parser("confirm", help="confirm with a typed reason")
+    bc.add_argument("id")
+    bc.add_argument("--reason", required=True)
+    bc.set_defaults(func=cmd_break_confirm)
+    be = bsub.add_parser("emergency", help="D-019 immediate path")
+    be.add_argument("--reason", default="")
+    be.set_defaults(func=cmd_break_emergency)
 
-    p = sub.add_parser("proof", help="submit evidence")
-    p.add_argument("action",
-                   choices=["command", "file", "manual", "mark-unreliable"],
-                   help="evidence kind, or mark-unreliable")
-    p.add_argument("--command", default="")
-    p.add_argument("--path", default="")
-    p.add_argument("--note", default="")
-    p.add_argument("--cwd", default=None)
-    p.add_argument("--session", default=None,
-                   help="session id (mark-unreliable)")
-    p.add_argument("--evidence-id", dest="evidence_id", default="")
-    p.set_defaults(func=cmd_proof)
+    p = sub.add_parser("evidence", help="submit proof")
+    esub = p.add_subparsers(dest="sub", required=True)
+    ef = esub.add_parser("file", help="submit a file (hashed)")
+    ef.add_argument("--target", required=True,
+                    help="the contract target label this proves")
+    ef.add_argument("path")
+    ef.add_argument("--note", default="")
+    ef.set_defaults(func=cmd_evidence_file)
+    em = esub.add_parser("machine", help="run a command; exit code is "
+                                         "the fact")
+    em.add_argument("--target", required=True)
+    em.add_argument("--accept-nonzero", dest="accept_nonzero",
+                    action="store_true",
+                    help="documented-failure proof counts")
+    em.add_argument("command")
+    em.set_defaults(func=cmd_evidence_machine)
+    eu = esub.add_parser("manual", help="a claim, kept for review")
+    eu.add_argument("--target", required=True)
+    eu.add_argument("--note", default="")
+    eu.set_defaults(func=cmd_evidence_manual)
 
-    p = sub.add_parser("research", help="bounded research pass")
-    p.add_argument("sub", choices=["start", "return"])
-    p.add_argument("--dependency", default="")
-    p.add_argument("--sources", default="",
-                   help="comma-separated domains")
-    p.add_argument("--return-condition", default="")
+    p = sub.add_parser("research", help="bounded, topic-locked pass")
+    p.add_argument("sub", choices=["open", "return"])
+    p.add_argument("--question", default="")
     p.add_argument("--minutes", type=int, default=None)
     p.add_argument("--pass-id", dest="pass_id", default="")
-    p.add_argument("--notes", default="")
+    p.add_argument("--answer", default="")
     p.set_defaults(func=cmd_research)
 
     p = sub.add_parser("report", help="aftermath / cold review")
@@ -998,27 +988,30 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--profile", default="coding")
     p.set_defaults(func=cmd_ignite)
 
-    p = sub.add_parser("park", help="curiosity parking lot (one line, "
-                                     "deferred to cold review)")
+    p = sub.add_parser("park", help="curiosity parking lot (one line)")
     p.add_argument("question", nargs="?", default="")
-    p.add_argument("--origin", default="", help="where it came from")
-    p.add_argument("--list", action="store_true")
-    p.add_argument("--status", default=None,
-                   help="filter: parked|approved|dropped|explored")
-    p.add_argument("--dispose", default=None,
-                   help="parking id to dispose (cold state)")
-    p.add_argument("--disposition", default="",
-                   choices=["", "approved", "dropped", "explored"])
-    p.add_argument("--note", default="")
+    p.add_argument("--source", default=None,
+                   help="where it came from (url, event id)")
     p.set_defaults(func=cmd_park)
+
+    p = sub.add_parser("parking", help="the parking lot, cold")
+    psub = p.add_subparsers(dest="sub", required=True)
+    psub.add_parser("list")
+    p.set_defaults(func=cmd_parking)
+
+    p = sub.add_parser("parking-dispose", help="dispose a parked item")
+    p.add_argument("id")
+    p.add_argument("disposition",
+                   choices=["approved", "dropped", "explored"])
+    p.add_argument("--note", default="")
+    p.set_defaults(func=cmd_parking_dispose)
 
     p = sub.add_parser("review", help="cold review question protocol")
     p.add_argument("--scope", default="day", choices=["day", "week"])
     p.add_argument("--date", default=None, help="YYYY-MM-DD")
-    p.add_argument("--redo", action="store_true",
-                   help="ask already-answered questions again")
-    p.add_argument("--ask-parking", dest="ask_parking", action="store_true",
-                   help="disposition parked topics first")
+    p.add_argument("--redo", action="store_true")
+    p.add_argument("--ask-parking", dest="ask_parking",
+                   action="store_true")
     p.set_defaults(func=cmd_review)
 
     p = sub.add_parser("digest", help="weekly digest (dead-man's switch)")
@@ -1028,20 +1021,53 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("sub", choices=["show", "rotate"])
     p.set_defaults(func=cmd_token)
 
-    p = sub.add_parser("declare", help="structured declarations "
-                                        "(dependency, tool, leisure)")
+    p = sub.add_parser("declare", help="structured declarations")
     p.add_argument("sub", choices=["dependency", "essential-tool",
-                                    "leisure"])
-    p.add_argument("--what", default="", help="the obstacle (dependency)")
+                                   "leisure"])
+    p.add_argument("--what", default="")
     p.add_argument("--resource", default="")
     p.add_argument("--tool", default="")
     p.add_argument("--why", default="")
-    p.add_argument("--activity", default="",
-                   help="the chosen rest (leisure), in your words")
-    p.add_argument("--minutes", type=int, default=45,
-                   help="bounded length of the declared rest (1..240)")
+    p.add_argument("--activity", default="")
+    p.add_argument("--minutes", type=int, default=45)
     p.add_argument("--note", default="")
     p.set_defaults(func=cmd_declare)
+
+    p = sub.add_parser("vidura", help="spaced review of your answers")
+    vsub = p.add_subparsers(dest="sub", required=True)
+    vi = vsub.add_parser("ingest", help="ingest a day's pass answers")
+    vi.add_argument("--date", default=None, help="YYYY-MM-DD")
+    vi.set_defaults(func=cmd_vidura_ingest)
+    vd = vsub.add_parser("due", help="items due")
+    vd.add_argument("--date", default=None)
+    vd.set_defaults(func=cmd_vidura_due)
+    vr = vsub.add_parser("review", help="review an item")
+    vr.add_argument("item")
+    vr.add_argument("grade", choices=["again", "hard", "good", "easy"])
+    vr.set_defaults(func=cmd_vidura_review)
+
+    p = sub.add_parser("health", help="operational state, one screen")
+    p.set_defaults(func=cmd_health)
+
+    p = sub.add_parser("backup", help="local backup with manifest")
+    p.add_argument("--dest", default=None)
+    p.set_defaults(func=cmd_backup)
+
+    p = sub.add_parser("journal", help="experimenter's log (separate DB)")
+    p.add_argument("sub", choices=["add", "list", "export"])
+    p.add_argument("text", nargs="?", default="")
+    p.add_argument("--since", default=None)
+    p.set_defaults(func=cmd_journal)
+
+    p = sub.add_parser("explain", help="trace a number to its events")
+    p.add_argument("what", nargs="?", default="")
+    p.set_defaults(func=cmd_explain)
+
+    p = sub.add_parser("config", help="config validate/show/get/set")
+    p.add_argument("sub", choices=["validate", "show", "get", "set"])
+    p.add_argument("key", nargs="?", default="")
+    p.add_argument("value", nargs="?", default="")
+    p.set_defaults(func=cmd_config)
 
     return parser
 
@@ -1049,14 +1075,22 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
+    ctx = None
     try:
-        args.func(args)
+        ctx = _make_ctx(args)
+        args.func(args, ctx)
     except DhritiError as exc:
+        print(f"error: {exc}")
+        sys.exit(1)
+    except ContractError as exc:
         print(f"error: {exc}")
         sys.exit(1)
     except FileNotFoundError as exc:
         print(f"error: {exc}")
         sys.exit(1)
+    finally:
+        if ctx is not None:
+            ctx.close()
 
 
 if __name__ == "__main__":

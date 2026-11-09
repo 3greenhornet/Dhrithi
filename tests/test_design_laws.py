@@ -101,13 +101,12 @@ class TestShameSafetyReports(DhritiTestCase):
         day = self.days.ensure_day(self.today)
         self.ledger.record(
             "browser_navigation", source_adapter="extension",
-            observed_payload={"url": "https://www.youtube.com",
+            observed={"url": "https://www.youtube.com",
                               "title": ""})
-        self.break_glass.emergency("laptop on fire, literally",
-                                   day_id=day["id"])
+        self.breaks.emergency(None, "laptop on fire, literally")
         report = AftermathService(
             self.db, self.config, self.clock, self.ledger)\
-            .day_report(day)
+            .day_report(day["date"])
         for phrase in FORBIDDEN_PHRASES:
             self.assertNotIn(phrase, report["markdown"].lower())
             self.assertNotIn(phrase, report["html"].lower())
