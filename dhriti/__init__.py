@@ -13,5 +13,5 @@ Design invariants (see docs/ARCHITECTURE.md):
   * The user's own contract is the only voice. No coaching copy.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 __tier__ = "Lite"  # per dossier section 11.1 reference tiers

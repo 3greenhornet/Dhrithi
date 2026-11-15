@@ -41,8 +41,15 @@ SOFTENING_PHRASES = (
 )
 
 AFFORDANCE_RE = re.compile(
-    r"<(?:a\b[^>]*href|button|form|input\b[^>]*type=[\"']submit)",
+    r"<(?:a\b[^>]*href|form|input\b[^>]*type=[\"']submit)",
     re.IGNORECASE)
+
+BUTTON_RE = re.compile(r"<button\b[^>]*>", re.IGNORECASE)
+# Wall Silence Protocol (v0.7.0 §4.12): the ONE permitted control is
+# the quiet corner dot that reveals the user's own line. Every other
+# button is still a violation — the exception is exactly one element
+# with id="reveal-dot", no onclick, no form behavior.
+PERMITTED_BUTTON = "reveal-dot"
 
 
 def lint_file(path: Path, phrases) -> list:
@@ -58,6 +65,12 @@ def lint_file(path: Path, phrases) -> list:
                             "must not offer a click)")
         if "onclick" in lowered:
             problems.append(f"{path}: onclick handler (L-1)")
+        # buttons: only the §4.12 reveal-dot is permitted
+        for match in BUTTON_RE.finditer(text):
+            if f'id="{PERMITTED_BUTTON}"' not in match.group(0):
+                problems.append(
+                    f"{path}: button without the §4.12 permit "
+                    f"(L-1: {match.group(0)[:60]})")
     return problems
 
 

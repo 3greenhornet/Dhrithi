@@ -196,6 +196,61 @@ def build_health(home: Path, config: Optional[dict] = None,
                 + (f" — {probe.hint}" if probe.status != "INSTALLED"
                    and probe.hint else ""))
 
+        # -- selector staleness (v0.7.0 §3.14) ----------------------------
+        # any surface rule reported stale in the last 7 days is a
+        # maintenance signal, aggregated by rule. The cutoff comes
+        # from the CLOCK (a replayed/simulated record must aggregate
+        # against its own timeline, not the wall clock).
+        from datetime import timedelta
+        stale_cutoff = (clock.now_utc() - timedelta(days=7)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+        stale = db.query(
+            "SELECT observed_payload AS observed FROM event WHERE "
+            "event_type='surface_rule_stale' AND occurred_at_utc > ?",
+            (stale_cutoff,))
+        stale_counts = {}
+        import json as _json
+        for row in stale:
+            try:
+                rule = _json.loads(row["observed"]).get("rule", "?")
+            except Exception:
+                rule = "?"
+            stale_counts[rule] = stale_counts.get(rule, 0) + 1
+        for rule, count in sorted(stale_counts.items()):
+            report.check(
+                f"suppression.{rule}", False,
+                f"stale for 7 days ({count} report(s) in the window)")
+
+        # -- mirror quota / OAuth (v0.7.0 §3.14) ---------------------------
+        mirror_cfg = config.get("mirror", {})
+        if mirror_cfg.get("enabled", False):
+            from .mirror.store import MirrorStore
+            from .mirror.ingest import YouTubeIngest
+            store = MirrorStore(db, config, clock)
+            ingest = YouTubeIngest(db, config, home, clock)
+            budget = int(mirror_cfg.get("youtube", {}).get(
+                "quota_budget_per_day", 8000))
+            report.check(
+                "mirror.quota", True,
+                f"YouTube quota: {ingest.quota_used_today}/{budget} "
+                "used today")
+            report.check(
+                "mirror.oauth", ingest.has_refresh_token(),
+                "OAuth refresh token present" if
+                ingest.has_refresh_token() else
+                "no refresh token — run dhriti mirror auth")
+            report.check(
+                "mirror.items", True,
+                f"{store.unopened_count()} unopened item(s)")
+
+        # -- honesty boundaries (v0.7.0 §4.16) --------------------------------
+        # stated every run: what this check CANNOT establish
+        report.check(
+            "honesty.boundaries", True,
+            "source verification reconstructed from docs; test "
+            "coverage extension-only; chain integrity not "
+            "completeness; model calibration shadow-only")
+
         # -- config drift (v0.6.0, Part 1 §9.2) -----------------------------
         # Compares the config on disk against the fingerprint the daemon
         # recorded at its start (daemon_config_fingerprint in meta). The

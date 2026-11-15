@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 APP_NAME = "dhriti"
 HOMEDIR_ENV = "DHRITI_HOME"
@@ -144,6 +144,138 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "max_items": 5000,
     },
+    # v0.7.0 Part 3 §3.1 — the saved-content mirror. Off by default
+    # (L-6); every default respects the laws.
+    "mirror": {
+        "enabled": False,           # L-6
+        "ingestion_interval_minutes": 15,
+        "ingestion_only_in_evening": True,
+        "max_items_per_ingestion": 500,
+        "youtube": {
+            "oauth_client_id_env": "DHRITI_YOUTUBE_CLIENT_ID",
+            "oauth_client_secret_env": "DHRITI_YOUTUBE_CLIENT_SECRET",
+            "oauth_refresh_token_path": "youtube_refresh_token",
+            "sources": [{"type": "youtube_liked", "identifier": "LL",
+                         "display_name": "Liked Videos",
+                         "intent_class": "intent", "enabled": True}],
+            "quota_budget_per_day": 8000,
+            "quota_search_disallowed": True,
+        },
+        "ml_service": {"enabled": False,
+                       "url": "http://127.0.0.1:8765",
+                       "timeout_seconds": 10,
+                       "fallback_to_rule": True},
+        "surfacing": {
+            "one_per_day": True,
+            "one_per_day_when_opened": False,
+            "surface_after_window_end": True,
+            "surface_time_local": "21:00",
+            "recall_before_reveal": True,
+            "time_budget_narrowing_enabled": True,
+            "max_age_days_for_surfacing": 365,
+            "aged_out_after_days": 180,
+            "degrade_after_consecutive_dismissals": 5,
+            "degrade_to": "title_only",
+        },
+        "decay": {
+            "use_stability": False,   # gate 3 (FSRS)
+            "fsrs_v": "v4",
+            "type_half_life_days": {"intent": 30, "reference": 180,
+                                    "mixed": 60},
+            "dismiss_penalty": 0.2,
+            "open_boost": 0.3,
+            "completion_boost": 0.5,
+            "resave_boost": 0.2,
+            "recall_failure_penalty": 0.4,
+            "recall_success_boost": 0.15,
+            "difficulty_cap": 2.0,
+            "stability_bounds_ratio": 4.0,
+        },
+        "active_learning": {"enabled": True,
+                            "confidence_threshold": 0.6,
+                            "labels_per_review": 3},
+        "privacy": {"store_descriptions": True,
+                    "store_transcripts": False,
+                    "delete_after_days": None},
+    },
+    # v0.7.0 Part 3 §3.2 — the life mirror (declared alternatives).
+    "life_mirror": {"enabled": True},
+    # v0.7.0 Part 3 §3.3 — declared device-use bounds. The honest
+    # number is unknown; the per-navigation weight states the
+    # assumption instead of hiding it.
+    "declared_bounds": {
+        "evening_minutes": 60,
+        "unit": "minutes",
+        "minutes_per_navigation": 3,
+    },
+    # v0.7.0 Part 3 §3.11 — the break-glass friction ladder.
+    "break_glass_friction": {
+        "baseline": {"delay_seconds": 60, "min_reason_words": 20},
+        "physical": {"barcode_required": False,
+                     "barcode_scan_dir": "~/.dhriti/barcodes",
+                     "barcode_min_match_score": 0.85},
+        "communication": {"otp_enabled": False,
+                          "otp_provider": "email_to_sms",
+                          "otp_gateway_email": "",
+                          "otp_recipient_phone": "",
+                          "otp_window_seconds": 300},
+        "human": {"approval_enabled": False,
+                  "approver_label": ""},
+        "text": {"long_random_chars": 0},
+        "time": {"max_delay_hours": 24},
+        "escalation": {"enabled": True,
+                       "tier_up_after_breaks_in_30_days": 2,
+                       "tiers": ["baseline", "text", "communication",
+                                 "physical"]},
+    },
+    # v0.7.0 Part 3 §3.12 — existing stack integration.
+    "stack": {
+        "cold_turkey": {"enabled": False, "executable": "",
+                        "arm_cmd": [], "disarm_cmd": [],
+                        "status_cmd": [], "delegate_domains": []},
+        "nextdns": {"enabled": False, "profile_id": "",
+                    "api_key_env": "DHRITI_NEXTDNS_API_KEY",
+                    "log_poll_minutes": 15},
+        "foqos": {"enabled": False, "barcode_dir": "~/.dhriti/barcodes"},
+        "unhook": {"enabled": False,
+                   "delegate_youtube_suppression": True},
+        "brave_filters": {"enabled": False, "import_path": ""},
+        "applock": {"enabled": False, "executable": "",
+                    "status_cmd": []},
+    },
+    # v0.7.0 Part 3 §3.13 — the reflection bank (off by default: the
+    # questions are harsh; enabling them is a cold-state act).
+    "reflection_bank": {"enabled": False, "questions_per_week": 1},
+    # v0.7.0 Part 3 §3.16 — the semantic topic-lock (L-9, off).
+    "topic_lock": {
+        "require_topic": True,
+        "min_topic_chars": 10,
+        "semantic_mode_enabled": False,   # L-9 exception; off by default
+        "similarity_threshold": 0.65,
+        "lexical_weight": 0.4,
+        "embedding_weight": 0.6,
+        "embedding_model": "local",
+        "on_divergence": "pre_send",
+        "park_button": True,
+    },
+    # v0.7.0 Part 4 — the rituals.
+    "digest_extra": {
+        "witness_mode": True,
+        "one_true_thing_enabled": True,
+    },
+    "compost": {"interval_days": 90},
+    "absence": {"max_days_per_month": 1},
+    "ceremony": {"enabled": True},
+    "meta_commitment": {"enabled": False},
+    "quiet_hour": {"enabled": False, "start_local": "16:00",
+                   "duration_minutes": 60},
+    "debrief": {"enabled": True},
+    "letters": {"enabled": True},
+    "voice_archive": {"enabled": False},
+    "wall": {"show_line_by_default": False},
+    "archive": {"enabled": True},
+    "confession": {"enabled": False},
+    "aftermath_views": {"five_views": True},
     "database": {
         # Plan §4.10 / R-007: null = auto (DELETE on Windows, WAL
         # elsewhere). Force "delete" or "wal" explicitly if needed.

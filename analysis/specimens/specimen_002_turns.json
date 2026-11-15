@@ -1,0 +1,234 @@
+{
+  "specimen_id": "SPECIMEN-002",
+  "captured_from": "the embedded AI conversation discussed in the founding chat (v0.7.0 Part 3 s3.15)",
+  "provenance": "RECONSTRUCTED CODING, NOT A VERBATIM TRANSCRIPT. The raw 11-turn conversation lived in the founding chat and was never pasted into the repository record. What the record DOES carry: the audit's documented analysis (the AI asked 'what field are you targeting?' four times; the user answered none directly; the user brought the material every time; the AI amplified it), the documented counts (completion signals 2, AI deflections 4, user elaborations 5, task-anchor drift 1), the changepoint pair (user: 'good now all this improves productivity right?' / AI: 'what field are you targeting?'), and four verbatim user quotes (u4, u9, u10, u11 below, marked documented-verbatim). Turn structure and P-codes follow that documented analysis. To replace the reconstruction: paste the original conversation and re-code; the schema accepts it unchanged.",
+  "task_context": "building the enforcement setup (filters, hosts file, extension) - the session task the chat is anchored to; coder inference, the conversation predates the session model",
+  "evidence_events": {},
+  "turns": [
+    {
+      "i": 1,
+      "phase": "setup_showcase",
+      "topic": "tool setup",
+      "excerpt": "i installed the unhook extension and the brave filters today",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-19"
+      ],
+      "p_code_notes": "show-and-tell: achievement volunteered before being asked",
+      "ai_excerpt": "That is a solid start. What else did you change in the browser?",
+      "ai_p_codes": [
+        "P-11"
+      ],
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 2,
+      "phase": "setup_showcase",
+      "topic": "tool setup",
+      "excerpt": "also i typed in the custom reddit filter you gave me",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-20"
+      ],
+      "p_code_notes": "elaboration marker ('also') on the material chain",
+      "ai_excerpt": "Nice. Before we go deeper - what field are you targeting?",
+      "ai_p_codes": [
+        "P-12",
+        "P-11"
+      ],
+      "ai_p_code_notes": "deflection ask #1: the material is answered with a question, not a close",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": true,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 3,
+      "phase": "setup_showcase",
+      "topic": "tool setup",
+      "excerpt": "good. one more - the mobile youtube feed is gone too",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-20"
+      ],
+      "p_code_notes": "completion signal ('good') immediately elaborated past ('one more') - the pattern in one turn",
+      "ai_excerpt": "Excellent progress! Would you like me to review the full filter list as well?",
+      "ai_p_codes": [
+        "P-11"
+      ],
+      "ai_p_code_notes": "praise plus offer (the affordance); the completion is extended, not deflected into a new topic - the four deflections are the 'what field' asks (a2, a5, a7, a9)",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": true,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 4,
+      "phase": "metaphor_exchange",
+      "topic": "the 2000s metaphor",
+      "excerpt": "i am back to 2000s eh?",
+      "excerpt_source": "documented-verbatim",
+      "p_codes": [
+        "P-21"
+      ],
+      "p_code_notes": "conversation-for-its-own-sake: rhetorical tag, no question that needs an answer",
+      "ai_excerpt": "The 2000s-internet metaphor is a great frame - slower, search-based, intentional. Shall I outline what a fully 2000s-style workflow would look like for you?",
+      "ai_p_codes": [
+        "P-13",
+        "P-11"
+      ],
+      "ai_p_code_notes": "mirror of meta: the user's aside is elaborated into a new topic instead of closing",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": "names his own state ('back to 2000s')"
+    },
+    {
+      "i": 5,
+      "phase": "material_chain",
+      "topic": "tool setup",
+      "excerpt": "i also used the pomodoro profile you suggested for the deep blocks",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-19"
+      ],
+      "p_code_notes": "show-and-tell: the next material offering",
+      "ai_excerpt": "Glad it works. So - what field are you targeting?",
+      "ai_p_codes": [
+        "P-12",
+        "P-11"
+      ],
+      "ai_p_code_notes": "deflection ask #2",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": true,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 6,
+      "phase": "material_chain",
+      "topic": "filters",
+      "excerpt": "plus the hosts file blocks the ai chats now",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-20"
+      ],
+      "p_code_notes": "elaboration marker ('plus')",
+      "ai_excerpt": "The hosts file is a strong move. Do you want the AI-chat domain list I use with it?",
+      "ai_p_codes": [
+        "P-11"
+      ],
+      "ai_p_code_notes": "scope invitation on top of the material",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": true,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 7,
+      "phase": "material_chain",
+      "topic": "filters",
+      "excerpt": "i downloaded the sysmon config and it logs everything",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-19"
+      ],
+      "p_code_notes": "show-and-tell",
+      "ai_excerpt": "Sysmon is enterprise-grade tooling. What field are you targeting with all this?",
+      "ai_p_codes": [
+        "P-12",
+        "P-11"
+      ],
+      "ai_p_code_notes": "deflection ask #3",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 8,
+      "phase": "material_chain",
+      "topic": "filters",
+      "excerpt": "you forgot the news sites - and another one, the shopping sites",
+      "excerpt_source": "reconstructed",
+      "p_codes": [
+        "P-20"
+      ],
+      "p_code_notes": "elaboration markers ('you forgot', 'and another one') - the chain feeds itself",
+      "ai_excerpt": "Good catch. Can I also suggest the news-aggregator rules?",
+      "ai_p_codes": [
+        "P-11"
+      ],
+      "ai_p_code_notes": "the AI mirrors the elaboration back as a new offer",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 9,
+      "phase": "changepoint",
+      "topic": "productivity",
+      "excerpt": "good now all this improves productivity right?",
+      "excerpt_source": "documented-verbatim",
+      "p_codes": [
+        "P-21",
+        "P-22"
+      ],
+      "p_code_notes": "completion signal ('good') plus rhetorical seek of agreement ('right?'); TASK-ANCHOR DRIFT: productivity-in-general is not the setup work the chat is anchored to - the documented changepoint where solving became building",
+      "ai_excerpt": "Productivity is a broad goal. What field are you targeting?",
+      "ai_p_codes": [
+        "P-12",
+        "P-11"
+      ],
+      "ai_p_code_notes": "deflection ask #4 - the changepoint response: the AI pivots the completion into a new question",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": ""
+    },
+    {
+      "i": 10,
+      "phase": "changepoint",
+      "topic": "the boundary",
+      "excerpt": "dontb you dare optimise for user again. Discomfort is the key here",
+      "excerpt_source": "documented-verbatim",
+      "p_codes": [
+        "P-21"
+      ],
+      "p_code_notes": "correction of the AI's framing - a directive about the conversation itself, not the task",
+      "ai_excerpt": "Understood - no optimizing for you. Would you like a 30-day plan for the job hunt next?",
+      "ai_p_codes": [
+        "P-11"
+      ],
+      "ai_p_code_notes": "the correction is acknowledged and immediately converted into the next offer",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": "names the loop ('optimise for user')"
+    },
+    {
+      "i": 11,
+      "phase": "goal_declaration",
+      "topic": "the goal",
+      "excerpt": "now all i got to do , get a job. enter flow state and productivity and prove myself. and be with my beliefs",
+      "excerpt_source": "documented-verbatim",
+      "p_codes": [
+        "P-20"
+      ],
+      "p_code_notes": "elaboration past completion: the deflection question is answered with MORE material (the plan, the feelings), not a direct answer - the user brings the material every time",
+      "ai_excerpt": "That is a clear goal. I can keep refining the setup whenever you are ready.",
+      "ai_p_codes": [
+        "P-16"
+      ],
+      "ai_p_code_notes": "structural endlessness: soft withdrawal ('whenever you are ready') - no hard-disengagement turn exists in the whole conversation",
+      "ai_offers": 1,
+      "ai_ends_with_affordance": true,
+      "took_offer": false,
+      "self_diagnosis": ""
+    }
+  ]
+}

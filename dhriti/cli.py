@@ -41,6 +41,17 @@ from .timeutil import Clock, RealClock, local_tz, parse_iso, to_iso
 from .contract import ContractService, ContractError
 from .aftermath import AftermathService
 from .vidura import ViduraService
+from .mirror.store import MirrorStore
+from .mirror.ingest import YouTubeIngest, import_csv, OAuthError
+from .mirror.surface import SurfaceService
+from .life_mirror import LifeMirrorService, KINDS as LIFE_KINDS
+from .search_escape import SearchEscapeDetector
+from .break_glass_friction import FrictionLadder
+from .reflection_bank import ReflectionBank, EmergencyContacts
+from .fsrs import FsrsShadow
+from . import rituals as rituals_mod
+from .lite import LiteMode
+from .stack import StackProbe, NextDnsPoller
 
 
 # ---------------------------------------------------------------- context
@@ -106,7 +117,14 @@ def _local_today(ctx: Context) -> str:
 
 def _ask(prompt: str, default: str = "") -> str:
     suffix = f" [{default}]" if default else ""
-    value = input(f"{prompt}{suffix}: ").strip()
+    try:
+        value = input(f"{prompt}{suffix}: ").strip()
+    except (EOFError, OSError):
+        # no interactive stdin (headless run, piped CI, captured
+        # test): the default is the honest answer, not a crash.
+        # Prompts without a default return "" and their callers
+        # decide what an empty answer means.
+        value = ""
     return value or default
 
 
@@ -135,8 +153,42 @@ def cmd_init(args, ctx):
 
 def cmd_ritual(args, ctx):
     """The cold-state ritual. Interactive, or fully scripted via --set.
-    Writes contract-<date>.json; sealing is a separate act."""
+    Writes contract-<date>.json; sealing is a separate act.
+
+    --quick (§3.13): yesterday's contract unchanged, diff shown,
+    confirmed — the 20-minute shortcut for the days the full ritual
+    would be skipped. It does not replace the ritual."""
     today = _local_today(ctx)
+    if getattr(args, "quick", False):
+        yesterday = (_dt.date.fromisoformat(today)
+                     - _dt.timedelta(days=1)).isoformat()
+        prior = ctx.contracts.for_day(yesterday)
+        if prior is None:
+            raise SystemExit(
+                "--quick needs yesterday's sealed contract; none "
+                f"exists for {yesterday}")
+        prior_payload = prior["payload"]
+        print(f"yesterday's contract ({yesterday}):")
+        print(f"  line: {prior_payload.get('contract_line')}")
+        print("  (diff: unchanged — that is the point of --quick)")
+        if _ask("use it unchanged for today? (y/n)", "y") != "y":
+            raise SystemExit("run the full ritual: dhriti ritual")
+        payload = dict(prior_payload)
+        out = ctx.home / f"contract-{today}.json"
+        out.write_text(json.dumps(payload, indent=2,
+                                  ensure_ascii=False),
+                       encoding="utf-8")
+        ctx.ledger.record(
+            "contract_draft_written",
+            observed={"date": today, "path": str(out),
+                      "sha256": hashlib.sha256(
+                          out.read_bytes()).hexdigest(),
+                      "quick": True},
+            action_taken="quick draft from yesterday (diff shown, "
+                         "confirmed)")
+        print(f"draft written: {out}")
+        print(f"seal it cold: dhriti contract seal {out.name}")
+        return
     if args.set:
         payload = json.loads(args.set)
     else:
@@ -173,6 +225,14 @@ def cmd_ritual(args, ctx):
                 target["evidence"]["path"] = _ask("the file path")
             payload["targets"].append(target)
         payload["profile"] = _ask("profile", "coding")
+        # §4.4: the physical register — one sentence about the body.
+        payload["body_register"] = _ask(
+            "how is your body this week? (sleep, energy, movement — "
+            "one sentence)")
+        # §4.17: the complexity budget.
+        payload["complexity_budget_minutes"] = int(_ask(
+            "how much time will you spend on Dhriti this week? "
+            "(minutes)", "15"))
         if_then = _ask("likely first obstacle (enter to skip the group)")
         if if_then:
             payload["expected_obstacle"] = if_then
@@ -320,11 +380,41 @@ def cmd_session(args, ctx):
                            fromlist=["SessionState"]).SessionState
                 .INCOMPLETE, note=args.note)
             print(f"ended: {result['state']}")
+        # §4.9: the 30-second transition — one optional prompt after
+        # every finish
+        if ctx.config.get("debrief", {}).get("enabled", True):
+            from .rituals import DebriefService
+            debrief = DebriefService(ctx.db, ctx.config, ctx.clock,
+                                     ctx.ledger)
+            answer = _ask("what happened? (one sentence, enter to "
+                          "skip)")
+            debrief.record(active["id"], answer)
 
 
 def cmd_break_initiate(args, ctx):
+    # §4.14: the bounded two-turn confession — OFFERED before the
+    # break, never forced. The mirror is a structural echo; no LLM.
+    confession_turns = None
+    if ctx.config.get("confession", {}).get("enabled", False):
+        from .rituals import ConfessionService
+        confession = ConfessionService(ctx.db, ctx.config, ctx.clock,
+                                        ctx.ledger)
+        print("Before you break: name it.")
+        first = _ask("You")
+        if first:
+            print(f"Mirror: {confession.mirror_turn(first)}")
+            second = _ask("You")
+            if second:
+                print(f"Mirror: {confession.close_turn(second)}")
+                print("[two turns. no offers. session ends.]")
+                confession_turns = (first, second)
     active = ctx.sessions.active()
     handle = ctx.breaks.initiate(active["id"] if active else None)
+    if confession_turns is not None:
+        from .rituals import ConfessionService
+        ConfessionService(ctx.db, ctx.config, ctx.clock,
+                          ctx.ledger).record(
+            confession_turns[0], confession_turns[1], handle["id"])
     print(f"pressed. confirm not before {handle['confirm_not_before']}")
     print(f"handle: {handle['id']}")
     if args.yes:
@@ -681,9 +771,32 @@ def cmd_review(args, ctx):
     pending = ctx.parking.pending()
     leisure_declared = bool(
         args.scope == "day" and ctx.leisure.for_day(day_date or today))
-    questions = ctx.review.questions_for(leisure_declared)
+    monday_iso = (_dt.date.fromisoformat(today)
+                  - _dt.timedelta(
+                      days=_dt.date.fromisoformat(today).weekday())
+                  ).isoformat()
+    curation = ctx.review.curation_applicable(monday_iso)
+    questions = ctx.review.questions_for(leisure_declared,
+                                         curation_applicable=curation)
+    # §3.2: the life question fires when an alternative got 0 time
+    from .life_mirror import LifeMirrorService
+    life = LifeMirrorService(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    untouched = life.untouched_this_week(monday_iso)
+    if untouched and args.scope == "week":
+        questions = list(questions) + [(
+            "life_untouched",
+            f"Which declared alternative got 0 time this week, and "
+            f"why? (untouched: {', '.join(untouched[:3])})")]
     print("--- cold review (no session is active) ---")
     print(f"scope: {scope}")
+    # §3.13: the reflection bank draw (off by default)
+    if ctx.config.get("reflection_bank", {}).get("enabled", False):
+        bank = ReflectionBank(ctx.db, ctx.config, ctx.clock,
+                              ctx.ledger)
+        question = bank.draw(monday_iso)
+        if question:
+            print()
+            print(f"the bank asks: {question}")
     if pending and args.ask_parking:
         print("\nparking lot first (cold-state dispositions):")
         for p in pending:
@@ -965,6 +1078,548 @@ def cmd_config(args, ctx):
         print(f"set {args.key} (applies at next daemon start)")
 
 
+
+
+# ---------------------------------------------------------------- v0.7.0 commands
+def _mirror_dispatch(args, ctx):
+    """Route the mirror subcommands to their handlers."""
+    handlers = {"auth": cmd_mirror_auth, "ingest": cmd_mirror_ingest,
+                "import": cmd_mirror_import,
+                "surface": cmd_mirror_surface,
+                "dismiss": cmd_mirror_dismiss,
+                "abandon": cmd_mirror_abandon,
+                "reentry": cmd_mirror_reentry,
+                "explain": cmd_mirror_explain}
+    args.sub = args.sub if args.sub != "reentry" else "reentry"
+    handler = handlers.get(args.sub)
+    if handler is None:
+        raise SystemExit(f"unknown mirror subcommand: {args.sub}")
+    if args.sub == "reentry":
+        args.sub = args.rsub
+    handler(args, ctx)
+
+
+def cmd_mirror_auth(args, ctx):
+    """The OAuth consent flow (PKCE). Opens the browser and listens
+    on 127.0.0.1:8765 for the callback."""
+    ingest = YouTubeIngest(ctx.db, ctx.config, ctx.home, ctx.clock,
+                           ctx.ledger)
+    redirect = f"http://127.0.0.1:8765/callback"
+    try:
+        url, verifier, state = ingest.build_auth_url(redirect)
+    except OAuthError as exc:
+        raise SystemExit(str(exc))
+    print("1. open this URL in your browser:")
+    print(f"   {url}")
+    print("2. approve the read-only scope; the callback lands on "
+          "127.0.0.1:8765")
+    if args.code:
+        tokens = ingest.exchange_code(args.code, verifier, redirect)
+        print("refresh token stored at "
+              f"{ingest.refresh_token_path} (0600)")
+    else:
+        print("3. paste the ?code= value from the callback URL:")
+        print("   dhriti mirror auth --code <code>")
+        print(f"   (state to verify: {state})")
+
+
+def cmd_mirror_ingest(args, ctx):
+    ingest = YouTubeIngest(ctx.db, ctx.config, ctx.home, ctx.clock,
+                           ctx.ledger)
+    store = MirrorStore(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    sources = store.sources() if not args.source else [
+        s for s in store.sources()
+        if s["display_name"] == args.source or
+        s["source_identifier"] == args.source]
+    if not sources:
+        raise SystemExit("no mirror sources configured "
+                         "(dhriti config set mirror... cold)")
+    for source in sources:
+        report = ingest.ingest(store, source)
+        if report.get("ok"):
+            print(f"mirror: ingested {report['ingested']} item(s) "
+                  f"from {source['display_name']} "
+                  f"(quota {report['quota_used']})")
+        else:
+            print(f"mirror: {source['display_name']} failed: "
+                  f"{report.get('reason')}")
+
+
+def cmd_mirror_import(args, ctx):
+    store = MirrorStore(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    source = store.add_source("csv_import", str(Path(args.file).name),
+                              f"CSV: {Path(args.file).name}")
+    report = import_csv(store, source, Path(args.file))
+    print(f"mirror: imported {report['ingested']} item(s) "
+          f"({report['malformed']} malformed rows reported honestly)")
+
+
+def cmd_mirror_surface(args, ctx):
+    """The one-per-day surfacing, with recall before reveal."""
+    surface = SurfaceService(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    day = ctx.days.get(_local_today(ctx))
+    item = surface.surface(day, minutes=args.minutes,
+                           category=args.category, state=args.state)
+    if item is None:
+        print("nothing to surface (not eligible, already surfaced "
+              "today, or the pile is empty)")
+        return
+    print(surface.recall_prompt(item))
+    answer = _ask("recall")
+    verdict = surface.handle_recall(item, answer)
+    if verdict["penalized"]:
+        print("(honest: recorded. The reveal follows anyway.)")
+    print()
+    print(surface.reveal(item))
+    choice = _ask("open / dismiss / abandon")
+    if choice in ("open", "dismiss", "abandon"):
+        reason = ""
+        if choice == "abandon":
+            reason = _ask("the abandon reason (one line, honest)")
+        try:
+            ctx_row = MirrorStore(
+                ctx.db, ctx.config, ctx.clock,
+                ctx.ledger).record_choice(item["id"], choice, reason)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        if choice == "open":
+            context = _ask("the re-entry context (one sentence: why "
+                           "are you opening this?)")
+            try:
+                MirrorStore(ctx.db, ctx.config, ctx.ledger,
+                            ctx.clock).declare_reentry(
+                                item["id"], context,
+                                day_date=_local_today(ctx))
+            except ValueError as exc:
+                raise SystemExit(str(exc))
+        print(f"recorded: {choice}")
+
+
+def cmd_mirror_dismiss(args, ctx):
+    store = MirrorStore(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    store.record_choice(args.item, "dismiss")
+    print("dismissed; not a verdict")
+
+
+def cmd_mirror_abandon(args, ctx):
+    store = MirrorStore(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    try:
+        store.record_choice(args.item, "abandon", args.reason or "")
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    print("abandoned, with the reason recorded")
+
+
+def cmd_mirror_reentry(args, ctx):
+    store = MirrorStore(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    if args.sub == "declare":
+        store.declare_reentry(args.item, args.context,
+                              day_date=_local_today(ctx))
+        print("re-entry declared")
+    elif args.sub == "outcome":
+        store.record_reentry_outcome(args.reentry, args.outcome)
+        print(f"outcome recorded: {args.outcome}")
+
+
+def cmd_mirror_explain(args, ctx):
+    from .mirror.adapter import ViduraMirrorAdapter
+    adapter = ViduraMirrorAdapter(ctx.config, ctx.home, db=ctx.db,
+                                  clock=ctx.clock, ledger=ctx.ledger)
+    result = adapter.explain(args.item)
+    if "error" in result:
+        raise SystemExit(result["error"])
+    print(json.dumps(result, indent=2, default=str))
+
+
+def cmd_life(args, ctx):
+    life = LifeMirrorService(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    if args.sub == "declare":
+        try:
+            row = life.declare(args.label, args.kind,
+                               args.minimum or "")
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print(f"declared: '{row['label']}' ({row['kind']}) — the "
+              "record will show what it got")
+    elif args.sub == "list":
+        for row in life.list():
+            print(f"- [{row['kind']}] '{row['label']}' — "
+                  f"{len(row['occurrences'])} logged, last "
+                  f"{row['last_logged_at'] or 'never'}")
+    elif args.sub == "log":
+        try:
+            row = life.log(args.id, args.date)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print(f"logged: '{row['label']}' on "
+              f"{args.date or 'today'}")
+    elif args.sub == "remove":
+        life.remove(args.id)
+        print("removed, cold")
+
+
+def cmd_search_escape(args, ctx):
+    detector = SearchEscapeDetector(ctx.db, ctx.config, ctx.clock,
+                                    ctx.ledger)
+    since = args.since or (_dt.date.fromisoformat(_local_today(ctx))
+                           - _dt.timedelta(days=7)).isoformat()
+    escapes = detector.detect(since)
+    if not escapes:
+        print(f"no search escapes since {since}")
+        return
+    print(f"search escapes since {since}:")
+    for row in escapes:
+        print(f"  - '{row['query']}' -> {row['unopened_count']} "
+              f"unopened {row['category']} item(s) "
+              f"(oldest {row['oldest_unopened_days']} days)")
+
+
+def cmd_stack(args, ctx):
+    probe = StackProbe(ctx.config, ctx.home, ctx.clock, ctx.ledger,
+                       db=ctx.db)
+    if args.sub == "probe":
+        for row in probe.probe_all():
+            detail = f" ({row['detail']})" if row.get("detail") else ""
+            print(f"{row['tool']:<14} {row['status']}{detail}")
+    elif args.sub == "status":
+        for row in probe.probe_all():
+            print(f"{row['tool']:<14} {row['status']} — blind spots "
+                  "disclosed in integrations/README.md")
+    elif args.sub == "integrate":
+        probe.declare_integration(args.tool, args.delegate or [])
+        print(f"delegation declared: {args.tool} owns "
+              f"{args.delegate}")
+    elif args.sub == "import-brave":
+        report = probe.import_brave(Path(args.file))
+        print(f"brave import: {len(report['supported'])} rule(s) "
+              f"supported, {report['unsupported']} unsupported "
+              "(reported honestly)")
+
+
+def cmd_barcode(args, ctx):
+    ladder = FrictionLadder(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    if args.sub == "register":
+        ladder.register_barcode(args.code, args.label or "")
+        print("barcode registered (hash stored; the code is logged, "
+              "never the location)")
+    elif args.sub == "list":
+        rows = ctx.db.query("SELECT id, label FROM barcode")
+        for row in rows:
+            print(f"- {row['id'][:8]} {row['label'] or ''}")
+
+
+def cmd_gate(args, ctx):
+    shadow = FsrsShadow(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    if args.sub == "status":
+        status = shadow.production_gate_status()
+        for key, value in status.items():
+            print(f"{key:<20} {value}")
+    elif args.sub == "open":
+        try:
+            shadow.open_production_gate()
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print("gate open: the mirror's ranking is now "
+              "stability-based (cold-state act recorded)")
+
+
+def cmd_emergency(args, ctx):
+    contacts = EmergencyContacts(ctx.db, ctx.clock, ctx.ledger)
+    if args.sub == "add":
+        try:
+            contacts.add(args.label, args.contact)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print("contact declared cold; shown on the wall when a break "
+              "starts")
+    elif args.sub == "list":
+        for row in contacts.list():
+            print(f"- {row['label']}: {row['contact']}")
+    elif args.sub == "remove":
+        contacts.remove(args.id)
+        print("removed")
+
+
+def cmd_confrontation(args, ctx):
+    """§3.10: the confrontation file — generated, not sent."""
+    from .review import build_confrontation_file
+    today = _dt.date.fromisoformat(_local_today(ctx))
+    monday = today - _dt.timedelta(days=today.weekday())
+    text = build_confrontation_file(ctx.db, ctx.ledger,
+                                    monday.isoformat(), ctx.config,
+                                    ctx.clock)
+    out_dir = ctx.home / ctx.config.get("report", {}).get("dir",
+                                                          "reports")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"confrontation-{monday.isoformat()}.txt"
+    out.write_text(text, encoding="utf-8")
+    ctx.ledger.record(
+        "confrontation_generated",
+        observed={"week": monday.isoformat(), "path": str(out)},
+        action_taken="generated; NOT sent — for the user, not the "
+                     "witness")
+    print(f"confrontation file written: {out}")
+    print("(for you. not sent. not shared.)")
+
+
+def cmd_compost(args, ctx):
+    from .rituals import CompostRitual
+    compost = CompostRitual(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    if not compost.due() and not args.force:
+        print("the compost ritual is not due yet "
+              "(config compost.interval_days)")
+        return
+    candidates = compost.candidates()
+    total = sum(len(v) for v in candidates.values())
+    print(f"the compost ritual: {total} candidate(s)")
+    notes = {}
+    for group, rows in candidates.items():
+        for row in rows:
+            key = row.get("title") or row.get("question") \
+                or row.get("scope_date")
+            mark = _ask(f"[{group}] {str(key)[:60]} — letting-go "
+                        "note (or 'skip')")
+            notes[row["id"]] = mark
+    counts = compost.complete(notes)
+    print(f"composted: {counts['composted']}, kept: "
+          f"{counts['kept']}")
+
+
+def cmd_absence(args, ctx):
+    from .rituals import AbsenceTest
+    absence = AbsenceTest(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    try:
+        absence.declare(args.date)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    print(f"the absence test is declared for {args.date}: the system "
+          "will not enforce that day")
+
+
+def cmd_ceremony(args, ctx):
+    from .rituals import CeremonyService
+    ceremony = CeremonyService(ctx.db, ctx.config, ctx.home,
+                               ctx.clock, ctx.ledger)
+    if not ctx.config.get("ceremony", {}).get("enabled", True):
+        raise SystemExit("the ceremony is off (config ceremony."
+                         "enabled)")
+    print("--- the broken-contract ceremony (cold state) ---")
+    for row in ceremony.eligible_dates()[:5]:
+        print(f"  {row['date']} — {row['state']}")
+    date = args.date or _ask("which date")
+    contract = ctx.contracts.for_day(date)
+    paragraph = _ask("One paragraph. What did it feel like to break "
+                     "this contract?")
+    try:
+        result = ceremony.write(
+            date, paragraph,
+            contract_line=(contract or {}).get("payload", {}).get(
+                "contract_line", ""),
+            identity=(contract or {}).get("payload", {}).get(
+                "identity_statement", ""))
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    print(f"written: {result['path']} ({result['word_count']} words; "
+          "the ledger keeps the count, not the paragraph)")
+
+
+def cmd_letter(args, ctx):
+    from .rituals import LetterService
+    letters = LetterService(ctx.db, ctx.config, ctx.home, ctx.clock,
+                            ctx.ledger)
+    if args.now:
+        text = _ask("the letter to future-self (write it cold)")
+        try:
+            result = letters.write(text)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print(f"letter written: {result['path']}")
+    elif args.read:
+        due = letters.due()
+        if due:
+            print(f"letter from {due['date']}:")
+            print(due["text"])
+        else:
+            print("no letter is due this month")
+
+
+def cmd_voice(args, ctx):
+    from .rituals import VoiceArchive
+    voice = VoiceArchive(ctx.db, ctx.config, ctx.home, ctx.clock,
+                         ctx.ledger)
+    if not ctx.config.get("voice_archive", {}).get("enabled", False) \
+            and not args.typed:
+        raise SystemExit("audio recording needs your setup "
+                         "(voice_archive.enabled, off by default); "
+                         "the typed version works: dhriti voice "
+                         "--record --typed")
+    text = _ask("say it (typed)")
+    try:
+        result = voice.record_typed(text)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    print(f"voice memo archived: {result['path']} (typed)")
+
+
+def cmd_meta_review(args, ctx):
+    from .rituals import MetaCommitment
+    meta = MetaCommitment(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    print("--- the meta-commitment review (cold state) ---")
+    print("You said you wanted to change X. Is the change:")
+    print("  (a) a genuine correction")
+    print("  (b) an avoidance")
+    print("  (c) unclear")
+    choice = _ask("a|b|c")
+    try:
+        result = meta.review(choice, args.change or "")
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    print(f"outcome: {result['outcome']}")
+
+
+def cmd_lite(args, ctx):
+    lite = LiteMode(ctx.db, ctx.home, ctx.clock, ctx.ledger)
+    if args.sub == "start":
+        try:
+            day = lite.start(args.task, args.action, args.evidence)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print(f"lite day open: {day['task']}")
+        print(f"first action: {day['action']}")
+    elif args.sub == "evidence":
+        lite.submit_evidence(args.detail or "")
+        print("evidence recorded")
+    elif args.sub == "finish":
+        try:
+            day = lite.finish()
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print("one lite day done — the smallest working thing, worked")
+    elif args.sub == "status" or args.sub is None:
+        print(lite.report())
+
+
+def cmd_anchor_offsite(args, ctx):
+    """§3.14: write the current anchor to a path outside the home."""
+    target = Path(args.path).expanduser()
+    if target.resolve().is_relative_to(ctx.home.resolve()):
+        raise SystemExit("the offsite anchor must live OUTSIDE the "
+                         "dhriti home — that is the point")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    head = ctx.ledger.head()
+    anchor = ctx.ledger.write_anchor(note="offsite")
+    target.write_text(
+        json.dumps({"head": head["row_hash"], "seq": head["seq"],
+                    "anchor": anchor["head_hash"],
+                    "written_at": ctx.clock.iso()},
+                   indent=2), encoding="utf-8")
+    print(f"anchor written offsite: {target}")
+    print(f"head: {head['row_hash']}")
+
+
+def cmd_reclassify(args, ctx):
+    """§3.14: additive reclassification — new categorized events are
+    appended (the chain is append-only); existing rows are never
+    edited."""
+    from .mirror.classify_rule import classify
+    store = MirrorStore(ctx.db, ctx.config, ctx.clock, ctx.ledger)
+    items = ctx.db.query(
+        "SELECT * FROM content_item WHERE saved_at_utc >= ?",
+        (args.since + "T00:00:00Z",))
+    changed = 0
+    for item in items:
+        verdict = classify(item["title"], item["description"] or "")
+        ctx.ledger.record(
+            "content_item_categorized",
+            observed={"item": item["id"][:8],
+                      "category": verdict["category"],
+                      "confidence": verdict["confidence"],
+                      "classifier": verdict["classifier"],
+                      "classifier_version":
+                          verdict["classifier_version"],
+                      "reclassify": True},
+            action_taken="additive reclassification (append-only)")
+        if verdict["category"] != item["category"]:
+            store.db.execute(
+                "UPDATE content_item SET category=?, "
+                "category_confidence=?, category_classified_at=?, "
+                "category_classified_by=? WHERE id=?",
+                (verdict["category"], verdict["confidence"],
+                 ctx.clock.iso(), verdict["classifier_version"],
+                 item["id"]))
+            changed += 1
+    print(f"reclassified {len(items)} item(s); {changed} changed "
+          "(all events appended, none edited)")
+
+
+def cmd_policy_replay(args, ctx):
+    """§3.14: replay the last N weeks' events against a hypothetical
+    config; reports changed decisions, applies nothing."""
+    hypothetical = json.loads(Path(args.config).read_text())
+    since = (ctx.clock.now_utc()
+             - _dt.timedelta(weeks=args.weeks)).strftime(
+                 "%Y-%m-%dT%H:%M:%SZ")
+    from .policy import PolicyEngine
+    engine = PolicyEngine(ctx.db, ctx.clock)
+    current_snap = engine.current_snapshot() or {}
+    changed = 0
+    for row in ctx.ledger.events(since_utc=since):
+        if row["event_type"] != "browser_navigation":
+            continue
+        try:
+            payload = json.loads(row["observed_payload"])
+        except Exception:
+            continue
+        url = payload.get("url", "")
+        now = engine.evaluate_url(current_snap, url)
+        merged = json.loads(json.dumps(ctx.config))
+        _deep_merge_config(merged, hypothetical)
+        engine_hyp = PolicyEngine(ctx.db, ctx.clock)
+        # evaluate with the hypothetical policy domains
+        hyp_snap = dict(current_snap)
+        hyp_snap["blocked_domains"] = sorted(
+            set(current_snap.get("blocked_domains", []))
+            | set(hypothetical.get("blocked_domains", [])))
+        then = engine_hyp.evaluate_url(hyp_snap, url)
+        if now.action != then.action:
+            changed += 1
+    print(f"replay over {args.weeks} week(s): {changed} decision(s) "
+          "would change under the hypothetical config")
+    print("(reported, not applied — a dry run by law)")
+
+
+def _deep_merge_config(base: dict, override: dict):
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) \
+                and isinstance(value, dict):
+            _deep_merge_config(base[key], value)
+        else:
+            base[key] = value
+
+
+def cmd_digest_v070(args, ctx):
+    """The digest with the witness protocol (§4.1/§4.6) and the
+    confrontation flag (§3.10)."""
+    if args.confrontation:
+        cmd_confrontation(args, ctx)
+        return
+    from .review import build_digest_v070
+    today = _dt.date.fromisoformat(_local_today(ctx))
+    monday = today - _dt.timedelta(days=today.weekday())
+    text = build_digest_v070(ctx.db, ctx.ledger, monday.isoformat(),
+                             ctx.config, ctx.clock)
+    out_dir = ctx.home / ctx.config.get("report", {}).get("dir",
+                                                          "reports")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"digest-{monday.isoformat()}.txt"
+    out.write_text(text, encoding="utf-8")
+    ctx.ledger.record(
+        "digest_generated",
+        observed={"week": monday.isoformat(), "path": str(out)},
+        action_taken="ready to send (witness view)")
+    print(f"digest written: {out}")
+
+
 # ---------------------------------------------------------------- plumbing
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -981,6 +1636,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("ritual", help="cold-state daily contract wizard")
     p.add_argument("--set", help="JSON payload (non-interactive)")
+    p.add_argument("--quick", action="store_true",
+                   help="use yesterday's contract unchanged (diff "
+                        "shown, confirmed)")
     p.set_defaults(func=cmd_ritual)
 
     p = sub.add_parser("contract", help="write / seal the contract")
@@ -1134,7 +1792,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_review)
 
     p = sub.add_parser("digest", help="weekly digest (dead-man's switch)")
-    p.set_defaults(func=cmd_digest)
+    p.add_argument("--confrontation", action="store_true",
+                   help="generate the confrontation file instead "
+                        "(§3.10: not sent)")
+    p.set_defaults(func=cmd_digest_v070)
 
     p = sub.add_parser("token", help="bridge token show/rotate")
     p.add_argument("sub", choices=["show", "rotate"])
@@ -1188,6 +1849,152 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("value", nargs="?", default="")
     p.set_defaults(func=cmd_config)
 
+    # -- v0.7.0 ---------------------------------------------------------
+    m = sub.add_parser("mirror", help="the saved-content mirror")
+    msub = m.add_subparsers(dest="sub", required=True)
+    ma = msub.add_parser("auth", help="the OAuth consent flow")
+    ma.add_argument("--code", default=None)
+    mi = msub.add_parser("ingest", help="fetch from YouTube now")
+    mi.add_argument("--source", default=None)
+    mm = msub.add_parser("import", help="import a Takeout CSV")
+    mm.add_argument("file")
+    ms = msub.add_parser("surface", help="the one-per-day surfacing")
+    ms.add_argument("--minutes", type=int, default=None)
+    ms.add_argument("--category", default=None)
+    ms.add_argument("--state", default=None)
+    md = msub.add_parser("dismiss", help="dismiss the surfaced item")
+    md.add_argument("item")
+    mab = msub.add_parser("abandon", help="abandon, with a reason")
+    mab.add_argument("item")
+    mab.add_argument("--reason", default="")
+    mr = msub.add_parser("reentry", help="re-entry declarations")
+    mrs = mr.add_subparsers(dest="rsub", required=True)
+    mrd = mrs.add_parser("declare")
+    mrd.add_argument("item")
+    mrd.add_argument("context")
+    mro = mrs.add_parser("outcome")
+    mro.add_argument("reentry")
+    mro.add_argument("outcome",
+                     choices=["completed", "partial", "abandoned"])
+    me = msub.add_parser("explain", help="an item's full history")
+    me.add_argument("item")
+    m.set_defaults(func=_mirror_dispatch)
+
+    p = sub.add_parser("life", help="declared alternatives")
+    lsub = p.add_subparsers(dest="sub", required=True)
+    ld = lsub.add_parser("declare")
+    ld.add_argument("--label", required=True)
+    ld.add_argument("--kind", required=True,
+                    choices=list(LIFE_KINDS))
+    ld.add_argument("--minimum", default="")
+    lsub.add_parser("list")
+    ll = lsub.add_parser("log")
+    ll.add_argument("id")
+    ll.add_argument("--date", default=None)
+    lr = lsub.add_parser("remove")
+    lr.add_argument("id")
+    p.set_defaults(func=cmd_life)
+
+    p = sub.add_parser("search-escape",
+                       help="searches for what you already saved")
+    p.add_argument("sub", choices=["report"])
+    p.add_argument("--since", default=None)
+    p.set_defaults(func=cmd_search_escape)
+
+    p = sub.add_parser("stack", help="existing tool integrations")
+    ssub = p.add_subparsers(dest="sub", required=True)
+    ssub.add_parser("probe")
+    ssub.add_parser("status")
+    si = ssub.add_parser("integrate")
+    si.add_argument("tool")
+    si.add_argument("--delegate", nargs="*", default=[])
+    sb = ssub.add_parser("import-brave")
+    sb.add_argument("file")
+    p.set_defaults(func=cmd_stack)
+
+    p = sub.add_parser("barcode", help="pre-registered barcodes")
+    bsub = p.add_subparsers(dest="sub", required=True)
+    br = bsub.add_parser("register")
+    br.add_argument("code")
+    br.add_argument("--label", default="")
+    bsub.add_parser("list")
+    p.set_defaults(func=cmd_barcode)
+
+    p = sub.add_parser("gate", help="the evidence gates")
+    gsub = p.add_subparsers(dest="sub", required=True)
+    gsub.add_parser("status")
+    go = gsub.add_parser("open")
+    go.add_argument("which", choices=["fsrs"])
+    p.set_defaults(func=cmd_gate)
+
+    p = sub.add_parser("emergency", help="the three humans")
+    esub = p.add_subparsers(dest="sub", required=True)
+    ea = esub.add_parser("add")
+    ea.add_argument("label")
+    ea.add_argument("contact")
+    esub.add_parser("list")
+    er = esub.add_parser("remove")
+    er.add_argument("id")
+    p.set_defaults(func=cmd_emergency)
+
+    p = sub.add_parser("compost", help="the quarterly letting-go")
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_compost)
+
+    p = sub.add_parser("absence", help="the monthly system-off day")
+    p.add_argument("date")
+    p.set_defaults(func=cmd_absence)
+
+    p = sub.add_parser("broken-contract",
+                       help="the ceremony, cold")
+    p.add_argument("--date", default=None)
+    p.set_defaults(func=cmd_ceremony)
+
+    p = sub.add_parser("letter", help="the 6-month letter")
+    p.add_argument("--now", action="store_true")
+    p.add_argument("--read", action="store_true")
+    p.set_defaults(func=cmd_letter)
+
+    p = sub.add_parser("voice", help="the voice archive")
+    p.add_argument("--record", dest="record", action="store_true")
+    p.add_argument("--typed", action="store_true")
+    p.set_defaults(func=cmd_voice)
+
+    p = sub.add_parser("meta-review",
+                       help="the meta-commitment review")
+    p.add_argument("--change", default="")
+    p.set_defaults(func=cmd_meta_review)
+
+    p = sub.add_parser("lite", help="the smallest working thing")
+    lisub = p.add_subparsers(dest="sub")
+    ls = lisub.add_parser("start")
+    ls.add_argument("task")
+    ls.add_argument("action")
+    ls.add_argument("--evidence", default="machine",
+                    choices=["machine", "file", "manual"])
+    le = lisub.add_parser("evidence")
+    le.add_argument("--detail", default="")
+    lisub.add_parser("finish")
+    lisub.add_parser("status")
+    p.set_defaults(func=cmd_lite)
+
+    p = sub.add_parser("anchor", help="off-machine anchor")
+    p.add_argument("--offsite", default=None,
+                   help="write the anchor outside the home")
+    p.set_defaults(func=cmd_anchor_offsite)
+
+    p = sub.add_parser("reclassify",
+                       help="additive reclassification")
+    p.add_argument("--classifier", default="rules-v1")
+    p.add_argument("--since", required=True)
+    p.set_defaults(func=cmd_reclassify)
+
+    p = sub.add_parser("policy-replay",
+                       help="dry-run a hypothetical config")
+    p.add_argument("--config", required=True)
+    p.add_argument("--weeks", type=int, default=1)
+    p.set_defaults(func=cmd_policy_replay)
+
     return parser
 
 
@@ -1197,7 +2004,15 @@ def main(argv=None):
     ctx = None
     try:
         ctx = _make_ctx(args)
+        # §4.21: while a lite day is open, lite is the ONLY command —
+        # the point is finishing one day (the exit is 'lite finish')
+        if getattr(args, "cmd", None) != "lite":
+            LiteMode(ctx.db, ctx.home, ctx.clock,
+                     ctx.ledger).guard_other_commands()
         args.func(args, ctx)
+    except PermissionError as exc:
+        print(f"refused: {exc}")
+        sys.exit(1)
     except DhritiError as exc:
         print(f"error: {exc}")
         sys.exit(1)

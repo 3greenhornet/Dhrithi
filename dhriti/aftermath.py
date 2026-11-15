@@ -156,10 +156,16 @@ class AftermathService:
 
     # -- the shared blocks --------------------------------------------------------
     def _common_blocks(self, data: dict) -> list:
-        """The section builders, in report order. v0.6.0 (Bug B): the
-        identity line moved to the top of the report (see _render);
-        v0.6.0 (D-030 restoration): the exchange block follows it."""
+        """The section builders, in report order. v0.7.0 (§4.15): the
+        blocks are grouped into five views (Wall, Mirror, Conversation
+        Boundary, Evidence Record, Experiment) with a
+        'coverage missing' line per view; when aftermath_views.
+        five_views is False the v0.6.0 flat order is kept."""
         lines = []
+        if (self.config.get("aftermath_views", {})
+                .get("five_views", True)):
+            self._five_views(lines, data)
+            return lines
         self._exchange_block(lines, data)
         self._contract_block(lines, data)
         self._reality_block(lines, data)
@@ -169,12 +175,357 @@ class AftermathService:
         self._research_ratio_block(lines, data)
         self._proof_block(lines, data)
         self._breaks_block(lines, data)
+        self._ladder_block(lines, data)
         self._loop_block(lines, data)
         self._parking_block(lines, data)
         self._evening_block(lines, data)
         self._review_block(lines, data)
+        self._body_register_block(lines, data)
+        self._absence_block(lines, data)
         self._facts_block(lines, data)
         return lines
+
+    # -- the five views (v0.7.0 §4.15) --------------------------------------
+    def _five_views(self, lines, data):
+        """Wall / Mirror / Conversation Boundary / Evidence Record /
+        Experiment — each view groups its blocks and names what it
+        CANNOT see (coverage missing), because an honest gap beats a
+        confident blank."""
+        # View 1: the Wall (what was blocked and when)
+        lines.append("## View: the Wall")
+        self._reality_block(lines, data)
+        self._consumption_block(lines, data)
+        self._ratio_block(lines, data)
+        self._breaks_block(lines, data)
+        self._ladder_block(lines, data)
+        wall_coverage = ["adapter coverage is E1 only unless "
+                         "configured", "out-of-scope devices are "
+                         "self-reported"]
+        lines.append("Coverage missing: " + "; ".join(wall_coverage)
+                     + ".")
+        lines.append("")
+
+        # View 2: the Mirror (saved content, the life mirror, bounds,
+        # chosen rest vs drift)
+        lines.append("## View: the Mirror")
+        self._record_block(lines, data)
+        self._life_block(lines, data)
+        self._bounds_block(lines, data)
+        self._leisure_block(lines, data)
+        lines.append("Coverage missing: the mirror is off until "
+                     "enabled cold; device minutes are a weighted "
+                     "count, not a timer.")
+        lines.append("")
+
+        # View 3: the Conversation Boundary (passes, ratio, parking)
+        lines.append("## View: the Conversation Boundary")
+        self._research_ratio_block(lines, data)
+        self._parking_block(lines, data)
+        self._evening_block(lines, data)
+        lines.append("Coverage missing: AI-chat prompt content is "
+                     "never read unless the topic-lock (L-9) is "
+                     "enabled cold.")
+        lines.append("")
+
+        # View 4: the Evidence Record
+        lines.append("## View: the Evidence Record")
+        self._proof_block(lines, data)
+        self._loop_block(lines, data)
+        self._facts_block(lines, data)
+        lines.append("Coverage missing: observed-evidence adapters "
+                     "are opt-in; manual claims are kept but never "
+                     "accepted.")
+        lines.append("")
+
+        # View 5: the Experiment (the contract, the exchange over
+        # time, the review)
+        lines.append("## View: the Experiment")
+        self._contract_block(lines, data)
+        self._body_register_block(lines, data)
+        self._exchange_block(lines, data)
+        self._identity_revision_block(lines, data)
+        self._complexity_budget_block(lines, data)
+        self._review_block(lines, data)
+        self._absence_block(lines, data)
+        lines.append("Coverage missing: taper decisions need 30+ "
+                     "days of data; correlations appear when the "
+                     "weeks exist.")
+        lines.append("")
+
+    def _record_block(self, lines, data):
+        """§3.1: the mirror's record — saved, surfaced, opened,
+        completed, dismissed, abandoned, oldest, re-saves, search
+        escapes, by category."""
+        mirror_cfg = self.config.get("mirror", {})
+        if not mirror_cfg.get("enabled", False):
+            return
+        from .mirror.store import MirrorStore
+        store = MirrorStore(self.db, self.config, self.clock,
+                            self.ledger)
+        week = data.get("date")
+        facts = store.week_facts(week) if week else None
+        if not facts:
+            return
+        lines.append("### The record")
+        lines.append(f"- Saved this week: {facts['saved']} item(s)")
+        lines.append(
+            f"- Surfaced: {facts['surfaced']}; Opened: "
+            f"{facts['opened']}; Completed: {facts['completed']}; "
+            f"Dismissed: {facts['dismissed']}; Abandoned: "
+            f"{facts['abandoned']}")
+        oldest = facts.get("oldest_unopened")
+        if oldest:
+            age = (self.clock.now_utc()
+                   - parse_iso(oldest["saved_at_utc"])).days
+            lines.append(f"- Oldest unopened: {age} days "
+                         f"({oldest['title'][:60]})")
+        lines.append(f"- Re-saves this week: {facts['resaved_total']}")
+        # search escapes (§3.4)
+        from .search_escape import SearchEscapeDetector
+        detector = SearchEscapeDetector(self.db, self.config,
+                                        self.clock, self.ledger)
+        escapes = detector.week_summary(week)
+        if escapes:
+            lines.append(f"- Search escapes this week: {len(escapes)}")
+            for row in escapes[:5]:
+                lines.append(
+                    f"  - '{row['search_query']}' -> "
+                    f"{row['searches']} search(es), "
+                    f"{row['unopened']} unopened "
+                    f"{row['matched_category']} item(s)")
+        if facts["by_category"]:
+            lines.append("")
+            lines.append("### By category")
+            lines.append("| Category | Saved |")
+            lines.append("|---|---|")
+            for row in facts["by_category"]:
+                lines.append(f"| {row['category']} | {row['saved']} |")
+        self._abandonment_rate_fact(lines)
+
+    def _abandonment_rate_fact(self, lines):
+        """§3.6: the abandonment-rate comparison — 'You abandon X
+        items at 3x the rate of Y items. Is X still an interest?'
+        A fact, not a verdict; fires only when the top category has
+        enough history for the ratio to mean something (3+ items,
+        2+ abandoned) and a comparison category exists."""
+        rows = self.db.query(
+            "SELECT category, COUNT(*) AS total, "
+            "SUM(CASE WHEN abandoned_at IS NOT NULL THEN 1 ELSE 0 "
+            "END) AS abandoned FROM content_item WHERE category != "
+            "'unknown' GROUP BY category HAVING total >= 3")
+        rates = [(r["category"], r["abandoned"] / r["total"],
+                  r["abandoned"]) for r in rows]
+        if len(rates) < 2:
+            return
+        rates.sort(key=lambda kv: -kv[1])
+        (top_cat, top_rate, top_n) = rates[0]
+        (low_cat, low_rate, _) = rates[-1]
+        if top_n < 2 or top_rate <= low_rate:
+            return
+        if top_rate >= 2 * max(low_rate, 0.01):
+            if low_rate > 0:
+                ratio = max(2, round(top_rate / low_rate))
+                ratio_str = f"{ratio}x the rate of"
+            else:
+                ratio_str = "a far higher rate than"
+            lines.append("")
+            lines.append(
+                f"You abandon '{top_cat}' items at {ratio_str} "
+                f"'{low_cat}' items. Is '{top_cat}' still an "
+                "interest? (a fact, not a verdict)")
+
+    def _life_block(self, lines, data):
+        """§3.2: the life mirror — declared alternatives vs device
+        use, the two numbers."""
+        from .life_mirror import LifeMirrorService
+        life = LifeMirrorService(self.db, self.config, self.clock,
+                                 self.ledger)
+        if not life.enabled:
+            return
+        week = data.get("date")
+        if not week:
+            return
+        facts = life.week_facts(week)
+        if not facts["declared_count"]:
+            return
+        lines.append("### The life (declared alternatives)")
+        lines.append("")
+        lines.append("You declared these, cold. This is what the "
+                     "record says about the last 7 days:")
+        lines.append("")
+        for alt in facts["alternatives"]:
+            minimum = (f" (minimum: '{alt['minimum_version']}')"
+                       if alt["minimum_version"] else "")
+            lines.append(
+                f"- {alt['kind']}: '{alt['label']}' — logged "
+                f"{alt['occurrences']} of 7 days{minimum}")
+        device_minutes = self._device_use_minutes(week)
+        lines.append("")
+        lines.append(f"Device use this week: "
+                     f"{self._format_minutes(device_minutes)}.")
+        lines.append(f"Life logged: {facts['total_occurrences']} "
+                     "occurrence(s).")
+        lines.append("")
+        lines.append("The system does not tell you what to do with "
+                     "this. It shows the two numbers.")
+
+    def _device_use_minutes(self, week_start_iso: str) -> int:
+        """Evening device use (§3.3): consumption navigations after
+        window_end, weighted (config minutes_per_navigation — the
+        honest number is unknown; the weight states the assumption)."""
+        weight = float(self.config.get("declared_bounds", {}).get(
+            "minutes_per_navigation", 3))
+        from .stage_ratio import consumption_category
+        count = 0
+        for row in self.db.query(
+                "SELECT occurred_at_utc, observed_payload FROM event "
+                "WHERE event_type='browser_navigation' AND "
+                "occurred_at_utc >= ? AND occurred_at_utc < ?",
+                (week_start_iso + "T00:00:00Z",
+                 (parse_iso(week_start_iso + "T00:00:00Z")
+                  + timedelta(days=7)).strftime(
+                      "%Y-%m-%dT%H:%M:%SZ"))):
+            try:
+                payload = json.loads(row["observed_payload"] or "{}")
+            except Exception:
+                continue
+            if not consumption_category(payload.get("url", "")):
+                continue
+            # after window_end on that day (the day row when it
+            # exists; the config-resolved window otherwise — a report
+            # can be requested for a day that never opened)
+            date = row["occurred_at_utc"][:10]
+            day = self.db.query_one(
+                "SELECT window_end_at FROM day WHERE date=?", (date,))
+            window_end = day["window_end_at"] if day else None
+            if not window_end:
+                from .day_window import resolve_window
+                try:
+                    window_end = to_iso(resolve_window(
+                        _dt.date.fromisoformat(date),
+                        self.config).window_end)
+                except Exception:
+                    window_end = None
+            if window_end and row["occurred_at_utc"] > window_end:
+                count += 1
+        return int(count * weight)
+
+    @staticmethod
+    def _format_minutes(minutes: int) -> str:
+        hours, mins = divmod(int(minutes), 60)
+        if hours:
+            return f"{hours}h {mins}m"
+        return f"{mins}m"
+
+    def _bounds_block(self, lines, data):
+        """§3.3: declared device-use bounds — measurement, not
+        verdict."""
+        bounds = self.config.get("declared_bounds", {})
+        week = data.get("date")
+        if not week:
+            return
+        declared = int(bounds.get("evening_minutes", 60))
+        used = self._device_use_minutes(week)
+        gap = used - declared
+        lines.append("### Declared device bounds")
+        lines.append(f"Evening device time: "
+                     f"{self._format_minutes(used)} this week. "
+                     f"Declared bound: {declared} minutes.")
+        if gap > 0:
+            lines.append(f"The gap is: {self._format_minutes(gap)} "
+                         "over.")
+        else:
+            lines.append("Inside the declared bound.")
+        lines.append("(This is a measurement, not a verdict. The "
+                     "bound is yours.)")
+
+    def _absence_block(self, lines, data):
+        """§4.3: the day after an absence test — one question, no
+        telemetry behind it (the system was off; that was the
+        point)."""
+        day = data.get("date")
+        if not day:
+            return
+        row = self.db.query_one(
+            "SELECT 1 AS one FROM absence_day WHERE date=?", (day,))
+        if row is None:
+            return
+        lines.append("The absence test: you ran the day without the "
+                     "system. Did you miss it?")
+        lines.append("")
+
+    def _body_register_block(self, lines, data):
+        """§4.4: the physical register — one sentence about the body,
+    asked at the ritual, stored in the contract, shown here. No
+    correlation yet (needs weeks of data); the field is stored, and
+    correlations appear in analysis/measures.py once the weeks
+    exist."""
+        contract = data.get("contract") or {}
+        payload = contract.get("payload") or {}
+        body = payload.get("body_register")
+        if not body:
+            return
+        lines.append(f"Body this week: '{body}'")
+        lines.append("")
+
+    def _ladder_block(self, lines, data):
+        """§4.19: the earned break-glass ladder — breaks this month
+        and the current friction tier, as a fact."""
+        from .break_glass_friction import FrictionLadder
+        ladder = FrictionLadder(self.db, self.config, self.clock,
+                                self.ledger)
+        summary = ladder.month_summary()
+        if not summary["breaks_30d"] \
+                and summary["current_tier"] == "baseline":
+            return
+        tier = summary["current_tier"]
+        if tier != "baseline":
+            lines.append(
+                f"Break-glass this month: {summary['breaks_30d']}. "
+                f"Current tier: '{tier}' (escalated from 'baseline').")
+        else:
+            lines.append(
+                f"Break-glass this month: {summary['breaks_30d']}. "
+                "Current tier: 'baseline'.")
+        lines.append("")
+
+    def _identity_revision_block(self, lines, data):
+        """§4.18: preservation as identity revision — the sequence of
+        main_belief_current_state values. Not a verdict. A record."""
+        from .contract import ContractService
+        contracts = ContractService(self.db, self.clock, self.ledger)
+        history = contracts.get_history_of_field(
+            "main_belief_current_state")
+        if len(history) < 1:
+            return
+        lines.append("### Your current state, over time")
+        for row in history:
+            lines.append(f"- {row['date']}: "
+                         f"'{str(row['value'])[:120]}'")
+        lines.append("")
+
+    def _complexity_budget_block(self, lines, data):
+        """§4.17: complexity budget vs actual time-on-system."""
+        contract = data.get("contract") or {}
+        payload = contract.get("payload") or {}
+        budget = payload.get("complexity_budget_minutes")
+        if not budget:
+            return
+        # actual: dhriti-specific events this week as a proxy (each
+        # operator action ~30s; the proxy is stated as a proxy)
+        week = data.get("date")
+        if week:
+            rows = self.db.query(
+                "SELECT COUNT(*) AS n FROM event WHERE "
+                "occurred_at_utc >= ? AND occurred_at_utc < ? AND "
+                "source_adapter='core'",
+                (week + "T00:00:00Z",
+                 (parse_iso(week + "T00:00:00Z")
+                  + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")))
+            actual = int((rows[0]["n"] if rows else 0) * 0.5)
+            lines.append(f"Complexity budget: {budget} minutes/week. "
+                         f"Actual this week: ~{actual} minutes "
+                         "(event-count proxy).")
 
     def _exchange_block(self, lines, data):
         """The D-030 exchange: the main belief and its exchange rate
@@ -481,13 +832,44 @@ class AftermathService:
         if not open_items:
             lines.append("_(empty)_")
             lines.append("")
+        else:
+            for item in open_items:
+                spark = ""
+                if item.get("sparked_by_url"):
+                    spark = (f" (sparked by: "
+                             f"{item['sparked_by_url']})")
+                lines.append(f"- [{item['kind']}] "
+                             f"{item['question']}{spark}")
+            lines.append("")
+        # §3.6: the week's drop reasons, on the day report too (the
+        # day report is the surface the operator actually reads)
+        day = data.get("date")
+        if day:
+            monday = (_dt.date.fromisoformat(day)
+                      - _dt.timedelta(
+                          days=_dt.date.fromisoformat(day)
+                          .weekday())).isoformat()
+            self._dropped_this_week(lines, monday)
+
+    def _dropped_this_week(self, lines, week_start_iso: str):
+        """§3.6: the week's parking-lot drops with their typed
+        reasons (dropping requires one)."""
+        if not week_start_iso:
             return
-        for item in open_items:
-            spark = ""
-            if item.get("sparked_by_url"):
-                spark = f" (sparked by: {item['sparked_by_url']})"
-            lines.append(f"- [{item['kind']}] {item['question']}{spark}")
-        lines.append("")
+        week_end = (parse_iso(week_start_iso + "T00:00:00Z")
+                    + timedelta(days=7)).strftime("%Y-%m-%d")
+        dropped = self.db.query(
+            "SELECT question, note FROM parking_lot WHERE "
+            "disposition='dropped' AND disposed_at >= ? AND "
+            "disposed_at < ?",
+            (week_start_iso + "T00:00:00Z",
+             week_end + "T00:00:00Z"))
+        if dropped:
+            lines.append("Dropped this week, with the reasons:")
+            for item in dropped:
+                lines.append(f"- {item['question'][:60]} — "
+                             f"{item['note'][:120]}")
+            lines.append("")
 
     def _parking_week_block(self, lines, data):
         """Part 2 §1.3: the week's parked items, the older ones still
@@ -533,6 +915,20 @@ class AftermathService:
                 f"Parking graveyard: {anti['graveyard_count']} items "
                 "are 30+ days old and undisposed. Let them go or "
                 "face them.")
+        # §3.6: the week's drop reasons — dropping requires a reason;
+        # the reason is contract-design feedback, shown cold
+        dropped = self.db.query(
+            "SELECT question, note FROM parking_lot WHERE "
+            "disposition='dropped' AND disposed_at >= ? AND "
+            "disposed_at < ?",
+            (start + "T00:00:00Z", end + "T23:59:59Z")) \
+            if start and end else []
+        if dropped:
+            lines.append("")
+            lines.append("Dropped this week, with the reasons:")
+            for item in dropped:
+                lines.append(f"- {item['question'][:60]} — "
+                             f"{item['note'][:120]}")
         lines.append("")
 
     def _review_block(self, lines, data):

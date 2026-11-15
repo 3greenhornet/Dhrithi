@@ -132,6 +132,153 @@ MIGRATIONS = {
          "CREATE INDEX IF NOT EXISTS idx_parking_lot_kind "
          "ON parking_lot(kind)"),
     ],
+    # v0.7.0 Part 3 §3.1/§3.2/§3.17: the mirror, the life mirror, the
+    # friction ladder's stored artifacts, and the Part 4 declarations.
+    6: [
+        ("table content_source",
+         "CREATE TABLE IF NOT EXISTS content_source("
+         " id TEXT PRIMARY KEY,"
+         " source_type TEXT NOT NULL,"
+         " source_identifier TEXT NOT NULL,"
+         " display_name TEXT NOT NULL,"
+         " enabled INTEGER NOT NULL DEFAULT 1,"
+         " intent_class TEXT NOT NULL DEFAULT 'intent',"
+         " created_at TEXT NOT NULL,"
+         " last_ingested_at TEXT,"
+         " UNIQUE(source_type, source_identifier))"),
+        ("table content_item",
+         "CREATE TABLE IF NOT EXISTS content_item("
+         " id TEXT PRIMARY KEY,"
+         " source_id TEXT NOT NULL REFERENCES content_source(id),"
+         " external_id TEXT NOT NULL,"
+         " title TEXT NOT NULL,"
+         " description TEXT,"
+         " duration_seconds INTEGER,"
+         " thumbnail_url TEXT,"
+         " published_at TEXT,"
+         " saved_at_utc TEXT NOT NULL,"
+         " last_surfaced_at TEXT,"
+         " surface_count INTEGER NOT NULL DEFAULT 0,"
+         " dismiss_count INTEGER NOT NULL DEFAULT 0,"
+         " consecutive_dismissals INTEGER NOT NULL DEFAULT 0,"
+         " times_resaved INTEGER NOT NULL DEFAULT 0,"
+         " opened_at TEXT,"
+         " completed_at TEXT,"
+         " abandoned_at TEXT,"
+         " abandoned_reason TEXT,"
+         " aged_out_at TEXT,"
+         " metadata_completeness REAL NOT NULL DEFAULT 1.0,"
+         " category TEXT NOT NULL DEFAULT 'unknown',"
+         " category_confidence REAL NOT NULL DEFAULT 0.0,"
+         " category_classified_at TEXT,"
+         " category_classified_by TEXT,"
+         " intent_class TEXT NOT NULL DEFAULT 'intent',"
+         " effort_tier TEXT,"
+         " recall_attempts INTEGER NOT NULL DEFAULT 0,"
+         " recall_successes INTEGER NOT NULL DEFAULT 0,"
+         " current_stability_days REAL NOT NULL DEFAULT 30.0,"
+         " last_surface_intensity TEXT NOT NULL DEFAULT 'full',"
+         " UNIQUE(source_id, external_id))"),
+        ("index content_item_unopened",
+         "CREATE INDEX IF NOT EXISTS idx_content_item_unopened "
+         "ON content_item(saved_at_utc) WHERE opened_at IS NULL "
+         "AND abandoned_at IS NULL AND aged_out_at IS NULL"),
+        ("table content_item_progress",
+         "CREATE TABLE IF NOT EXISTS content_item_progress("
+         " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+         " item_id TEXT NOT NULL REFERENCES content_item(id),"
+         " recorded_at TEXT NOT NULL,"
+         " fraction REAL NOT NULL,"
+         " source TEXT NOT NULL)"),
+        ("table content_item_reentry",
+         "CREATE TABLE IF NOT EXISTS content_item_reentry("
+         " id TEXT PRIMARY KEY,"
+         " item_id TEXT NOT NULL REFERENCES content_item(id),"
+         " declared_at TEXT NOT NULL,"
+         " context TEXT NOT NULL,"
+         " session_id TEXT,"
+         " day_date TEXT NOT NULL,"
+         " outcome TEXT,"
+         " outcome_recorded_at TEXT)"),
+        ("table content_item_label",
+         "CREATE TABLE IF NOT EXISTS content_item_label("
+         " id TEXT PRIMARY KEY,"
+         " item_id TEXT NOT NULL REFERENCES content_item(id),"
+         " labeled_at TEXT NOT NULL,"
+         " label TEXT NOT NULL,"
+         " previous_classifier_category TEXT,"
+         " previous_classifier_confidence REAL,"
+         " classifier_version TEXT,"
+         " source TEXT NOT NULL)"),
+        ("table search_escape",
+         "CREATE TABLE IF NOT EXISTS search_escape("
+         " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+         " computed_at TEXT NOT NULL,"
+         " search_at TEXT NOT NULL,"
+         " search_query TEXT NOT NULL,"
+         " search_host TEXT NOT NULL,"
+         " matched_category TEXT NOT NULL,"
+         " unopened_count INTEGER NOT NULL,"
+         " oldest_unopened_days INTEGER NOT NULL)"),
+        ("table fsrs_shadow",
+         "CREATE TABLE IF NOT EXISTS fsrs_shadow("
+         " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+         " computed_at TEXT NOT NULL,"
+         " week_start TEXT NOT NULL,"
+         " items_compared INTEGER NOT NULL,"
+         " items_with_different_top_choice INTEGER NOT NULL,"
+         " top_item_age_based TEXT,"
+         " top_item_stability_based TEXT,"
+         " rank_correlation REAL)"),
+        ("table life_alternative",
+         "CREATE TABLE IF NOT EXISTS life_alternative("
+         " id TEXT PRIMARY KEY,"
+         " created_at TEXT NOT NULL,"
+         " label TEXT NOT NULL,"
+         " kind TEXT NOT NULL,"
+         " minimum_version TEXT,"
+         " occurrence_log TEXT,"
+         " last_logged_at TEXT,"
+         " UNIQUE(label))"),
+        ("table emergency_contact",
+         "CREATE TABLE IF NOT EXISTS emergency_contact("
+         " id TEXT PRIMARY KEY,"
+         " created_at TEXT NOT NULL,"
+         " label TEXT NOT NULL,"
+         " contact TEXT NOT NULL)"),
+        ("table absence_day",
+         "CREATE TABLE IF NOT EXISTS absence_day("
+         " date TEXT PRIMARY KEY,"
+         " declared_at TEXT NOT NULL)"),
+        ("table reflection_draw",
+         "CREATE TABLE IF NOT EXISTS reflection_draw("
+         " week_start TEXT PRIMARY KEY,"
+         " question_index INTEGER NOT NULL,"
+         " drawn_at TEXT NOT NULL)"),
+        ("table lite_day",
+         "CREATE TABLE IF NOT EXISTS lite_day("
+         " id TEXT PRIMARY KEY,"
+         " started_at TEXT NOT NULL,"
+         " task TEXT NOT NULL,"
+         " action TEXT NOT NULL,"
+         " evidence_kind TEXT NOT NULL,"
+         " evidence_submitted INTEGER NOT NULL DEFAULT 0,"
+         " finished_at TEXT)"),
+        ("table otp_code",
+         "CREATE TABLE IF NOT EXISTS otp_code("
+         " id TEXT PRIMARY KEY,"
+         " break_id TEXT NOT NULL,"
+         " code_hash TEXT NOT NULL,"
+         " issued_at TEXT NOT NULL,"
+         " expires_at TEXT NOT NULL,"
+         " used_at TEXT)"),
+        ("table barcode",
+         "CREATE TABLE IF NOT EXISTS barcode("
+         " id TEXT PRIMARY KEY,"
+         " code_hash TEXT NOT NULL,"
+         " label TEXT,"
+         " created_at TEXT NOT NULL)"),
+    ],
 }
 
 

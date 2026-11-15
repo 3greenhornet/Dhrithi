@@ -9,10 +9,20 @@
 <body>
 <main>
   <p class="mark">Dhriti</p>
-  <!-- The user's own contract line, fetched from the cached policy.
-       Their words. Nothing else. No reasons, no shame, no tips. -->
-  <p id="line">The window is open. Write today's goal.</p>
+  <!-- Wall Silence Protocol (v0.7.0 §4.12): the default state is
+       blank. The contract line appears only when the small dot in
+       the corner is clicked — the wall does not speak uninvited. -->
+  <p id="line" hidden></p>
+  <!-- §3.9: the count line. A single line of fact when the mirror is
+       enabled: not a link, not a button, not a form (L-1); a plain
+       number, not a nudge (L-2/L-7). -->
+  <p id="count" hidden></p>
+  <!-- §3.13: the emergency contacts, small text, only when a break
+       is initiated during an active session. -->
+  <p id="contacts" class="small" hidden></p>
 </main>
+<button id="reveal-dot" title=""
+        aria-label="show the line"></button>
 <script src="blocked.js"></script>
 </body>
 </html>

@@ -33,3 +33,41 @@ main {
   line-height: 1.6;
   margin: 0;
 }
+
+/* Wall Silence Protocol (§4.12): the dot is the only affordance on
+   the page — a small, quiet corner control that reveals the user's
+   own line. Not a link, not styled like a button that begs to be
+   pressed. */
+#reveal-dot {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #ddd;
+  cursor: default;
+}
+
+#reveal-dot:hover {
+  background: #ccc;
+}
+
+/* §3.9: the count line is smaller than the line — a fact, not a
+   headline. */
+#count {
+  font-size: 0.85rem;
+  color: #777;
+  margin: 0;
+}
+
+/* §3.13: the emergency contacts, small text — a fact on the wall
+   while a break sits unconfirmed, not a notification. */
+#contacts {
+  font-size: 0.75rem;
+  color: #999;
+  max-width: 30rem;
+  margin: 0;
+}

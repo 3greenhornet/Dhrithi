@@ -70,7 +70,14 @@ class TestShameSafetyExtension(unittest.TestCase):
         html = _strip_html_comments(
             (ROOT / "extension/blocked.html").read_text(encoding="utf-8"))
         self.assertNotIn("<a ", html)      # no links out
-        self.assertNotIn("<button", html)  # no buttons
+        # §4.12: the quiet reveal-dot is the ONE permitted control;
+        # every other button remains a violation
+        import re as _re
+        buttons = _re.findall(r"<button\b[^>]*>", html)
+        permitted = [b for b in buttons
+                     if 'id="reveal-dot"' in b]
+        self.assertLessEqual(len(buttons), len(permitted) + 0,
+                            f"unexpected buttons: {buttons}")
         self.assertNotIn("<form", html)    # no forms
         # the only voice is the contract line placeholder
         self.assertIn("line", html)
@@ -80,6 +87,52 @@ class TestShameSafetyExtension(unittest.TestCase):
         for rel in EXTENSION_SURFACES:
             text = (ROOT / rel).read_text(encoding="utf-8")
             self.assertNotIn("chrome.notifications", text)
+
+    def test_wall_count_is_a_fact_not_a_nudge(self):
+        """§3.9: the count line is a plain number — not a link, not a
+        button, not a form (L-1), and its wording passes the
+        shame-safety phrase list (L-2/L-7: no 'only 3 left!', no
+        'you're behind')."""
+        html = _strip_html_comments(
+            (ROOT / "extension/blocked.html").read_text(encoding="utf-8"))
+        self.assertIn('id="count"', html)
+        # the count paragraph carries no affordance
+        import re as _re
+        count_block = _re.search(
+            r"<p id=\"count\"[^>]*>(.*?)</p>", html, _re.S)
+        self.assertIsNotNone(count_block)
+        self.assertNotIn("<a ", count_block.group(0))
+        self.assertNotIn("<button", count_block.group(0))
+        self.assertNotIn("<form", count_block.group(0))
+        # the count text is a plain fact, linted like every surface
+        js = _strip_js_comments(
+            (ROOT / "extension/blocked.js").read_text(encoding="utf-8"))
+        count_line = _re.search(
+            r'count\.textContent = [^;]+;', js)
+        self.assertIsNotNone(count_line)
+        rendered = ("47 saved item(s) are unopened."
+                    if "mirror_unopened_count +" in count_line.group(0)
+                    else "")
+        for phrase in FORBIDDEN_PHRASES:
+            self.assertNotIn(phrase, rendered.lower())
+        # the count is absent when the pile is empty (no 'zero!')
+        self.assertIn("mirror_unopened_count !== null", js)
+
+    def test_wall_default_silence(self):
+        """§4.12: the wall's default state is blank — the line is
+        hidden until the dot is clicked; the config default records
+        it (wall.show_line_by_default = False)."""
+        html = _strip_html_comments(
+            (ROOT / "extension/blocked.html").read_text(encoding="utf-8"))
+        self.assertRegex(html, r'<p id="line"[^>]*\bhidden\b')
+        js = _strip_js_comments(
+            (ROOT / "extension/blocked.js").read_text(encoding="utf-8"))
+        # the only reveal path is the dot click, which toggles
+        self.assertIn("line.hidden = !line.hidden", js)
+        self.assertNotIn("line.hidden = false", js)
+        from dhriti.constants import DEFAULT_CONFIG
+        self.assertFalse(DEFAULT_CONFIG["wall"]
+                         ["show_line_by_default"])
 
     def test_extension_javascript_parses(self):
         # every surface file must at least be balanced JavaScript

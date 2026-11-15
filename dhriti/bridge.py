@@ -122,6 +122,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
         snap = self.state.snapshot()
         if path == "/status":
             self._send(200, snap["status"] or {"daemon": "running"})
+        elif path == "/session/topic":
+            self._send(200, snap["status"].get("session_topic")
+                       if snap["status"].get("session_topic")
+                       else {"topic": None, "session_id": None,
+                             "expires_at": None})
         elif path == "/policy":
             self._send(200, snap["policy"] or {
                 "enforce": False, "reason": "no active policy (dormant)"})

@@ -133,6 +133,36 @@ mirror surfaces carry no affordances.
 
 ---
 
+## L-9. The explicit-content exception, topic-lock only (v0.7.0)
+
+L-4 (structure-aware, content-blind) governs enforcement and ambient
+observation, absolutely. The topic-lock is a **distinct mechanism**:
+the operator explicitly consents, in cold state, to the system reading
+ONLY the prompts they submit to AI chat surfaces during an ACTIVE
+session, and comparing them semantically to the session's declared
+topic. L-9 is that narrow exception — nothing else may invoke it.
+
+The exception's own bounds (each is tested):
+
+1. **Off by default.** `topic_lock.semantic_mode_enabled = False`;
+   enabling it is a cold-state act recorded as `topic_lock_enabled`
+   (L-6 applies to the exception itself).
+2. **Session-bound.** The lock binds to the declared session topic;
+   outside an ACTIVE session nothing is read.
+3. **Prompts only.** The submitted prompt text — never the page, the
+   history, or the response content beyond the divergence verdict.
+4. **Bounded, not optimized** (L-8 inherits): the lock bounds the
+   conversation; it never ranks, paces, or "improves" it.
+5. **The hash, not the vector.** The topic embedding is stored as a
+   hash — reproducibility, not surveillance.
+
+*Tests:* `tests/test_v070_part3b.py::TestTopicLockLedger` (off by
+default, the enabling event, divergence and pivot events),
+`TestSemanticTopicLock` (bind/threshold/verdict semantics, the
+embedding backend disclosed, never silently swapped).
+
+---
+
 ## How to use these laws
 
 When adding any surface (page, report, message, notification-shaped

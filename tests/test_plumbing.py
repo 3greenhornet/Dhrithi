@@ -122,6 +122,14 @@ class DhritiTestCase(unittest.TestCase):
 
     # -- helpers ------------------------------------------------------------
     def seal_today(self, payload=None):
+        # Idempotent by design (fixture semantics, not product
+        # semantics): a test that sealed its own payload and then
+        # calls start_session() keeps ITS contract; the service-level
+        # immutability refusal is tested against contracts.seal
+        # directly in test_contracts.
+        existing = self.contracts.for_day(self.today.isoformat())
+        if existing is not None:
+            return existing
         payload = payload or daily_payload()
         # NOTE: no ensure_day first — the day row is created on demand
         # AFTER the seal, so it is born PLANNED (not NO_CONTRACT),

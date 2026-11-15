@@ -247,6 +247,7 @@ class Daemon:
         else:
             rules["research_sources"] = []
             rules["research_expires_at"] = None
+        self._mirror_wall_count(rules)
         return rules
 
     def _earned_evening_policy(self, day: Optional[dict]) -> Optional[dict]:
@@ -295,7 +296,7 @@ class Daemon:
                                      .get("contract_line") or "")
                 except Exception:
                     contract_line = ""
-        return {
+        payload = {
             "version": 0,          # day-level rules; frozen by D-050
             "enforce": True,
             "mode": "earned_evening",
@@ -309,6 +310,46 @@ class Daemon:
             "research_sources": [],
             "research_expires_at": None,
         }
+        self._mirror_wall_count(payload)
+        self._emergency_contacts_on_wall(payload)
+        return payload
+
+    def _emergency_contacts_on_wall(self, payload: dict):
+        """§3.13: the three emergency contacts, declared cold, shown
+        on the wall when a session is ACTIVE and a break is initiated
+        — small text, a fact, not a notification."""
+        payload["emergency_contacts"] = None
+        active = self.db.query_one(
+            "SELECT id FROM session WHERE state='ACTIVE' "
+            "ORDER BY started_at DESC LIMIT 1")
+        if not active:
+            return
+        open_break = self.db.query_one(
+            "SELECT 1 AS one FROM break_glass WHERE session_id=? "
+            "AND confirmed_at IS NULL", (active["id"],))
+        if not open_break:
+            return
+        rows = self.db.query(
+            "SELECT label, contact FROM emergency_contact "
+            "ORDER BY created_at")
+        if rows:
+            payload["emergency_contacts"] = [
+                {"label": r["label"], "contact": r["contact"]}
+                for r in rows]
+
+    def _mirror_wall_count(self, payload: dict):
+        """§3.9: when the mirror is enabled, the policy carries
+        mirror_unopened_count — a single line of fact on the wall
+        page, not a link, not a button, not a nudge (L-1/L-2/L-7
+        tested)."""
+        if self.config.get("mirror", {}).get("enabled", False):
+            row = self.db.query_one(
+                "SELECT COUNT(*) AS n FROM content_item WHERE "
+                "opened_at IS NULL AND abandoned_at IS NULL AND "
+                "aged_out_at IS NULL")
+            payload["mirror_unopened_count"] = row["n"] if row else 0
+        else:
+            payload["mirror_unopened_count"] = None
 
     # -- lifecycle --------------------------------------------------------------
     def _local_today(self) -> _dt.date:
@@ -443,6 +484,24 @@ class Daemon:
                 observed={"pass": pass_id},
                 action_taken="sources no longer allowed")
 
+        # 3a. v0.7.0: the absence test (§4.3) — no sessions on the
+        # declared day; the quiet hour (§4.8) — no enforcement,
+        # observation, or mirror for one hour a week.
+        if day and self._absence_active(day) \
+                and not self._absence_marked(day["date"]):
+            self.ledger.record(
+                "absence_test_active",
+                observed={"date": day["date"]},
+                action_taken="the system is off today by declaration",
+                telemetry_quality="OK")
+        if self._quiet_hour_active():
+            self._publish()  # status only; nothing else this tick
+            return
+
+        # 3a2. v0.7.0: mirror ingestion (§3.1) — poll the enabled
+        # sources on the daemon tick (evening-only when configured)
+        self._mirror_tick()
+
         # 3b. evening observation marker (D-048), once per day
         if self._evening_observation_active() \
                 and self._evening_marker_date != today:
@@ -472,6 +531,42 @@ class Daemon:
                         telemetry_quality="DEGRADED")
 
         self._publish()
+
+    def _absence_active(self, day: dict) -> bool:
+        from .rituals import AbsenceTest
+        return AbsenceTest(self.db, self.config, self.clock,
+                           self.ledger).is_active(day["date"])
+
+    def _absence_marked(self, date_iso: str) -> bool:
+        return self.db.query_one(
+            "SELECT 1 AS one FROM event WHERE "
+            "event_type='absence_test_active' AND occurred_at_utc "
+            "LIKE ? LIMIT 1", (date_iso + "%",)) is not None
+
+    def _quiet_hour_active(self) -> bool:
+        from .rituals import QuietHour
+        quiet = QuietHour(self.db, self.config, self.clock,
+                          self.ledger)
+        return quiet.active_now()
+
+    def _mirror_tick(self):
+        """§3.1: the mirror ingests on the daemon tick. The adapter
+        lives outside the enforcement registry — it never gates a
+        session, never blocks a domain."""
+        mirror_cfg = self.config.get("mirror", {})
+        if not mirror_cfg.get("enabled", False):
+            return
+        from .mirror.adapter import ViduraMirrorAdapter
+        adapter = ViduraMirrorAdapter(self.config, self.home,
+                                      db=self.db, clock=self.clock,
+                                      ledger=self.ledger)
+        try:
+            adapter.poll(self.ledger, self.clock)
+        except Exception as exc:
+            self.ledger.record(
+                "mirror_ingestion_malformed",
+                observed={"error": str(exc)[:200]},
+                telemetry_quality="DEGRADED")
 
     def _anti_drift_parking(self):
         """Part 2 §1.6: the parking lot's anti-drift check runs once
@@ -524,6 +619,21 @@ class Daemon:
         day = self.days.get(today)
         active = self.sessions.active()
         bootcamp = self.bootcamp.active()
+        session_topic = None
+        if active is not None:
+            row = self.db.query_one(
+                "SELECT payload_json FROM contract WHERE id=?",
+                (active.get("contract_id"),))
+            if row:
+                try:
+                    payload = json.loads(row["payload_json"])
+                    session_topic = {
+                        "topic": payload.get("contract_line"),
+                        "session_id": active["id"],
+                        "expires_at": day["window_end_at"] if day
+                        else None}
+                except Exception:
+                    session_topic = None
         self._bridge_state.publish_policy(self._current_extension_policy())
         self._bridge_state.publish_status({
             "daemon": "running",
@@ -532,6 +642,7 @@ class Daemon:
             "day": day["state"] if day else "none",
             "day_state": day["state"] if day else "none",
             "active_session": (active["id"] if active else None),
+            "session_topic": session_topic,
             "evening": {
                 "observation": self._evening_observation_active(),
                 "earned_enforcement": bool(
@@ -571,6 +682,12 @@ class Daemon:
                 "before starting another")
         today = self._local_today()
         day = self.days.ensure_day(today)
+        from .rituals import AbsenceTest
+        if AbsenceTest(self.db, self.config, self.clock,
+                       self.ledger).is_active(day["date"]):
+            raise RuntimeError(
+                "the absence test is active — the system is off "
+                "today, by your own cold-state declaration")
         if day["state"] != "OPEN":
             raise RuntimeError(
                 f"day is {day['state']}; the wall is only up while the "

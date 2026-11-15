@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Dhriti Wall",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Local commitment enforcement. The wall does not respond. Your own contract is the only voice. Requires the Dhriti daemon.",
   "permissions": [
     "storage",

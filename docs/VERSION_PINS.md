@@ -9,7 +9,7 @@ science.
 |---|---|---|---|
 | Python core (this repo) | 3.12 (stdlib only) | v0.2.0 | zero pip dependencies by design |
 | SQLite | bundled CPython | v0.2.0 | journal mode DELETE on Windows (R-007) |
-| Dhriti Wall extension | 0.2.0 (MV3) | v0.2.0 | Chrome/Edge/Brave; suppression rules v1 |
+| Dhriti Wall extension | 0.7.0 (MV3) | v0.7.0 | Chrome/Edge/Brave; suppression rules v1 |
 | Chrome | NOT PINNED — record yours | — | CVE-2026-17923 floor: ≥ 151.0.7922.72 for URLBlocklist use (we do not rely on it as sole barrier) |
 | Windows | NOT PINNED — record edition/build | — | AppLocker availability depends on Pro+ |
 | ActivityWatch | NOT INSTALLED | — | heartbeat fix PR #561 required; 10-min zero-duration test before any baseline (R-004) |

@@ -41,13 +41,17 @@ from pathlib import Path
 # the springboard is an interaction pattern, not a website.
 OBSERVED_EVENT_TYPES = {
     "user_turn": "one user message in the export",
-    "ai_turn": "one assistant message (recorded on the row that follows)",
+    "ai_turn": "one assistant message (v0.7.0: emitted as its own "
+               "row when the turn entry carries ai_excerpt / "
+               "ai_p_codes — specimen-002 form)",
     "ai_suggestion_offered": "assistant ended its turn by proposing "
                               "follow-up directions",
     "ai_suggestion_taken": "next user turn continued a proposed direction",
     "ai_affordance_tail": "assistant turn ended with any next-interaction "
                           "affordance (including refusals that end with "
                           "'come back and tell me ...')",
+    "p_code_labeled": "the analyst's P-11..P-22 turn-type coding "
+                      "(inference, never policy — D-014)",
 }
 INFERRED_ONLY = {"topic_label", "phase_label"}
 
@@ -64,11 +68,21 @@ def load_turns(path: Path) -> dict:
 
 
 def code_events(data: dict, session_id: str) -> list:
-    """Expand turns into normalized event rows (vocabulary fields)."""
+    """Expand turns into normalized event rows (vocabulary fields).
+    v0.7.0 (s3.15): turns may carry p_codes / ai_p_codes / ai_excerpt
+    (the specimen-002 form); when present, an explicit ai_turn row is
+    emitted and the P-codes ride the inference payload. Specimen-001
+    turn files (without those keys) produce byte-identical output."""
     rows = []
     seq = 0
     for turn in data["turns"]:
         seq += 1
+        inference = {
+            "topic_label": turn["topic"],
+            "phase_label": turn["phase"],
+        }
+        if turn.get("p_codes"):
+            inference["p_codes"] = turn["p_codes"]
         rows.append({
             "event_id": f"{session_id}-u{turn['i']:03d}",
             "occurred_at_utc": "UNKNOWN",  # export has no timestamps (D-040)
@@ -81,14 +95,35 @@ def code_events(data: dict, session_id: str) -> list:
                 "excerpt": turn["excerpt"],
                 "self_diagnosis_parenthetical": turn["self_diagnosis"],
             }, ensure_ascii=False),
-            "inference_payload": json.dumps({
-                "topic_label": turn["topic"],
-                "phase_label": turn["phase"],
-            }, ensure_ascii=False),
-            "model_id_or_rule_version": "manual-v1",
+            "inference_payload": json.dumps(
+                inference, ensure_ascii=False),
+            "model_id_or_rule_version": (
+                "manual-v2-pcode" if turn.get("p_codes")
+                else "manual-v1"),
             "action_taken": "none (no system existed)",
             "telemetry_quality": "MANUAL",
         })
+        # specimen-002 form: the AI turn as its own row, P-coded
+        if turn.get("ai_excerpt") or turn.get("ai_p_codes"):
+            seq += 1
+            rows.append({
+                "event_id": f"{session_id}-a{turn['i']:03d}",
+                "occurred_at_utc": "UNKNOWN",
+                "session_id": session_id,
+                "source_adapter": "manual_coding",
+                "event_type": "ai_turn",
+                "parent_event_id": f"{session_id}-u{turn['i']:03d}",
+                "observed_payload": json.dumps({
+                    "excerpt": turn.get("ai_excerpt", ""),
+                }, ensure_ascii=False),
+                "inference_payload": json.dumps({
+                    "p_codes": turn.get("ai_p_codes", []),
+                    "p_code_notes": turn.get("ai_p_code_notes", ""),
+                }, ensure_ascii=False),
+                "model_id_or_rule_version": "manual-v2-pcode",
+                "action_taken": "none (no system existed)",
+                "telemetry_quality": "MANUAL",
+            })
         if turn["ai_offers"] > 0:
             seq += 1
             rows.append({
@@ -153,7 +188,7 @@ def summarize(data: dict) -> dict:
     phases = {}
     for t in turns:
         phases[t["phase"]] = phases.get(t["phase"], 0) + 1
-    return {
+    summary = {
         "specimen_id": data["specimen_id"],
         "user_turns": len(turns),
         "ai_turns_assumed": len(turns),
@@ -184,6 +219,24 @@ def summarize(data: dict) -> dict:
                 "phase labels are the coder's INFERERENCE (D-014: labels "
                 "never become policy).",
     }
+    # v0.7.0 (s3.15): the P-code distribution, only when the turns
+    # carry P-codes (specimen-001 summaries stay byte-identical)
+    if any(t.get("p_codes") or t.get("ai_p_codes") for t in turns):
+        summary["p_code_distribution"] = {
+            "user_side": {
+                code: sum(1 for t in turns
+                          if code in t.get("p_codes", []))
+                for code in sorted({c for t in turns
+                                    for c in t.get("p_codes", [])})},
+            "ai_side": {
+                code: sum(1 for t in turns
+                          if code in t.get("ai_p_codes", []))
+                for code in sorted({c for t in turns
+                                    for c in t.get("ai_p_codes", [])})},
+        }
+        summary["provenance"] = data.get(
+            "provenance", "P-coded by the analyst (hand coding)")
+    return summary
 
 
 def main():

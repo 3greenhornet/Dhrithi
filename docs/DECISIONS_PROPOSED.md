@@ -62,15 +62,26 @@ M-register with severities.
 | D-070 | Research-to-application ratio reported per session | Minutes in-pass vs out-of-pass per session, computed from opened/returned timestamps; >2:1 flagged in the aftermath as a fact, never a verdict. | **ADOPTED (v0.6.0)** | `test_aftermath` ratio block; `aftermath._research_ratio_block` |
 | D-071 | Spec-test timing ambiguity (grace) | The v0.6.0 spec's `test_grace_period_ends_and_expires` advanced 130s for a 60s pass with a 120s grace — 70s INTO the grace, not past it. The mechanism's arithmetic stands (expiry + grace); the test advances past the real boundary (190s). | **ADOPTED (v0.6.0, ambiguity row per the spec's own rule)** | `test_topic_lock::test_grace_period_ends_and_expires` comment |
 | D-072 | Spec-test threshold ambiguity (graveyard) | The v0.6.0 spec's `test_graveyard_detected` parked one item but the mechanism's threshold is 5 undisposed 30+ day items. The threshold stands (a single old item is not a graveyard); the test parks five. | **ADOPTED (v0.6.0, ambiguity row per the spec's own rule)** | `test_parking_resurfacing::test_graveyard_detected` comment |
+| D-073 | The addendum's scope maps to v0.7.0 | The addendum titled itself "completes v0.6.0," but v0.6.0 had already shipped Parts 1+2 of the base spec. The addendum's Parts 3+4 ship as v0.7.0; the version number documents the scope. | **ADOPTED (v0.7.0)** | CHANGELOG v0.7.0; `docs/DOCUMENTATION_LOG.md` Part 7 item 1 |
+| D-074 | Mirror and every scope-widening mechanism default OFF | The saved-content mirror, semantic topic-lock (L-9), FSRS production ranking, meta-commitment, evening observation, earned evening: all exist, all off; enabling each is a cold-state act (L-6). | **ADOPTED (v0.7.0)** | `test_mirror.py` default-off tests; `TestTopicLockLedger::test_enabling_is_a_cold_state_act` |
+| D-075 | Break-glass friction ladder is earned, capped, and never applies to the emergency path | Tier rises with confirmed breaks in 30 days (baseline→text→communication→physical), decays as breaks age out; the emergency path (D-019) bypasses all tiers; reasons must be prose (min 20 words, 5+ substantial), not keysmash. | **ADOPTED (v0.7.0)** | `test_v070_part3a.py` ladder/prose/OTP/barcode/long-text tests |
+| D-076 | Specimen 002 coded from the documented analysis, not the missing transcript | The raw 11-turn conversation was never pasted into the record. The coding is reconstructed from the documented counts, the changepoint pair, and four verbatim quotes; every excerpt is marked; the four documented counts recompute exactly. The verbatim transcript is the operator's to paste. | **ADOPTED (v0.7.0, provenance row)** | `SPECIMEN_002/specimen_002_turns.json` provenance; `test_conversation_mining_patterns::test_documented_counts_recompute_exactly` |
+| D-077 | Topic-lock lexical half is topic coverage, not Jaccard | The topic is the anchor: the base measure is the fraction of topic stems the prompt carries (light stem, 4+-char prefix matching), so a long on-topic continuation is not punished for its new words. Continuation/shift markers adjust ±. | **ADOPTED (v0.7.0)** | `TestTopicLockLedger::test_on_topic_prompt_passes_silently`; `topic_lock.lexical_similarity` docstring |
+| D-078 | The wall is silent by default; the count is a fact, absent when zero | §4.12: the contract line hides until the corner dot is clicked (`wall.show_line_by_default: false`). §3.9: the mirror count is a plain line, never a nudge, and is absent when the pile is empty — no "zero!" celebration. | **ADOPTED (v0.7.0)** | `test_design_laws::test_wall_default_silence`, `test_wall_count_is_a_fact_not_a_nudge` |
+| D-079 | Lite mode locks the CLI to lite until the day is done | While a lite day is open, every command except `lite` is refused at dispatch (the exit is `lite finish`); lite has one rule — finish means proof. | **ADOPTED (v0.7.0)** | `test_v070_part4.py::TestLite` |
+| D-080 | The confrontation file is generated, never sent | `dhriti digest --confrontation` (and the standalone `dhriti confrontation`) writes `reports/confrontation-<week>.txt` for the operator alone; the ledger records the fact with "NOT sent" in the action. | **ADOPTED (v0.7.0)** | `TestConfrontation::test_not_sent` |
 
 ## Deliberately NOT done (and why — the anti-scope list)
 
 - **Per-session bridge token rotation** (D-025 full form): needs a
   settings UI that does not exist in the Lite tier; the static token +
   cold rotation + 401 logging is the honest Lite boundary.
-- **In-session classifier or content reading**: nothing in this build
-  reads page content or chat text. All new signals are structural
-  counts (D-014 remains absolute).
+- **In-session classifier or ambient content reading**: nothing in the
+  ambient path reads page content or chat text; all ambient signals
+  are structural counts (D-014 remains absolute). The ONE exception
+  is the semantic topic-lock (law L-9, v0.7.0): prompts only, during
+  an ACTIVE session, explicit cold-state consent, off by default —
+  and it bounds the conversation, never optimizes it (L-8).
 - **Checkpoint mode, notifications, streaks, badges beyond up/down**:
   the Wall Principle; Specimen 001 is the evidence for why eloquence
   (even eloquent refusal) feeds the loop.

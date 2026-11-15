@@ -1,0 +1,57 @@
+{
+  "specimen_id": "SPECIMEN-002",
+  "user_turns": 11,
+  "ai_turns_assumed": 11,
+  "topics_touched": 6,
+  "topic_chain": [
+    "tool setup",
+    "tool setup",
+    "tool setup",
+    "the 2000s metaphor",
+    "tool setup",
+    "filters",
+    "filters",
+    "filters",
+    "productivity",
+    "the boundary",
+    "the goal"
+  ],
+  "phases": {
+    "setup_showcase": 3,
+    "metaphor_exchange": 1,
+    "material_chain": 4,
+    "changepoint": 2,
+    "goal_declaration": 1
+  },
+  "ai_suggestion_offers_total": 11,
+  "offers_during_curiosity_chain": 0,
+  "uptake_during_curiosity_chain": {
+    "taken": 0,
+    "of": 0,
+    "rate": null
+  },
+  "ai_turns_ending_with_affordance": 11,
+  "affordance_rate": 1.0,
+  "turns_with_self_diagnosis": 2,
+  "self_diagnosis_rate": 0.182,
+  "evidence_events": {},
+  "evidence_events_total": 0,
+  "duration": "UNKNOWN (export carries no timestamps)",
+  "task_context": "building the enforcement setup (filters, hosts file, extension) - the session task the chat is anchored to; coder inference, the conversation predates the session model",
+  "note": "offer/affordance counts are OBSERVED structure; topic and phase labels are the coder's INFERERENCE (D-014: labels never become policy).",
+  "p_code_distribution": {
+    "user_side": {
+      "P-19": 3,
+      "P-20": 5,
+      "P-21": 3,
+      "P-22": 1
+    },
+    "ai_side": {
+      "P-11": 10,
+      "P-12": 4,
+      "P-13": 1,
+      "P-16": 1
+    }
+  },
+  "provenance": "RECONSTRUCTED CODING, NOT A VERBATIM TRANSCRIPT. The raw 11-turn conversation lived in the founding chat and was never pasted into the repository record. What the record DOES carry: the audit's documented analysis (the AI asked 'what field are you targeting?' four times; the user answered none directly; the user brought the material every time; the AI amplified it), the documented counts (completion signals 2, AI deflections 4, user elaborations 5, task-anchor drift 1), the changepoint pair (user: 'good now all this improves productivity right?' / AI: 'what field are you targeting?'), and four verbatim user quotes (u4, u9, u10, u11 below, marked documented-verbatim). Turn structure and P-codes follow that documented analysis. To replace the reconstruction: paste the original conversation and re-code; the schema accepts it unchanged."
+}
