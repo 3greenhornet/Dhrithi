@@ -2,7 +2,9 @@
 # Pre-commit gate: full suite + surface lint must pass before a commit
 # ships (operator toolkit #8). Install once:
 #   cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# stdin is /dev/null: the gate is headless by definition, and the
+# interactive prompts (_ask) take their defaults instead of blocking.
 set -e
 cd "$(dirname "$0")/.."
-python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests < /dev/null
 python3 scripts/lint_surfaces.py
