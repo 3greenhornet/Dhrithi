@@ -5,6 +5,23 @@ with well-made placeholders wherever something needs manual
 download/integration. This is that build. Read this page, then you
 are oriented.
 
+## v0.7 — the mirror, the ladder, and the rituals (one screen)
+
+Everything discussed, built: the saved-content mirror (YouTube
+ingestion, one-per-day surfacing with recall-before-reveal, default
+OFF); the life mirror and declared device bounds; the search-escape
+and re-save detectors; the count on the wall (a fact, absent when
+zero); the confrontation file (generated, never sent); the
+break-glass friction ladder (earned escalation: prose reasons,
+long text, OTP, barcodes — the emergency path stays free); stack
+integration (Cold Turkey, NextDNS, Unhook, Brave import);
+`dhriti stack`, `dhriti life`, `dhriti lite`, `dhriti compost`,
+`dhriti absence`, `dhriti letter`, `dhriti broken-contract`; the
+semantic topic-lock (law L-9, prompts only, off by default); FSRS
+in shadow mode behind its gates; Specimen 002 coded and the
+conversation-mining `--patterns` mode. The aftermath reads in five
+views, each naming what it cannot see. Suite 346, all green.
+
 ## v0.6 — the restoration and resurfacing batch (one screen)
 
 Four bugs fixed (health's bridge probe went HTTP; the unsolvable
