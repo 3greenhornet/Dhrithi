@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dhriti — Tactile Dual-Mode Focus Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Full-bleed Painting Background Underlay -->
+  <div class="painting-canvas-underlay" id="painting-underlay"></div>
+
+  <!-- Top Floating Header Bar -->
+  <header class="top-header">
+    <div class="header-left">
+      <button class="icon-btn" id="btn-settings" title="Dashboard & Art Settings">⚙️</button>
+      <div class="mode-badge" id="mode-badge">
+        <span class="status-dot" id="status-dot"></span>
+        Art & Poem Mode
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="mode-badge" style="font-family: var(--font-mono); font-size: 11px; opacity: 0.85;">
+        DHRITI v0.7.0
+      </div>
+    </div>
+  </header>
+
+  <!-- Mode 1 & 2 Main Hero Viewport -->
+  <main class="hero-viewport" id="hero-viewport">
+
+    <!-- Tactile Bento Grid (Seamless Texture Projection on Front, Widgets on Back) -->
+    <div class="grid-board" id="grid-board">
+
+      <!-- Row 1: Session (1 col) + Pomodoro Engine (2 cols) + ChatGuard (1 col) -->
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="0">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">01 • Session</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🎯 Active Focus</span>
+              <span class="widget-badge success">Live</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Current Intent</span>
+              <span class="metric-val" id="widget-session-intent" style="font-size: 12px; font-weight: 500;">Core Architecture</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Elapsed Focus</span>
+              <span class="metric-val">42 min</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill emerald" style="width: 70%;"></div>
+            </div>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-key">Session Health</div>
+              <div class="capsule-value" style="font-size: 11px;">Zero leakage detected. Sovereign focus lock active.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tile 1: Integrated Pomodoro Timer (Wide 2-col Bento) -->
+      <div class="tile-wrapper bento-span-2">
+        <div class="tactile-tile" data-tile-id="1">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">02 • Pomodoro Focus Engine</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">⏱️ Pomodoro Engine</span>
+              <span class="widget-badge info" id="pomo-label">Focus Interval</span>
+            </div>
+            <div class="pomo-display">
+              <div class="pomo-time" id="pomo-time">25:00</div>
+            </div>
+            <div class="pomo-presets">
+              <button class="pomo-preset-btn active" data-preset="standard">Standard 25/5</button>
+              <button class="pomo-preset-btn" data-preset="extended">Extended 50/15</button>
+              <button class="pomo-preset-btn" data-preset="deep">Deep Work 100/30</button>
+            </div>
+            <div class="pomo-controls">
+              <button class="pomo-btn primary" id="btn-pomo-toggle">Start</button>
+              <button class="pomo-btn secondary" id="btn-pomo-reset">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tile 3: ChatGuard Budget & Burst Cooldown (1 col) -->
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="3">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">03 • ChatGuard</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🛡️ ChatGuard Budget</span>
+              <span class="widget-badge success">Healthy</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">15m Window Budget</span>
+              <span class="metric-val" id="widget-guard-budget">15m / 15m</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" style="width: 100%;"></div>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Burst Cooldown</span>
+              <span class="metric-val">0s (Ready)</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Tier</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">Direct Human</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Return Anchor (2 cols) + Stage Ratio (2 cols) -->
+      <div class="tile-wrapper bento-span-2">
+        <div class="tactile-tile" data-tile-id="2">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">04 • Return Anchor & Resume Capsule</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">⚓ Return Anchor & Resume Capsule</span>
+              <span class="widget-badge warning">D-090 Ready</span>
+            </div>
+            <div class="capsule-box">
+              <div class="capsule-key">Next Concrete Action</div>
+              <div class="capsule-value" id="widget-capsule-next">Finalize tactile flip Solitaire wave & integrate with local bridge.</div>
+            </div>
+            <div class="capsule-box">
+              <div class="capsule-key">Active Blocker</div>
+              <div class="capsule-value">None detected. Sovereign execution path unobstructed.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tile 4: Stage Ratio & Wall Principle (2 cols) -->
+      <div class="tile-wrapper bento-span-2">
+        <div class="tactile-tile" data-tile-id="4">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">05 • Stage Ratio & Wall</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🎭 Stage Ratio & The Wall</span>
+              <span class="widget-badge success">88% Stage</span>
+            </div>
+            <div class="metric-label" style="margin-bottom: 6px;">Stage (Generative Output) vs Audience (Passive Input)</div>
+            <div class="ratio-bar">
+              <div class="ratio-stage" style="width: 88%;" title="Stage 88%"></div>
+              <div class="ratio-aud" style="width: 12%;" title="Audience 12%"></div>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Wall Principle Status</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">Fully Enforced</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 6px;">
+              <div class="capsule-value" style="font-size: 11px; color: var(--text-muted);">
+                High generative throughput maintained. No unprompted feed consumption.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Day Window (1 col) + Declared Leisure (1 col) + Quick Drawers (1 col) + Velocity (1 col) -->
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="5">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">06 • Day Window</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🌅 Day Window</span>
+              <span class="widget-badge info">Open</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Bounds</span>
+              <span class="metric-val">08:00 — 22:30</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">To Curfew</span>
+              <span class="metric-val">6h 45m</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill amber" style="width: 58%;"></div>
+            </div>
+            <div class="capsule-box">
+              <div class="capsule-key">Evening Protocol</div>
+              <div class="capsule-value" style="font-size: 11px;">Gentle ramp down at 22:00.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="6">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">07 • Leisure & Drift</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">☕ Declared Leisure</span>
+              <span class="widget-badge success">Zero Drift</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Sanctioned</span>
+              <span class="metric-val">0 / 60m</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Drift</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">0m</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 8px;">
+              <div class="capsule-key">Sanctioned Break</div>
+              <div class="capsule-value" style="font-size: 11px;">Declare leisure explicitly before checking distractions.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="7">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">08 • Drawers</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">📥 Quick Drawers</span>
+              <span class="widget-badge info">Triage</span>
+            </div>
+            <div class="drawer-btn-grid">
+              <button class="drawer-btn" id="btn-drawer-park">
+                <span>📦 Park Thought</span>
+                <span>→</span>
+              </button>
+              <button class="drawer-btn" id="btn-drawer-leisure">
+                <span>☕ Declare 20m</span>
+                <span>→</span>
+              </button>
+              <button class="drawer-btn" id="btn-drawer-research">
+                <span>🔬 Research Box</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="8">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">09 • Velocity</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">⚡ Velocity</span>
+              <span class="widget-badge success">94 / 100</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Streak</span>
+              <span class="metric-val">14 Days</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Checkpoints</span>
+              <span class="metric-val">8 Micro-logs</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill emerald" style="width: 94%;"></div>
+            </div>
+            <div class="capsule-box">
+              <div class="capsule-value" style="font-size: 11px; color: var(--text-muted);">
+                Momentum threshold exceeded. Focus depth sustained.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4: Cold-State Security (1 col) + Recent Micro-Logs (1 col) + Quick Scratchpad (2 cols) -->
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="9">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">10 • Cold-State</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🔒 Cold-State</span>
+              <span class="widget-badge info">Sovereign</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Cloud Exfil</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">0 B</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Daemon</span>
+              <span class="metric-val">:7311</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 8px;">
+              <div class="capsule-key">Security Envelope</div>
+              <div class="capsule-value" style="font-size: 11px;">Every key and token is local-first.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile-wrapper bento-span-1">
+        <div class="tactile-tile" data-tile-id="10">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">11 • Micro-Logs</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">📝 Recent Logs</span>
+              <span class="widget-badge info">Audit</span>
+            </div>
+            <div style="font-size: 11px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-cyan); padding-left: 6px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">15:10</span> Stage ratio calibrated
+              </div>
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-emerald); padding-left: 6px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">14:45</span> D-090 reveal policy tested
+              </div>
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-indigo); padding-left: 6px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">14:15</span> Return Anchor snapshot saved
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile-wrapper bento-span-2">
+        <div class="tactile-tile" data-tile-id="11">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">12 • Quick Scratchpad</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">📌 Quick Scratchpad</span>
+              <span class="widget-badge info">Local</span>
+            </div>
+            <textarea style="width: 100%; height: 60px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #fff; padding: 6px; font-size: 11px; resize: none; outline: none; margin-bottom: 6px;" placeholder="Jot down active mental notes..."></textarea>
+            <div style="font-size: 10px; color: var(--text-dim); text-align: center;">
+              Triple-click anywhere to flip back to Art & Poem Mode
+            </div>
+          </div>
+        </div>
+      </div>
+              Triple-click anywhere to flip back to Art & Poem Mode
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Centered Translucent Floating Quote Card (Top Z-Index) -->
+    <div class="floating-quote-container" id="floating-quote">
+      <div class="floating-quote-card">
+        <div class="quote-mark">“</div>
+        <div class="quote-text" id="quote-text">
+          You have power over your mind - not outside events. Realize this, and you will find strength.
+        </div>
+        <div class="quote-author" id="quote-author">— Marcus Aurelius</div>
+        <div class="quote-refresh-hint">Rotates hourly • Triple-click anywhere to cycle painting & poem</div>
+      </div>
+    </div>
+
+    <!-- Scroll Down Hint Pill -->
+    <div class="scroll-hint-pill">
+      <span>↓</span>
+      <span>Scroll down to play Hanging Poem Installation</span>
+    </div>
+
+  </main>
+
+  <!-- Mode 1 Scrollable Physics-Based Hanging Poem Section -->
+  <section class="poem-section" id="poem-section">
+    <div class="poem-section-header">
+      <h2 class="poem-section-title">Suspended Poem Installation</h2>
+      <p class="poem-section-subtitle">
+        Letter-bead chains suspending paired stanzas with ambient breeze & Verlet spring acoustics.<br>
+        <strong>Drag across or pull the chains to play synthesized Akebono chimes.</strong>
+      </p>
+    </div>
+    <div class="poem-canvas-container">
+      <canvas id="chimes-canvas"></canvas>
+    </div>
+  </section>
+
+  <!-- Ambient Bottom Translucent Note -->
+  <div class="return-note-fixed">
+    [Mode 1: Click block to wave-sweep flip • Mode 2: Triple-click anywhere to return]
+  </div>
+
+  <!-- Full-Screen Frosted Glass Settings Modal -->
+  <div class="settings-overlay" id="settings-overlay">
+    <div class="settings-modal">
+      <div class="settings-header">
+        <div class="settings-title">
+          <span>⚙️</span>
+          <span>Dashboard & Gallery Configuration</span>
+        </div>
+        <button class="icon-btn" id="btn-close-settings" style="width: 34px; height: 34px; font-size: 14px;">✕</button>
+      </div>
+      <div class="settings-body">
+        
+        <!-- Tab Navigation -->
+        <nav class="settings-tabs-nav">
+          <button class="tab-btn active" data-tab="tab-art">🖼️ Art & Gallery</button>
+          <button class="tab-btn" data-tab="tab-quotes">💬 Hourly Quotes</button>
+          <button class="tab-btn" data-tab="tab-pomodoro">⏱️ Pomodoro Timer</button>
+          <button class="tab-btn" data-tab="tab-bridge">🌐 Dhriti Bridge</button>
+        </nav>
+
+        <!-- Tab Contents -->
+        <div class="settings-tab-content">
+          
+          <!-- Tab 1: Art & Gallery -->
+          <div class="tab-pane active" id="tab-art">
+            <h3 style="margin-bottom: 8px;">Background Painting Sets</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+              Select a preset artwork or paste an image URL to set the underlying painting.
+            </p>
+            <div class="form-group">
+              <label class="form-label">Add Custom Painting URL</label>
+              <div class="form-row">
+                <input type="text" class="form-input" id="custom-art-url" placeholder="https://images.unsplash.com/photo-...">
+                <button class="btn-primary" id="btn-add-art">Add to Set</button>
+              </div>
+            </div>
+            <label class="form-label">Curated Gallery</label>
+            <div class="art-preset-grid" id="art-preset-grid">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+          <!-- Tab 2: Hourly Quotes -->
+          <div class="tab-pane" id="tab-quotes">
+            <h3 style="margin-bottom: 8px;">Quote Rotation Collection</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+              Dhriti rotates through your quotes every 1 hour on the floating card.
+            </p>
+            <div class="form-group">
+              <label class="form-label">Add New Motivational Quote</label>
+              <textarea class="form-textarea" id="new-quote-text" rows="2" placeholder="Enter inspiring or stoic quote..."></textarea>
+              <div class="form-row" style="margin-top: 8px;">
+                <input type="text" class="form-input" id="new-quote-author" placeholder="Author / Source">
+                <button class="btn-primary" id="btn-add-quote">Add Quote</button>
+              </div>
+            </div>
+            <label class="form-label">Active Rotation List</label>
+            <div class="item-manager-list" id="quotes-manager-list">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+          <!-- Tab 3: Pomodoro Settings -->
+          <div class="tab-pane" id="tab-pomodoro">
+            <h3 style="margin-bottom: 8px;">Pomodoro Focus Engine Configuration</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+              Interval schedules aligned with Dhriti ultradian rhythm guidelines.
+            </p>
+            <div class="form-group">
+              <label class="form-label">Standard Focus Interval</label>
+              <input type="text" class="form-input" value="25 min focus / 5 min break" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Extended Focus Interval</label>
+              <input type="text" class="form-input" value="50 min focus / 15 min break" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Deep Work Interval</label>
+              <input type="text" class="form-input" value="100 min focus / 30 min break" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Completion Acoustic Signal</label>
+              <input type="text" class="form-input" value="Synthesized Tibetan Singing Bowl (Modal Resonator)" readonly>
+            </div>
+          </div>
+
+          <!-- Tab 4: Dhriti Bridge -->
+          <div class="tab-pane" id="tab-bridge">
+            <h3 style="margin-bottom: 8px;">Dhriti Sovereign Local Bridge</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+              Connects the dashboard directly to the local Python daemon over HTTP localhost.
+            </p>
+            <div class="form-group">
+              <label class="form-label">Bridge Endpoint</label>
+              <input type="text" class="form-input" id="bridge-host-input" value="http://127.0.0.1:7311">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cold-State Protection</label>
+              <input type="text" class="form-input" value="Strict Localhost Binding — Zero Cloud Telemetry" readonly>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="audio_synth.js"></script>
+  <script src="physics_chimes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

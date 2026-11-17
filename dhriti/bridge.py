@@ -101,7 +101,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         token_param = parse_qs(urlparse(self.path).query).get("token", [""])[0]
         ok = (self.headers.get("X-Dhriti-Token") == self.token) or (token_param == self.token)
-        if ok or self.path.startswith("/healthz") or path in ("/", "/dashboard", "/popup.css", "/popup.js"):
+        dashboard_paths = (
+            "/", "/dashboard", "/dashboard/",
+            "/style.css", "/dashboard/style.css",
+            "/app.js", "/dashboard/app.js",
+            "/physics_chimes.js", "/dashboard/physics_chimes.js",
+            "/audio_synth.js", "/dashboard/audio_synth.js",
+            "/popup.css", "/popup.js", "/popup.html", "/extension"
+        )
+        if ok or self.path.startswith("/healthz") or path in dashboard_paths:
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -127,18 +135,51 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path == "/healthz":
             self._send(200, {"ok": True})
             return
-        if path in ("/", "/dashboard"):
-            popup_file = Path(__file__).parent.parent / "extension" / "popup.html"
+
+        dashboard_dir = Path(__file__).parent.parent / "dashboard"
+        extension_dir = Path(__file__).parent.parent / "extension"
+
+        if path in ("/", "/dashboard", "/dashboard/"):
+            index_file = dashboard_dir / "index.html"
+            if index_file.exists():
+                self._send_bytes(200, index_file.read_bytes(), "text/html; charset=utf-8")
+                return
+            popup_file = extension_dir / "popup.html"
+            if popup_file.exists():
+                self._send_bytes(200, popup_file.read_bytes(), "text/html; charset=utf-8")
+                return
+        elif path in ("/style.css", "/dashboard/style.css"):
+            css_file = dashboard_dir / "style.css"
+            if css_file.exists():
+                self._send_bytes(200, css_file.read_bytes(), "text/css; charset=utf-8")
+                return
+        elif path in ("/app.js", "/dashboard/app.js"):
+            js_file = dashboard_dir / "app.js"
+            if js_file.exists():
+                self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
+                return
+        elif path in ("/physics_chimes.js", "/dashboard/physics_chimes.js"):
+            js_file = dashboard_dir / "physics_chimes.js"
+            if js_file.exists():
+                self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
+                return
+        elif path in ("/audio_synth.js", "/dashboard/audio_synth.js"):
+            js_file = dashboard_dir / "audio_synth.js"
+            if js_file.exists():
+                self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
+                return
+        elif path in ("/popup.html", "/extension"):
+            popup_file = extension_dir / "popup.html"
             if popup_file.exists():
                 self._send_bytes(200, popup_file.read_bytes(), "text/html; charset=utf-8")
                 return
         elif path == "/popup.css":
-            css_file = Path(__file__).parent.parent / "extension" / "popup.css"
+            css_file = extension_dir / "popup.css"
             if css_file.exists():
                 self._send_bytes(200, css_file.read_bytes(), "text/css; charset=utf-8")
                 return
         elif path == "/popup.js":
-            js_file = Path(__file__).parent.parent / "extension" / "popup.js"
+            js_file = extension_dir / "popup.js"
             if js_file.exists():
                 self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
                 return

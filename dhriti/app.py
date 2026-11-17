@@ -94,7 +94,7 @@ def ensure_sidecar_running(home: Path, port: int = 8765) -> None:
     time.sleep(0.5)
 
 
-def launch_desktop_app(port: int = 7311, width: int = 420, height: int = 740) -> None:
+def launch_desktop_app(port: int = 7311, width: int = 1280, height: int = 860) -> None:
     """Launches the dedicated standalone app window."""
     repo_root = Path(__file__).parent.parent
     home = Path(os.environ.get("DHRITI_HOME", Path.home() / ".dhriti"))

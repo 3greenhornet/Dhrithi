@@ -96,8 +96,12 @@ def fuse(topic_score: Optional[float], function_code: str,
         return Verdict(topic_score, function_code, confidence, None,
                        "on-topic and advancing", model_info=info).validate()
 
-    # 2. Hard Escalation: 2-of-3 Multi-Signal Quorum
-    if len(signals) >= 2 or (springboard_report and springboard_report.get("is_leap")):
+    # Definite topic leap or definitely below low threshold
+    is_definite_leap = (function_code in leap_codes and confidence >= 0.6)
+    is_definite_offtopic = (topic_score is not None and topic_score <= low)
+
+    # 2. Hard Escalation: 2-of-3 Multi-Signal Quorum OR definite leap / definite off-topic
+    if len(signals) >= 2 or is_definite_leap or is_definite_offtopic or (springboard_report and springboard_report.get("is_leap")):
         code = springboard_report.get("suggested_p_code", "P-15") if springboard_report else function_code
         conf = max(confidence, float(springboard_report.get("springboard_index", 0.85))) if springboard_report else confidence
         return Verdict(
@@ -105,12 +109,12 @@ def fuse(topic_score: Optional[float], function_code: str,
             function_code=code,
             confidence=conf,
             escalate="park",
-            reason=f"Quorum breach ({len(signals)} signals: {', '.join(signals[:3])})",
+            reason=f"Hard escalation ({', '.join(signals) if signals else 'definite breach'})",
             model_info=info
         ).validate()
 
-    # 3. Soft Hold: Exactly 1 signal fired (Section 7.5 Soft Hold)
-    if len(signals) == 1 or (topic_score is not None and topic_score < high):
+    # 3. Soft Hold: Ambiguous band (low < topic_score < high) or single weak signal
+    if len(signals) >= 1 or (topic_score is not None and topic_score < high):
         return Verdict(
             topic_score=topic_score,
             function_code=function_code if function_code != "unknown" else "P-03",
