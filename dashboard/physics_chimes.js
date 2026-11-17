@@ -57,7 +57,7 @@
       this.oy = y;
       this.pinned = pinned;
       this.char = char;
-      this.radius = 9;
+      this.radius = 5.0; // Refined, delicate bead radius
       this.isBlock = false;
       this.blockData = null; // { lines: [], width, height }
     }
@@ -104,15 +104,16 @@
     }
 
     buildChain(stanza1, stanza2) {
-      const linkLen = 16;
+      const linkLen = 14;
+      const clearance = 20; // Clear spacing above and below stanza blocks so beads never overlap
       let curY = this.startY;
 
       // 1. Pinned Top Anchor
       const anchor = new Particle(this.baseX, curY, "⚓", true);
       this.particles.push(anchor);
 
-      // 2. Random length of upper chain beads (5 to 8 beads)
-      const topCount = 5 + Math.floor(Math.random() * 4);
+      // 2. Upper chain beads (5 to 7 beads)
+      const topCount = 5 + Math.floor(Math.random() * 3);
       for (let i = 0; i < topCount; i++) {
         curY += linkLen;
         const char = BEAD_CHARS[Math.floor(Math.random() * BEAD_CHARS.length)];
@@ -122,41 +123,56 @@
       }
 
       // 3. Stanza 1 Block
-      curY += 24;
+      const s1Data = this.measureStanza(stanza1 || ["(Stanza Line 1)", "(Stanza Line 2)"]);
+      const s1HalfHeight = s1Data.height / 2;
+      // Position particle at its center: clearance + halfHeight below the last bead
+      curY += clearance + s1HalfHeight;
       const s1 = new Particle(this.baseX, curY);
       s1.isBlock = true;
-      s1.blockData = this.measureStanza(stanza1 || ["(Stanza Line 1)", "(Stanza Line 2)"]);
+      s1.blockData = s1Data;
       this.particles.push(s1);
-      this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s1, 28));
+      // Constraint length matches the center offset exactly
+      this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s1, clearance + s1HalfHeight));
 
-      // 4. Middle chain connecting Stanza 1 to Stanza 2 (6 to 9 beads)
-      curY += s1.blockData.height + 12;
-      const midCount = 6 + Math.floor(Math.random() * 4);
+      // 4. Middle chain connecting Stanza 1 to Stanza 2 (6 to 8 beads)
+      curY += s1HalfHeight + clearance;
+      const midCount = 6 + Math.floor(Math.random() * 3);
       for (let i = 0; i < midCount; i++) {
-        curY += linkLen;
         const char = BEAD_CHARS[Math.floor(Math.random() * BEAD_CHARS.length)];
         const p = new Particle(this.baseX, curY, char);
         this.particles.push(p);
-        this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
+        if (i === 0) {
+          // Constraint from s1 center to first middle bead
+          this.constraints.push(new Constraint(s1, p, s1HalfHeight + clearance));
+        } else {
+          this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
+        }
+        curY += linkLen;
       }
 
       // 5. Stanza 2 Block
-      curY += 24;
+      const s2Data = this.measureStanza(stanza2 || ["(Stanza Line 3)", "(Stanza Line 4)"]);
+      const s2HalfHeight = s2Data.height / 2;
+      curY += clearance + s2HalfHeight;
       const s2 = new Particle(this.baseX, curY);
       s2.isBlock = true;
-      s2.blockData = this.measureStanza(stanza2 || ["(Stanza Line 3)", "(Stanza Line 4)"]);
+      s2.blockData = s2Data;
       this.particles.push(s2);
-      this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s2, 28));
+      this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s2, clearance + s2HalfHeight));
 
-      // 6. Trailing tail beads (4 to 7 beads)
-      curY += s2.blockData.height + 12;
-      const tailCount = 4 + Math.floor(Math.random() * 4);
+      // 6. Trailing tail beads (4 to 6 beads)
+      curY += s2HalfHeight + clearance;
+      const tailCount = 4 + Math.floor(Math.random() * 3);
       for (let i = 0; i < tailCount; i++) {
-        curY += linkLen;
         const char = BEAD_CHARS[Math.floor(Math.random() * BEAD_CHARS.length)];
         const p = new Particle(this.baseX, curY, char);
         this.particles.push(p);
-        this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
+        if (i === 0) {
+          this.constraints.push(new Constraint(s2, p, s2HalfHeight + clearance));
+        } else {
+          this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
+        }
+        curY += linkLen;
       }
     }
 
@@ -164,8 +180,8 @@
       const lineList = Array.isArray(lines) ? lines : [String(lines)];
       let maxLen = 0;
       lineList.forEach(l => { if (l.length > maxLen) maxLen = l.length; });
-      const width = Math.max(160, Math.min(320, maxLen * 8.5 + 32));
-      const height = lineList.length * 20 + 24;
+      const width = Math.max(180, Math.min(340, maxLen * 8.5 + 36));
+      const height = lineList.length * 20 + 26;
       return { lines: lineList, width, height };
     }
   }
@@ -182,8 +198,8 @@
       this.config = {
         gravity: 0.28,
         damping: 0.982,
-        swaySpeed: 0.0018,
-        swayIntensity: 0.15,
+        swaySpeed: 0.022,
+        swayIntensity: 0.012,
         spacing: 340,
         chainSpacingY: 40
       };
@@ -344,8 +360,8 @@
       const swayTime = this.time * this.config.swaySpeed;
 
       this.chains.forEach((chain, cIdx) => {
-        // Natural breeze wave across chains
-        const chainPhase = cIdx * 0.8;
+        // Natural balanced breeze wave across chains
+        const chainPhase = cIdx * 1.2;
         const ambientWind = Math.sin(swayTime + chainPhase) * this.config.swayIntensity;
 
         chain.particles.forEach((p, pIdx) => {
@@ -359,9 +375,13 @@
           p.oy = p.y;
 
           // Depth-dependent wind force
-          const wind = ambientWind * (1 + (pIdx / chain.particles.length) * 0.6);
+          const wind = ambientWind * (1 + (pIdx / chain.particles.length) * 0.4);
 
-          p.x += vx + wind;
+          // Plumb-line restoring force centered exactly on chain anchor baseX
+          // Prevents one-sided drifting or leaning to the right
+          const plumbRestoring = (chain.baseX - p.x) * 0.0035;
+
+          p.x += vx + wind + plumbRestoring;
           p.y += vy + this.config.gravity;
         });
 
@@ -377,21 +397,42 @@
       ctx.clearRect(0, 0, this.width, this.height);
 
       this.chains.forEach((chain, cIdx) => {
-        // Draw connecting string lines
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(226, 232, 240, 0.28)";
-        ctx.lineWidth = 1.8;
-        chain.particles.forEach((p, i) => {
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        });
-        ctx.stroke();
+        // Draw string segments between adjacent particles (terminating at block eyelets)
+        ctx.strokeStyle = "rgba(226, 232, 240, 0.35)";
+        ctx.lineWidth = 1.6;
 
-        // Draw beads and stanzas
-        chain.particles.forEach((p, i) => {
+        for (let i = 0; i < chain.particles.length - 1; i++) {
+          const p1 = chain.particles[i];
+          const p2 = chain.particles[i + 1];
+
+          let startX = p1.x;
+          let startY = p1.y;
+          let endX = p2.x;
+          let endY = p2.y;
+
+          if (p1.isBlock && p1.blockData) {
+            startY += p1.blockData.height / 2;
+          }
+          if (p2.isBlock && p2.blockData) {
+            endY -= p2.blockData.height / 2;
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+        }
+
+        // Draw stanzas first (bottom layer)
+        chain.particles.forEach((p) => {
           if (p.isBlock) {
             this.drawStanzaBlock(ctx, p, chain);
-          } else {
+          }
+        });
+
+        // Draw beads second (top layer, but never overlapping stanzas due to clearance)
+        chain.particles.forEach((p, i) => {
+          if (!p.isBlock) {
             this.drawBead(ctx, p, i === 0);
           }
         });
@@ -402,33 +443,35 @@
       if (isAnchor) {
         ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
         ctx.fill();
         return;
       }
 
+      const r = p.radius || 5.0;
+
       // Metallic bead circle with letter
-      const grad = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, p.radius);
+      const grad = ctx.createRadialGradient(p.x - 1.5, p.y - 1.5, 0.8, p.x, p.y, r);
       grad.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-      grad.addColorStop(0.6, "rgba(203, 213, 225, 0.85)");
-      grad.addColorStop(1, "rgba(100, 116, 139, 0.75)");
+      grad.addColorStop(0.6, "rgba(203, 213, 225, 0.88)");
+      grad.addColorStop(1, "rgba(100, 116, 139, 0.78)");
 
       ctx.save();
       ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetY = 3;
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 2;
 
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
       ctx.fillStyle = "#0f172a";
-      ctx.font = "bold 9px system-ui, sans-serif";
+      ctx.font = "bold 6.5px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(p.char, p.x, p.y + 0.5);
+      ctx.fillText(p.char, p.x, p.y + 0.3);
     }
 
     drawStanzaBlock(ctx, p, chain) {
