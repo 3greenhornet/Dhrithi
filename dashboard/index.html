@@ -36,76 +36,133 @@
     <!-- Tactile Bento Grid (Seamless Texture Projection on Front, Widgets on Back) -->
     <div class="grid-board" id="grid-board">
 
-      <!-- Row 1: Session (1 col) + Pomodoro Engine (2 cols) + ChatGuard (1 col) -->
-      <div class="tile-wrapper bento-span-1">
-        <div class="tactile-tile" data-tile-id="0">
+      <!-- 1. Pomodoro Focus Engine (Big 2x2 Square Bento) -->
+      <div class="tile-wrapper bento-square-lg">
+        <div class="tactile-tile" data-tile-id="1">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">01 • Session</span>
+            <span class="tile-front-badge">01 • Pomodoro Focus Engine</span>
+          </div>
+          <div class="tile-face tile-face-back" style="justify-content: space-between;">
+            <div class="widget-header">
+              <span class="widget-title">⏱️ Pomodoro Engine</span>
+              <span class="widget-badge info" id="pomo-label">Focus Interval</span>
+            </div>
+            <div class="pomo-display" style="padding: 16px 0;">
+              <div class="pomo-time" id="pomo-time" style="font-size: 52px; font-weight: 800;">25:00</div>
+              <div style="font-size: 11px; color: var(--accent-cyan); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px;">Deep Focus Zone Active</div>
+            </div>
+            <div class="pomo-presets" style="margin-bottom: 12px;">
+              <button class="pomo-preset-btn active" data-preset="standard">Standard 25/5</button>
+              <button class="pomo-preset-btn" data-preset="extended">Extended 50/15</button>
+              <button class="pomo-preset-btn" data-preset="deep">Deep Work 100/30</button>
+            </div>
+            <div class="pomo-controls" style="margin-bottom: 8px;">
+              <button class="pomo-btn primary" id="btn-pomo-toggle" style="padding: 12px; font-size: 14px;">Start Focus</button>
+              <button class="pomo-btn secondary" id="btn-pomo-reset" style="padding: 12px;">Reset</button>
+            </div>
+            <div class="capsule-box" style="margin-top: 4px; padding: 8px 12px;">
+              <div class="capsule-key">Ultradian Rhythm Compliance</div>
+              <div class="capsule-value" style="font-size: 11px;">Acoustic signal: Modal Tibetan singing bowl harmonic chime.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Return Anchor & Resume Capsule (Wide 2-col Horizontal Bento) -->
+      <div class="tile-wrapper bento-wide">
+        <div class="tactile-tile" data-tile-id="2">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">02 • Return Anchor & Resume Capsule</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🎯 Active Focus</span>
-              <span class="widget-badge success">Live</span>
+              <span class="widget-title">⚓ Return Anchor (D-090 Capsule)</span>
+              <span class="widget-badge warning">Sovereign Ready</span>
+            </div>
+            <div class="capsule-box">
+              <div class="capsule-key">Next Concrete Step</div>
+              <div class="capsule-value" id="widget-capsule-next">Finalize tactile Solitaire sweep flip and link chimes engine.</div>
+            </div>
+            <div class="capsule-box" style="margin-top: 4px;">
+              <div class="capsule-key">Active Blocker</div>
+              <div class="capsule-value">None detected. Sovereign execution path completely unobstructed.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Stage Ratio & The Wall (Wide 2-col Horizontal Bento) -->
+      <div class="tile-wrapper bento-wide">
+        <div class="tactile-tile" data-tile-id="4">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">03 • Stage Ratio & Wall</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🎭 Stage Ratio & The Wall</span>
+              <span class="widget-badge success">88% Stage (Output)</span>
+            </div>
+            <div class="metric-label" style="margin-bottom: 6px;">Stage (Generative Output) vs Audience (Passive Input)</div>
+            <div class="ratio-bar" style="height: 12px; margin-bottom: 10px;">
+              <div class="ratio-stage" style="width: 88%;" title="Stage 88%"></div>
+              <div class="ratio-aud" style="width: 12%;" title="Audience 12%"></div>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Wall Principle Status</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">Fully Enforced</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 6px; padding: 6px 10px;">
+              <div class="capsule-value" style="font-size: 11px; color: var(--text-muted);">
+                High generative throughput maintained. No unprompted feed consumption.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Active Focus Session (Wide 2-col Horizontal Bento) -->
+      <div class="tile-wrapper bento-wide">
+        <div class="tactile-tile" data-tile-id="0">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">04 • Active Session</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">🎯 Active Focus Session</span>
+              <span class="widget-badge success">Live Session</span>
             </div>
             <div class="metric-row">
               <span class="metric-label">Current Intent</span>
-              <span class="metric-val" id="widget-session-intent" style="font-size: 12px; font-weight: 500;">Core Architecture</span>
+              <span class="metric-val" id="widget-session-intent" style="font-size: 13px; font-weight: 600;">Core Architecture & Bento UI</span>
             </div>
             <div class="metric-row">
               <span class="metric-label">Elapsed Focus</span>
               <span class="metric-val">42 min</span>
             </div>
-            <div class="progress-track">
+            <div class="progress-track" style="margin-bottom: 8px;">
               <div class="progress-fill emerald" style="width: 70%;"></div>
             </div>
-            <div class="capsule-box" style="margin-top: auto;">
+            <div class="capsule-box" style="padding: 6px 10px;">
               <div class="capsule-key">Session Health</div>
-              <div class="capsule-value" style="font-size: 11px;">Zero leakage detected. Sovereign focus lock active.</div>
+              <div class="capsule-value" style="font-size: 11px;">Zero cognitive leakage detected. Sovereign focus lock active.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Tile 1: Integrated Pomodoro Timer (Wide 2-col Bento) -->
-      <div class="tile-wrapper bento-span-2">
-        <div class="tactile-tile" data-tile-id="1">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">02 • Pomodoro Focus Engine</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">⏱️ Pomodoro Engine</span>
-              <span class="widget-badge info" id="pomo-label">Focus Interval</span>
-            </div>
-            <div class="pomo-display">
-              <div class="pomo-time" id="pomo-time">25:00</div>
-            </div>
-            <div class="pomo-presets">
-              <button class="pomo-preset-btn active" data-preset="standard">Standard 25/5</button>
-              <button class="pomo-preset-btn" data-preset="extended">Extended 50/15</button>
-              <button class="pomo-preset-btn" data-preset="deep">Deep Work 100/30</button>
-            </div>
-            <div class="pomo-controls">
-              <button class="pomo-btn primary" id="btn-pomo-toggle">Start</button>
-              <button class="pomo-btn secondary" id="btn-pomo-reset">Reset</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tile 3: ChatGuard Budget & Burst Cooldown (1 col) -->
-      <div class="tile-wrapper bento-span-1">
+      <!-- 5. ChatGuard Budget (Compact 1x1 Square Bento) -->
+      <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="3">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">03 • ChatGuard</span>
+            <span class="tile-front-badge">05 • ChatGuard</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🛡️ ChatGuard Budget</span>
+              <span class="widget-title">🛡️ ChatGuard</span>
               <span class="widget-badge success">Healthy</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">15m Window Budget</span>
+              <span class="metric-label">15m Window</span>
               <span class="metric-val" id="widget-guard-budget">15m / 15m</span>
             </div>
             <div class="progress-track">
@@ -123,60 +180,8 @@
         </div>
       </div>
 
-      <!-- Row 2: Return Anchor (2 cols) + Stage Ratio (2 cols) -->
-      <div class="tile-wrapper bento-span-2">
-        <div class="tactile-tile" data-tile-id="2">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">04 • Return Anchor & Resume Capsule</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">⚓ Return Anchor & Resume Capsule</span>
-              <span class="widget-badge warning">D-090 Ready</span>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Next Concrete Action</div>
-              <div class="capsule-value" id="widget-capsule-next">Finalize tactile flip Solitaire wave & integrate with local bridge.</div>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Active Blocker</div>
-              <div class="capsule-value">None detected. Sovereign execution path unobstructed.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tile 4: Stage Ratio & Wall Principle (2 cols) -->
-      <div class="tile-wrapper bento-span-2">
-        <div class="tactile-tile" data-tile-id="4">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">05 • Stage Ratio & Wall</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">🎭 Stage Ratio & The Wall</span>
-              <span class="widget-badge success">88% Stage</span>
-            </div>
-            <div class="metric-label" style="margin-bottom: 6px;">Stage (Generative Output) vs Audience (Passive Input)</div>
-            <div class="ratio-bar">
-              <div class="ratio-stage" style="width: 88%;" title="Stage 88%"></div>
-              <div class="ratio-aud" style="width: 12%;" title="Audience 12%"></div>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Wall Principle Status</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">Fully Enforced</span>
-            </div>
-            <div class="capsule-box" style="margin-top: 6px;">
-              <div class="capsule-value" style="font-size: 11px; color: var(--text-muted);">
-                High generative throughput maintained. No unprompted feed consumption.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Row 3: Day Window (1 col) + Declared Leisure (1 col) + Quick Drawers (1 col) + Velocity (1 col) -->
-      <div class="tile-wrapper bento-span-1">
+      <!-- 6. Day Window & Curfew (Compact 1x1 Square Bento) -->
+      <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="5">
           <div class="tile-face tile-face-front">
             <span class="tile-front-badge">06 • Day Window</span>
@@ -197,72 +202,106 @@
             <div class="progress-track">
               <div class="progress-fill amber" style="width: 58%;"></div>
             </div>
-            <div class="capsule-box">
+            <div class="capsule-box" style="padding: 6px 8px;">
               <div class="capsule-key">Evening Protocol</div>
-              <div class="capsule-value" style="font-size: 11px;">Gentle ramp down at 22:00.</div>
+              <div class="capsule-value" style="font-size: 10.5px;">Gentle ramp down at 22:00.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="tile-wrapper bento-span-1">
-        <div class="tactile-tile" data-tile-id="6">
+      <!-- 7. Recent Micro-Logs & Audit Feed (Tall 1x2 Vertical Bento) -->
+      <div class="tile-wrapper bento-tall">
+        <div class="tactile-tile" data-tile-id="10">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">07 • Leisure & Drift</span>
+            <span class="tile-front-badge">07 • Audit Logs</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">☕ Declared Leisure</span>
-              <span class="widget-badge success">Zero Drift</span>
+              <span class="widget-title">📝 Audit Trail</span>
+              <span class="widget-badge info">Ledger</span>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">Sanctioned</span>
-              <span class="metric-val">0 / 60m</span>
+            <div style="font-size: 11px; display: flex; flex-direction: column; gap: 8px; overflow: visible;">
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-cyan); padding-left: 8px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">15:45</span> Plumb-line chimes centered
+              </div>
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-indigo); padding-left: 8px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">15:30</span> Solitaire wave sweep tuned
+              </div>
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-emerald); padding-left: 8px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">15:10</span> Stage ratio calibrated (88%)
+              </div>
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-amber); padding-left: 8px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">14:45</span> D-090 reveal policy sealed
+              </div>
+              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-rose); padding-left: 8px;">
+                <span style="color: var(--text-dim); font-family: var(--font-mono);">14:15</span> Return Anchor snapshot saved
+              </div>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">Drift</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">0m</span>
-            </div>
-            <div class="capsule-box" style="margin-top: 8px;">
-              <div class="capsule-key">Sanctioned Break</div>
-              <div class="capsule-value" style="font-size: 11px;">Declare leisure explicitly before checking distractions.</div>
+            <div class="capsule-box" style="margin-top: auto; padding: 6px 8px;">
+              <div class="capsule-value" style="font-size: 10px; color: var(--text-dim);">Tamper-evident hash ledger synced.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="tile-wrapper bento-span-1">
+      <!-- 8. Quick Action Drawers & Triage (Tall 1x2 Vertical Bento) -->
+      <div class="tile-wrapper bento-tall">
         <div class="tactile-tile" data-tile-id="7">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">08 • Drawers</span>
+            <span class="tile-front-badge">08 • Fast Drawers</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
               <span class="widget-title">📥 Quick Drawers</span>
-              <span class="widget-badge info">Triage</span>
+              <span class="widget-badge info">Fast Triage</span>
             </div>
-            <div class="drawer-btn-grid">
+            <div class="drawer-btn-grid" style="gap: 8px;">
               <button class="drawer-btn" id="btn-drawer-park">
-                <span>📦 Park Thought</span>
+                <span>📦 Park Thought / Tab</span>
                 <span>→</span>
               </button>
               <button class="drawer-btn" id="btn-drawer-leisure">
-                <span>☕ Declare 20m</span>
+                <span>☕ Declare 20m Leisure</span>
                 <span>→</span>
               </button>
               <button class="drawer-btn" id="btn-drawer-research">
-                <span>🔬 Research Box</span>
+                <span>🔬 Open Research Box</span>
                 <span>→</span>
               </button>
+            </div>
+            <div class="capsule-box" style="margin-top: auto; padding: 8px 10px;">
+              <div class="capsule-key">Instantaneous Offloading</div>
+              <div class="capsule-value" style="font-size: 10.5px;">Parked ideas resurface strictly during cold-state review.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="tile-wrapper bento-span-1">
+      <!-- 9. Quick Scratchpad & Mode Switcher (Wide 2-col Horizontal Bento) -->
+      <div class="tile-wrapper bento-wide">
+        <div class="tactile-tile" data-tile-id="11">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">09 • Quick Scratchpad</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">📌 Quick Scratchpad</span>
+              <span class="widget-badge info">Local</span>
+            </div>
+            <textarea style="width: 100%; height: 68px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 8px; font-size: 12px; resize: none; outline: none; margin-bottom: 6px;" placeholder="Jot down active mental notes or next concrete code line..."></textarea>
+            <div style="font-size: 10px; color: var(--text-dim); text-align: center;">
+              Triple-click anywhere to flip back to Art & Poem Mode
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10. Focus Velocity & Streak (Compact 1x1 Square Bento) -->
+      <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="8">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">09 • Velocity</span>
+            <span class="tile-front-badge">10 • Velocity</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
@@ -277,11 +316,11 @@
               <span class="metric-label">Checkpoints</span>
               <span class="metric-val">8 Micro-logs</span>
             </div>
-            <div class="progress-track">
+            <div class="progress-track" style="margin-bottom: 8px;">
               <div class="progress-fill emerald" style="width: 94%;"></div>
             </div>
-            <div class="capsule-box">
-              <div class="capsule-value" style="font-size: 11px; color: var(--text-muted);">
+            <div class="capsule-box" style="padding: 6px 8px;">
+              <div class="capsule-value" style="font-size: 10.5px; color: var(--text-muted);">
                 Momentum threshold exceeded. Focus depth sustained.
               </div>
             </div>
@@ -289,76 +328,55 @@
         </div>
       </div>
 
-      <!-- Row 4: Cold-State Security (1 col) + Recent Micro-Logs (1 col) + Quick Scratchpad (2 cols) -->
-      <div class="tile-wrapper bento-span-1">
+      <!-- 11. Declared Leisure vs Drift (Compact 1x1 Square Bento) -->
+      <div class="tile-wrapper bento-square-sm">
+        <div class="tactile-tile" data-tile-id="6">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">11 • Leisure & Drift</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">☕ Leisure vs Drift</span>
+              <span class="widget-badge success">Zero Drift</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Sanctioned</span>
+              <span class="metric-val">0 / 60m</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Drift</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">0m</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 6px; padding: 6px 8px;">
+              <div class="capsule-key">Sanctioned Break</div>
+              <div class="capsule-value" style="font-size: 10.5px;">Declare leisure explicitly before checking distractions.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 12. Cold-State Consent & Security Envelope (Wide 2-col Horizontal Bento) -->
+      <div class="tile-wrapper bento-wide">
         <div class="tactile-tile" data-tile-id="9">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">10 • Cold-State</span>
+            <span class="tile-front-badge">12 • Cold-State Consent</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🔒 Cold-State</span>
-              <span class="widget-badge info">Sovereign</span>
+              <span class="widget-title">🔒 Cold-State Consent & Security</span>
+              <span class="widget-badge info">Sovereign Local</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">Cloud Exfil</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">0 B</span>
+              <span class="metric-label">Cloud Exfiltration</span>
+              <span class="metric-val" style="color: var(--accent-emerald);">0 Bytes (Blocked)</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">Daemon</span>
-              <span class="metric-val">:7311</span>
+              <span class="metric-label">Local Bridge Daemon</span>
+              <span class="metric-val">Port 7311 (Localhost Only)</span>
             </div>
-            <div class="capsule-box" style="margin-top: 8px;">
-              <div class="capsule-key">Security Envelope</div>
-              <div class="capsule-value" style="font-size: 11px;">Every key and token is local-first.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tile-wrapper bento-span-1">
-        <div class="tactile-tile" data-tile-id="10">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">11 • Micro-Logs</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">📝 Recent Logs</span>
-              <span class="widget-badge info">Audit</span>
-            </div>
-            <div style="font-size: 11px; display: flex; flex-direction: column; gap: 6px;">
-              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-cyan); padding-left: 6px;">
-                <span style="color: var(--text-dim); font-family: var(--font-mono);">15:10</span> Stage ratio calibrated
-              </div>
-              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-emerald); padding-left: 6px;">
-                <span style="color: var(--text-dim); font-family: var(--font-mono);">14:45</span> D-090 reveal policy tested
-              </div>
-              <div style="color: var(--text-muted); border-left: 2px solid var(--accent-indigo); padding-left: 6px;">
-                <span style="color: var(--text-dim); font-family: var(--font-mono);">14:15</span> Return Anchor snapshot saved
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tile-wrapper bento-span-2">
-        <div class="tactile-tile" data-tile-id="11">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">12 • Quick Scratchpad</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">📌 Quick Scratchpad</span>
-              <span class="widget-badge info">Local</span>
-            </div>
-            <textarea style="width: 100%; height: 60px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #fff; padding: 6px; font-size: 11px; resize: none; outline: none; margin-bottom: 6px;" placeholder="Jot down active mental notes..."></textarea>
-            <div style="font-size: 10px; color: var(--text-dim); text-align: center;">
-              Triple-click anywhere to flip back to Art & Poem Mode
-            </div>
-          </div>
-        </div>
-      </div>
-              Triple-click anywhere to flip back to Art & Poem Mode
+            <div class="capsule-box" style="margin-top: 6px; padding: 6px 10px;">
+              <div class="capsule-key">Cryptographic Envelope</div>
+              <div class="capsule-value" style="font-size: 11px;">Every key, token, and ledger record remains strictly isolated on your machine.</div>
             </div>
           </div>
         </div>

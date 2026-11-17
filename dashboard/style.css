@@ -191,30 +191,54 @@ body.mode-dashboard .tile-face-back {
 .hero-viewport {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
+  height: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   perspective: 1400px;
   z-index: 10;
-  padding: 72px 28px 36px 28px;
-  overflow: hidden;
+  padding: 80px 28px 48px 28px;
 }
 
 .grid-board {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-auto-rows: minmax(130px, 1fr);
-  gap: 16px;
+  grid-auto-flow: dense;
+  grid-auto-rows: minmax(180px, auto);
+  gap: 18px;
   width: 100%;
   max-width: 1380px;
-  height: calc(100vh - 110px);
   position: relative;
   transform-style: preserve-3d;
 }
 
-/* Authentic Bento Box Sizing Variations */
+/* Authentic Bento Box Sizing Variations (Big Square, Tall Rectangle, Wide Rectangle, Compact Square) */
+.tile-wrapper.bento-square-lg {
+  grid-column: span 2;
+  grid-row: span 2;
+  min-height: 380px;
+}
+
+.tile-wrapper.bento-tall {
+  grid-column: span 1;
+  grid-row: span 2;
+  min-height: 380px;
+}
+
+.tile-wrapper.bento-wide {
+  grid-column: span 2;
+  grid-row: span 1;
+  min-height: 180px;
+}
+
+.tile-wrapper.bento-square-sm {
+  grid-column: span 1;
+  grid-row: span 1;
+  min-height: 180px;
+}
+
 .tile-wrapper.bento-span-2 {
   grid-column: span 2;
 }
