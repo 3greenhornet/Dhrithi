@@ -26,6 +26,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .errors import BridgeError
+from .bridge_additions import GuardRoutes
 
 
 def ensure_token(home: Path) -> str:
@@ -88,9 +89,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_bytes(self, code: int, body: bytes, content_type: str = "text/html"):
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _authorized(self) -> bool:
-        ok = self.headers.get("X-Dhriti-Token") == self.token
-        if ok or self.path.startswith("/healthz"):
+        path = urlparse(self.path).path
+        token_param = parse_qs(urlparse(self.path).query).get("token", [""])[0]
+        ok = (self.headers.get("X-Dhriti-Token") == self.token) or (token_param == self.token)
+        if ok or self.path.startswith("/healthz") or path in ("/", "/dashboard", "/popup.css", "/popup.js"):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -116,6 +127,22 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path == "/healthz":
             self._send(200, {"ok": True})
             return
+        if path in ("/", "/dashboard"):
+            popup_file = Path(__file__).parent.parent / "extension" / "popup.html"
+            if popup_file.exists():
+                self._send_bytes(200, popup_file.read_bytes(), "text/html; charset=utf-8")
+                return
+        elif path == "/popup.css":
+            css_file = Path(__file__).parent.parent / "extension" / "popup.css"
+            if css_file.exists():
+                self._send_bytes(200, css_file.read_bytes(), "text/css; charset=utf-8")
+                return
+        elif path == "/popup.js":
+            js_file = Path(__file__).parent.parent / "extension" / "popup.js"
+            if js_file.exists():
+                self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
+                return
+
         if not self._authorized():
             self._send(401, {"error": "bad or missing X-Dhriti-Token"})
             return
@@ -130,6 +157,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == "/policy":
             self._send(200, snap["policy"] or {
                 "enforce": False, "reason": "no active policy (dormant)"})
+        elif GuardRoutes.dispatch(self, "GET", path, None):
+            return
         else:
             self._send(404, {"error": "unknown endpoint"})
 
@@ -160,19 +189,23 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == "/proof" and self.on_event is not None:
             self.on_event(self.ledger, {"type": "browser_proof", **payload})
             self._send(200, {"accepted": True})
+        elif GuardRoutes.dispatch(self, "POST", path, payload):
+            return
         else:
             self._send(404, {"error": "unknown endpoint"})
 
 
 class BridgeServer:
     def __init__(self, host: str, port: int, token: str,
-                 state: BridgeState, ledger=None, on_event=None):
+                 state: BridgeState, ledger=None, on_event=None,
+                 guard_ctx=None):
         self.host = host
         self.port = int(port)
         self.token = token
         self.state = state
         self.ledger = ledger
         self.on_event = on_event
+        self.guard_ctx = guard_ctx
         self._httpd = None
         self._thread = None
         self.port_bound = None      # set by start(); real bound port
@@ -187,6 +220,7 @@ class BridgeServer:
             "token": self.token,
             "on_event": staticmethod(self.on_event),
             "ledger": self.ledger,
+            "guard_ctx": self.guard_ctx,
         })
         self._httpd = ThreadingHTTPServer((self.host, self.port), handler)
         # port 0 = ephemeral: record what the OS actually assigned so

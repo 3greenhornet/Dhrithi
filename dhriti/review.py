@@ -165,6 +165,29 @@ class ParkingLotService:
             "AND disposition IS NULL "
             "ORDER BY created_at", (day + "%",))
 
+    def auto_archive_expired(self, max_age_days: float = 7.0) -> list:
+        """Dead-Letter Queue (DLQ) TTL: auto-compost undisposed items older than max_age_days."""
+        from datetime import datetime, timezone, timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        expired_rows = self.db.query(
+            "SELECT id, question FROM parking_lot WHERE created_at < ? AND disposition IS NULL",
+            (cutoff,)
+        )
+        for r in expired_rows:
+            self.db.update("parking_lot", r["id"], {
+                "disposition": "composted",
+                "disposed_at": self.clock.iso(),
+                "note": f"Auto-archived by DLQ TTL ({max_age_days}d threshold)"
+            })
+            if self.ledger is not None:
+                self.ledger.record(
+                    "parking_lot_disposition",
+                    observed={"disposition": "composted",
+                              "question": r["question"][:100],
+                              "note": f"DLQ TTL {max_age_days}d"},
+                    action_taken="auto-archived dead-letter item")
+        return expired_rows
+
     def surface_evening(self, day: str) -> list:
         """Mark the day's un-surfaced items as evening-surfaced; return
         them. Called at the earned-evening moment."""

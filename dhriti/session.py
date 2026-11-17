@@ -27,8 +27,17 @@ class SessionService:
         self.clock = clock or RealClock()
 
     def create(self, day_id: str, contract_id: str,
-               task: str = "") -> dict:
+               task: str = "", next_action: str = "", blocker: str = "") -> dict:
         session_id = str(uuid.uuid4())
+        outcome = None
+        if next_action or blocker:
+            outcome = json.dumps({
+                "resume_capsule": {
+                    "next_action": next_action.strip(),
+                    "blocker": blocker.strip(),
+                    "updated_at": self.clock.iso()
+                }
+            })
         self.db.insert("session", {
             "id": session_id,
             "day_id": day_id,
@@ -39,8 +48,31 @@ class SessionService:
             "evidence_spec": None,
             "experiment_condition": None,
             "ended_at": None,
-            "outcome_json": None,
+            "outcome_json": outcome,
         })
+        return self.get(session_id)
+
+    def checkpoint(self, session_id: str, next_action: str = "", blocker: str = "",
+                   artifact: str = "") -> dict:
+        sess = self.get(session_id)
+        if not sess:
+            raise StateError("session not found")
+        outcome = {}
+        if sess.get("outcome_json"):
+            try:
+                outcome = json.loads(sess["outcome_json"]) or {}
+            except Exception:
+                outcome = {}
+        capsule = outcome.get("resume_capsule", {})
+        if next_action:
+            capsule["next_action"] = next_action.strip()
+        if blocker:
+            capsule["blocker"] = blocker.strip()
+        if artifact:
+            capsule["artifact"] = artifact.strip()
+        capsule["updated_at"] = self.clock.iso()
+        outcome["resume_capsule"] = capsule
+        self.db.update("session", session_id, {"outcome_json": json.dumps(outcome)})
         return self.get(session_id)
 
     def get(self, session_id: str) -> Optional[dict]:

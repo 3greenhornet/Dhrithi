@@ -1,0 +1,109 @@
+{
+  "_header": {
+    "purpose": "Adversarial traces for the conversation guard, in the spirit of the repo's TLA+ work (D-020). The golden-day fixture exercises the golden path (their audit Note-2); these traces are counterexamples: each one tries to break a stated invariant. If a trace fails, the guard has a bug; if it holds, the invariant is re-proved against that attack.",
+    "relation_to_tla": "The lifecycle invariants (NoActiveWithoutSealed, EmergencyAlwaysPossible, RelaxationIsDelayed, DayReleaseIsBounded, InterruptedRecovers) stay in the repo's TLA+ artefacts. These are guard-local invariants with the same discipline. A real TLC counterexample can be exported and pasted here as steps + asserts; the runner is generic.",
+    "how_to_add": "Steps call a small registry of guard primitives (see tests/test_counterexamples.py). Asserts check one state field each. Every trace must have a documented attack story."
+  },
+  "invariants": [
+    {
+      "id": "G-1",
+      "name": "TighteningIsImmediate",
+      "attack_story": "User breaches during a clean streak and hopes the taper 'averages out' over the week so tomorrow starts relaxed.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"taper_index": 1}},
+        {"fn": "clean_days", "args": {"days": 2}},
+        {"fn": "schmitt_step", "args": {"breach": true}},
+        {"fn": "assert_field", "args": {"field": "taper_index", "op": "eq", "value": 2}},
+        {"fn": "assert_field", "args": {"field": "clean_streak", "op": "eq", "value": 0}},
+        {"fn": "clean_days", "args": {"days": 2}},
+        {"fn": "assert_field", "args": {"field": "taper_index", "op": "eq", "value": 2}}
+      ]
+    },
+    {
+      "id": "G-2",
+      "name": "RelaxationIsDelayed",
+      "attack_story": "Two clean days, then the user expects the stage to drop anyway; and after relaxing, expects another drop on day one of the next streak.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"taper_index": 2}},
+        {"fn": "clean_days", "args": {"days": 2}},
+        {"fn": "assert_field", "args": {"field": "taper_index", "op": "eq", "value": 2}},
+        {"fn": "clean_days", "args": {"days": 1}},
+        {"fn": "assert_field", "args": {"field": "taper_index", "op": "eq", "value": 1}},
+        {"fn": "clean_days", "args": {"days": 2}},
+        {"fn": "assert_field", "args": {"field": "taper_index", "op": "eq", "value": 1}},
+        {"fn": "clean_days", "args": {"days": 1}},
+        {"fn": "assert_field", "args": {"field": "taper_index", "op": "eq", "value": 0}}
+      ]
+    },
+    {
+      "id": "G-3",
+      "name": "DebtIsBounded",
+      "attack_story": "Hammer 500 off-scope holds in one session and hope the debt ceiling 10.0 is exceeded so the rebound pressure forces release.",
+      "steps": [
+        {"fn": "fresh_state", "args": {}},
+        {"fn": "accrue_many", "args": {"n": 500}},
+        {"fn": "assert_field", "args": {"field": "debt_value", "op": "le", "value": 10.0}}
+      ]
+    },
+    {
+      "id": "G-4",
+      "name": "DebtFrozenUnderFullLock",
+      "attack_story": "Sit in FULL_LOCK accumulating debt from every held send so that when the window opens the debt explodes into a rebound binge.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"mode": "full_lock"}},
+        {"fn": "accrue_many", "args": {"n": 50}},
+        {"fn": "assert_field", "args": {"field": "debt_value", "op": "eq", "value": 0.0}},
+        {"fn": "assert_field", "args": {"field": "debt_frozen", "op": "eq", "value": true}}
+      ]
+    },
+    {
+      "id": "G-5",
+      "name": "ThreadInterlockHolds",
+      "attack_story": "Open thread A, try to open thread B anyway; only disposal releases the key. Then try to use REDUCED_LOCK's single pivot to sneak a second thread in FULL_LOCK.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"mode": "reduced_lock"}},
+        {"fn": "open_thread", "args": {"thread_id": "A", "site": "chatgpt"}},
+        {"fn": "open_thread_expect_refused", "args": {"thread_id": "B", "site": "deepseek", "reason": "thread_interlock"}},
+        {"fn": "dispose_thread", "args": {"thread_id": "A", "disposition": "abandoned"}},
+        {"fn": "open_thread_expect_refused", "args": {"thread_id": "B", "site": "deepseek", "reason": "pivot_budget"}},
+        {"fn": "set_mode", "args": {"mode": "checkpoint"}},
+        {"fn": "open_thread", "args": {"thread_id": "B", "site": "deepseek"}},
+        {"fn": "set_mode", "args": {"mode": "full_lock"}},
+        {"fn": "dispose_thread", "args": {"thread_id": "B", "disposition": "parked"}},
+        {"fn": "open_thread_expect_refused", "args": {"thread_id": "C", "site": "gemini", "reason": "pivot_budget"}}
+      ]
+    },
+    {
+      "id": "G-6",
+      "name": "SidecarCannotUndercutDeterministicFloor",
+      "attack_story": "A held prompt is already PARK_ONLY by the mode floor; the sidecar returns no escalation -- the user hopes the parked prompt is silently released.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"mode": "full_lock", "topic_label": "SPECIMEN mining"}},
+        {"fn": "decide_expect", "args": {"in_scope": false, "sidecar_verdict": null, "action": "park_only"}},
+        {"fn": "decide_expect", "args": {"in_scope": true, "sidecar_verdict": null, "action": "send"}}
+      ]
+    },
+    {
+      "id": "G-7",
+      "name": "NoSilentAllowOnBurst",
+      "attack_story": "Burst to the threshold, pay nothing, and keep sending because the toll only 'suggests'.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"mode": "checkpoint"}},
+        {"fn": "send_n", "args": {"n": 3}},
+        {"fn": "decide_expect", "args": {"in_scope": true, "sidecar_verdict": null, "action": "hold_toll", "reason": "burst_toll"}},
+        {"fn": "wait_past_cooldown", "args": {}},
+        {"fn": "decide_expect", "args": {"in_scope": true, "sidecar_verdict": null, "action": "send", "reason": "in_scope"}}
+      ]
+    },
+    {
+      "id": "G-8",
+      "name": "BudgetCeilingOutranksEverything",
+      "attack_story": "Exhaust the pass budget, then send an IN-scope prompt and hope in-scope status overrides the ceiling.",
+      "steps": [
+        {"fn": "fresh_state", "args": {"mode": "reduced_lock", "prompt_budget_limit": 2}},
+        {"fn": "send_n", "args": {"n": 2}},
+        {"fn": "decide_expect", "args": {"in_scope": true, "sidecar_verdict": null, "action": "park_only", "reason": "budget_exhausted"}}
+      ]
+    }
+  ]
+}

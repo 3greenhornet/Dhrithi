@@ -19,6 +19,8 @@
  */
 
 importScripts("config.js");
+importScripts("chatguard_background.js");
+importScripts("background-images.js");
 
 const RULE_OFFSET = 10000;      // our dynamic rule ids start here
 const MAX_RULES = 500;          // DNR dynamic rule cap safety
@@ -28,11 +30,21 @@ const POLICY_KEY = "cachedPolicy";
 
 let currentRuleIds = [];
 
+async function getEffectiveToken() {
+  const cfg = self.DHRITI_CONFIG || {};
+  try {
+    const stored = await chrome.storage.local.get("token");
+    if (stored && stored.token) return stored.token;
+  } catch (e) {}
+  return (cfg.bridgeToken && cfg.bridgeToken !== "PASTE_BRIDGE_TOKEN_HERE") ? cfg.bridgeToken : "";
+}
+
 async function fetchPolicy() {
   const cfg = self.DHRITI_CONFIG;
+  const token = await getEffectiveToken();
   try {
     const resp = await fetch(cfg.bridgeUrl + "/policy", {
-      headers: { "X-Dhriti-Token": cfg.bridgeToken },
+      headers: { "X-Dhriti-Token": token },
       cache: "no-store",
     });
     if (!resp.ok) throw new Error("status " + resp.status);
@@ -110,11 +122,12 @@ async function postEvent(url, title, tabId) {
   });
   // cap the queue: a dead daemon must not grow memory forever
   const trimmed = queue.slice(-MAX_QUEUE);
+  const token = await getEffectiveToken();
   try {
     const resp = await fetch(cfg.bridgeUrl + "/events", {
       method: "POST",
       headers: {
-        "X-Dhriti-Token": cfg.bridgeToken,
+        "X-Dhriti-Token": token,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ events: trimmed }),
@@ -130,11 +143,12 @@ async function postTypedEvent(event) {
   /** Typed events keep their type: surface_suppressed reaches the
    * ledger as itself (D-024), not as a generic navigation. */
   const cfg = self.DHRITI_CONFIG;
+  const token = await getEffectiveToken();
   try {
     await fetch(cfg.bridgeUrl + "/events", {
       method: "POST",
       headers: {
-        "X-Dhriti-Token": cfg.bridgeToken,
+        "X-Dhriti-Token": token,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -196,6 +210,33 @@ async function closeBlockedTabs(policy) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "BRIDGE_REQ") {
+    (async () => {
+      const cfg = self.DHRITI_CONFIG || {};
+      const url = (cfg.bridgeUrl || "http://127.0.0.1:7311") + (msg.endpoint || "");
+      const stored = await chrome.storage.local.get("token");
+      const tok = (stored && stored.token) || ((cfg.bridgeToken && cfg.bridgeToken !== "PASTE_BRIDGE_TOKEN_HERE") ? cfg.bridgeToken : "");
+      try {
+        const resp = await fetch(url, {
+          method: msg.method || "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Dhriti-Token": tok,
+          },
+          body: msg.body ? JSON.stringify(msg.body) : undefined,
+        });
+        if (!resp.ok) {
+          sendResponse(null);
+          return;
+        }
+        const data = await resp.json();
+        sendResponse(data);
+      } catch (e) {
+        sendResponse(null);
+      }
+    })();
+    return true; // async
+  }
   if (msg && msg.type === "is_enforcing") {
     chrome.storage.local.get(POLICY_KEY).then((stored) => {
       const cached = stored[POLICY_KEY];

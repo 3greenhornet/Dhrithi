@@ -1,0 +1,36 @@
+# ==============================================================================
+# Dhriti (v0.7.0 + Guard Kit v1.1) — Production & Development Requirements
+#
+# DESIGN LAW COMPLIANCE:
+# Core commitment enforcement (CLI, daemon, SQLite ledger, state machine)
+# relies strictly on Python 3.9+ standard library (Zero-Breakage Principle).
+# The packages below power the hardware-accelerated 2026 AI Guard, Vector KNN,
+# FastEmbed ONNX inference, and comprehensive test suite.
+# ==============================================================================
+
+# --- Hardware-Accelerated Vector & Inference Stack (FastEmbed ONNX) ---
+# Fast CPU embeddings (~15ms per prompt, quantized BGE-small, 40MB RAM)
+fastembed>=0.9.1
+
+# SQLite native vector search extension (C-accelerated vector SIMD KNN)
+sqlite-vec>=0.1.9
+
+# Ultra-fast cross-platform ONNX runtime backend
+onnxruntime>=1.20.0
+
+# Vector normalization, cosine distances & centroid arithmetic
+numpy>=1.24.0
+
+# --- Optional / Power-User Machine Learning & Monitoring ---
+# (Uncomment if using PyTorch alternative backends or Process Mining)
+# torch>=2.0.0
+# transformers>=4.40.0
+# scikit-learn>=1.3.0
+# activitywatch-client>=0.1.0
+# pm4py>=2.7.0
+
+# --- Testing & Quality Assurance ---
+pytest>=7.0.0
+pytest-cov>=4.0.0
+ruff>=0.3.0
+

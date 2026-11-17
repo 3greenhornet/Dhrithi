@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||images.google.com^",
+      "resourceTypes": ["main_frame", "sub_frame", "image", "xmlhttprequest", "media", "websocket", "other"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||lens.google.com^",
+      "resourceTypes": ["main_frame", "sub_frame", "image", "xmlhttprequest", "media", "websocket", "other"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "regexFilter": "^https?://(?:www\\.)?google\\.[a-z]{2,3}(?:\\.[a-z]{2,3})?/(?:imghp|imgres).*$",
+      "resourceTypes": ["main_frame", "sub_frame", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "regexFilter": "^https?://(?:www\\.)?google\\.[a-z]{2,3}(?:\\.[a-z]{2,3})?/search\\?(?:[^#]*&)?(?:tbm=isch|udm=2)(?:[&#]|$).*$",
+      "resourceTypes": ["main_frame", "sub_frame", "xmlhttprequest"]
+    }
+  },
+  {
+    "id": 5,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "regexFilter": "^https?://encrypted-tbn\\d\\.gstatic\\.com/.*$",
+      "resourceTypes": ["image", "sub_frame", "xmlhttprequest", "media", "other"]
+    }
+  }
+]

@@ -7,9 +7,30 @@ name = "dhriti"
 version = "0.7.0"
 description = "Dhriti - local-first commitment-enforcement experiment (externalized will, not a coach)"
 requires-python = ">=3.9"
-# Intentionally EMPTY: the core is pure standard library so enforcement
-# never breaks because a dependency failed to install (fail-proof rule).
+# Core is pure standard library so enforcement never breaks if dependencies fail (fail-proof rule).
 dependencies = []
+
+[project.optional-dependencies]
+guard = [
+    "fastembed>=0.9.1",
+    "sqlite-vec>=0.1.9",
+    "onnxruntime>=1.20.0",
+    "numpy>=1.24.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.3.0",
+]
+all = [
+    "fastembed>=0.9.1",
+    "sqlite-vec>=0.1.9",
+    "onnxruntime>=1.20.0",
+    "numpy>=1.24.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.3.0",
+]
 
 [project.scripts]
 dhriti = "dhriti.cli:main"

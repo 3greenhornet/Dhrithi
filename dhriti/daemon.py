@@ -208,13 +208,35 @@ class Daemon:
                 if adapter.name == "extension_bridge":
                     adapter.note_extension_seen()
 
+        from types import SimpleNamespace
+        from .content_store import ContentStore
+        from .chat_guard import GuardState, GuardMode
+        from .bridge_additions import guard_emit
+
+        guard_store = ContentStore(str(self.home / "guard_content.sqlite3"))
+        raw = guard_store.kv_get("guard_state")
+        guard_state = (GuardState.from_snapshot(raw) if raw else
+                       GuardState(mode=GuardMode.CHECKPOINT,
+                                  topic_label="",
+                                  prompt_budget_limit=self.config.get("guard", {}).get(
+                                      "prompt_budget_per_pass", 15)))
+
+        guard_ctx = SimpleNamespace(
+            store=guard_store,
+            state=guard_state,
+            config=self.config,
+            emit=lambda ev: guard_emit(self.ledger, ev),
+            daemon=self,
+        )
+
         return BridgeServer(
             host=cfg.get("host", "127.0.0.1"),
             port=int(cfg.get("port", 7311)),
             token=token,
             state=self._bridge_state,
             ledger=self.ledger,
-            on_event=on_event)
+            on_event=on_event,
+            guard_ctx=guard_ctx)
 
     def _current_extension_policy(self) -> Optional[dict]:
         """What the bridge serves at /policy right now. Dormant unless a
@@ -624,16 +646,25 @@ class Daemon:
             row = self.db.query_one(
                 "SELECT payload_json FROM contract WHERE id=?",
                 (active.get("contract_id"),))
+            capsule = None
+            if active.get("outcome_json"):
+                try:
+                    capsule = json.loads(active["outcome_json"]).get("resume_capsule")
+                except Exception:
+                    capsule = None
+            topic_str = active.get("task")
             if row:
                 try:
                     payload = json.loads(row["payload_json"])
-                    session_topic = {
-                        "topic": payload.get("contract_line"),
-                        "session_id": active["id"],
-                        "expires_at": day["window_end_at"] if day
-                        else None}
+                    topic_str = topic_str or payload.get("contract_line")
                 except Exception:
-                    session_topic = None
+                    pass
+            session_topic = {
+                "topic": topic_str or "Active work session",
+                "session_id": active["id"],
+                "expires_at": day["window_end_at"] if day else None,
+                "resume_capsule": capsule
+            }
         self._bridge_state.publish_policy(self._current_extension_policy())
         self._bridge_state.publish_status({
             "daemon": "running",
@@ -670,7 +701,8 @@ class Daemon:
     def start_session(self, task: str, evidence_spec: str = "",
                       profile_name: str = "coding",
                       work_mode: WorkMode = WorkMode.CLOSED_WORLD,
-                      condition: str = None) -> dict:
+                      condition: str = None, next_action: str = "",
+                      blocker: str = "") -> dict:
         """Full DRAFT -> SEALED -> ARMING -> ACTIVE flow with the arming
         gate. Returns the session row (or raises StateError)."""
         self._check_config_drift()   # D-050: drift visible, never hot-loaded
@@ -694,7 +726,8 @@ class Daemon:
                 "day is OPEN")
         self.breaks.check_session_start_allowed()
         contract = self.days.contracts.require_sealed_daily(today)
-        session = self.sessions.create(day["id"], contract["id"], task)
+        session = self.sessions.create(day["id"], contract["id"], task,
+                                       next_action=next_action, blocker=blocker)
         session = self.sessions.seal(session["id"])
 
         # policy snapshot: contract + profile + mode + research sources
@@ -804,6 +837,16 @@ class Daemon:
             session_id, SessionState.INCOMPLETE, note=note)
         self.ledger.record("session_incomplete", session_id=session_id)
         return result
+
+    def checkpoint_session(self, session_id: str, next_action: str = "",
+                           blocker: str = "", artifact: str = "") -> dict:
+        sess = self.sessions.checkpoint(session_id, next_action=next_action,
+                                        blocker=blocker, artifact=artifact)
+        self.ledger.record("session_checkpointed", session_id=session_id,
+                           observed={"next_action": next_action, "blocker": blocker},
+                           action_taken="resume capsule recorded")
+        self._publish()
+        return sess
 
     def run_aftermath(self, day_date_iso: str) -> dict:
         day = self.db.query_one(

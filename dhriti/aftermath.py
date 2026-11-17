@@ -245,11 +245,43 @@ class AftermathService:
         self._exchange_block(lines, data)
         self._identity_revision_block(lines, data)
         self._complexity_budget_block(lines, data)
+        self._guard_block(lines, data)
         self._review_block(lines, data)
         self._absence_block(lines, data)
         lines.append("Coverage missing: taper decisions need 30+ "
                      "days of data; correlations appear when the "
                      "weeks exist.")
+        lines.append("")
+
+    def _guard_block(self, lines, data):
+        """Guard Kit telemetry: park:break ratio, active mode, and interruption stage (D-071..D-089)."""
+        from .guard_metrics import park_break_ratio, render_guard_block, kill_chain_attribution
+        from .content_store import ContentStore
+        from .chat_guard import GuardState, snapshot_for_digest
+        import time
+
+        parks_count = len(data.get("parks") or [])
+        breaks_count = len(data.get("breaks") or [])
+        ratio = park_break_ratio([{"label": data.get("date", "today"), "parks": parks_count, "breaks": breaks_count}])
+        chain = kill_chain_attribution(data.get("events") or [])
+
+        guard_db_path = self.db.path.parent / "guard_content.sqlite3" if hasattr(self.db, "path") and self.db.path else None
+        snap = {}
+        if guard_db_path and guard_db_path.exists():
+            try:
+                store = ContentStore(str(guard_db_path))
+                raw = store.kv_get("guard_state")
+                if raw:
+                    st = GuardState.from_snapshot(raw)
+                    snap = snapshot_for_digest(st, time.time())
+            except Exception:
+                pass
+        if not snap:
+            snap = {"mode": "CHECKPOINT", "prompt_budget_used": 0, "prompt_budget_limit": 15,
+                    "debt_value": 0.0, "debt_ceiling": 10.0, "open_threads": []}
+
+        block_text = render_guard_block(snap, ratio, chain, [])
+        lines.append(block_text)
         lines.append("")
 
     def _record_block(self, lines, data):

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dhriti Dashboard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Header: Bridge Status & Mode -->
+    <header class="header">
+      <div class="brand">
+        <div id="bridge-dot" class="brand-dot" title="127.0.0.1:7311"></div>
+        <div>
+          <span class="brand-title">Dhriti</span>
+          <span class="brand-meta" id="bridge-meta">127.0.0.1:7311</span>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge badge-open" id="day-badge">DAY: OPEN</span>
+        <span class="badge badge-mode" id="guard-badge">CHECKPOINT</span>
+      </div>
+    </header>
+
+    <!-- 1. Current Session State & Countdown Timer -->
+    <section class="card session-card">
+      <div class="session-top">
+        <div class="state-pill" id="session-state">
+          <span class="pip"></span>
+          <span id="session-state-text">IDLE</span>
+        </div>
+        <span class="meta-bounds" id="window-bounds">10:00–21:00</span>
+      </div>
+
+      <div class="timer-row">
+        <div class="timer-digits" id="timer-display">--:--</div>
+        <div class="timer-label" id="timer-label">No Active Session</div>
+      </div>
+
+      <div class="progress-track">
+        <div class="progress-bar" id="session-progress"></div>
+      </div>
+
+      <div class="task-box">
+        <div class="task-label">Current Work Line</div>
+        <div class="task-text" id="session-task-text">No active session</div>
+        <div class="resume-capsule" id="capsule-box" style="display:none; margin-top:6px; font-size:12px; color:#4ade80; border-top:1px dashed rgba(255,255,255,0.12); padding-top:4px;">
+          <span style="opacity:0.75;">Next: </span><span id="capsule-next"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Inline Action Drawer (Zero-jump Capture) -->
+    <div class="drawer" id="action-drawer">
+      <div class="drawer-header" id="drawer-title">Park a Thought</div>
+      <input type="text" class="drawer-input" id="drawer-input" placeholder="Type question or thought..." autocomplete="off">
+      <div class="drawer-actions">
+        <button class="btn btn-sm" id="drawer-cancel">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="drawer-submit">Confirm</button>
+      </div>
+    </div>
+
+    <!-- 2. Quick Action Buttons Grid -->
+    <nav class="actions-grid">
+      <button class="btn btn-primary" id="btn-session">
+        <span class="icon" id="btn-session-icon">▶</span>
+        <span id="btn-session-text">Start Session</span>
+      </button>
+      <button class="btn" id="btn-park">
+        <span class="icon">💡</span>
+        <span>Park a Thought</span>
+      </button>
+      <button class="btn" id="btn-leisure">
+        <span class="icon">☕</span>
+        <span>Declare Leisure</span>
+      </button>
+      <button class="btn" id="btn-research">
+        <span class="icon">🔍</span>
+        <span>Quick Research</span>
+      </button>
+    </nav>
+
+    <!-- 3. Guard Status Indicators (ChatGuard) -->
+    <section class="card guard-card">
+      <div class="guard-header">
+        <span class="guard-title">Guard Governors (ChatGuard)</span>
+        <span class="guard-sidecar" id="sidecar-status">Sidecar: OFFLINE</span>
+      </div>
+
+      <div class="guard-grid">
+        <!-- Prompt Budget Indicator -->
+        <div class="guard-cell">
+          <div class="cell-head">
+            <span>Pass Budget</span>
+            <span id="budget-ratio">15 / 15</span>
+          </div>
+          <div class="cell-val" id="budget-val">15 rem</div>
+          <div class="mini-bar-track">
+            <div class="mini-bar-fill bar-blue" id="budget-bar"></div>
+          </div>
+        </div>
+
+        <!-- Burst Cooldown Indicator -->
+        <div class="guard-cell">
+          <div class="cell-head">
+            <span>Burst Cooldown</span>
+            <span id="burst-count">0 in 10m</span>
+          </div>
+          <div class="cell-val tag-idle" id="burst-status">● Idle (0s)</div>
+          <div class="mini-bar-track">
+            <div class="mini-bar-fill bar-green" id="burst-bar"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Transient Feedback Toast -->
+    <div class="toast" id="toast"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
+

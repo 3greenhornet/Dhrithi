@@ -2,7 +2,8 @@
  * Dhriti Wall — configuration.
  *
  * MANUAL STEP (the only one): after `dhriti init`, copy the token from
- * <dhriti-home>/bridge_token below. Then load this folder unpacked:
+ * <dhriti-home>/bridge_token below (or set via chrome.storage.local).
+ * Then load this folder unpacked:
  * chrome://extensions -> Developer mode -> Load unpacked.
  *
  * The extension has no options page, no popup, no badges with counts,

@@ -126,11 +126,12 @@ class TestWorkspaceResolution(DhritiTestCase):
         self.assertEqual(row["detail"]["sha256"], expected)
 
     def test_machine_command_runs_in_workspace(self):
+        import sys
         workspace = self.home / "workspace"
         workspace.mkdir()
-        (workspace / "Makefile").write_text("test:\n\ttrue\n",
-                                            encoding="utf-8")
+        (workspace / "flag.txt").write_text("ok", encoding="utf-8")
         session = self.start_session()
+        cmd = f'"{sys.executable}" -c "import os, sys; sys.exit(0 if os.path.exists(\'flag.txt\') else 1)"'
         row = self.evidence.machine_check_command(
-            session["id"], "target", "make test", workspace=workspace)
+            session["id"], "target", cmd, workspace=workspace)
         self.assertEqual(row["verdict"], "ACCEPTED")

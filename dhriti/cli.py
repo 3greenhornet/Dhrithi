@@ -342,22 +342,55 @@ def cmd_session(args, ctx):
     if args.sub == "start":
         daemon = Daemon(ctx.home, config=ctx.config, clock=ctx.clock)
         try:
-            sess = daemon.start_session(args.task)
+            sess = daemon.start_session(args.task,
+                                        next_action=getattr(args, "next", ""),
+                                        blocker=getattr(args, "blocker", ""))
             print(f"active: {sess['id']}")
             print(f"task: {args.task}")
+            if getattr(args, "next", ""):
+                print(f"next: {args.next}")
+            if getattr(args, "blocker", ""):
+                print(f"blocker: {args.blocker}")
         finally:
             daemon.release_lock()
             daemon.db.close()
         return
-    active = ctx.sessions.active() if args.sub in ("end", "status") \
+    active = ctx.sessions.active() if args.sub in ("end", "status", "checkpoint") \
         else None
     if args.sub == "status":
         if active:
             print(f"ACTIVE {active['id'][:8]}")
             print(f"task   {active['task']}")
             print(f"since  {active['started_at']}")
+            if active.get("outcome_json"):
+                try:
+                    cap = json.loads(active["outcome_json"]).get("resume_capsule")
+                    if cap:
+                        if cap.get("next_action"):
+                            print(f"next   {cap['next_action']}")
+                        if cap.get("blocker"):
+                            print(f"block  {cap['blocker']}")
+                except Exception:
+                    pass
         else:
             print("no active session")
+    elif args.sub == "checkpoint":
+        if not active:
+            print("no active session to checkpoint")
+            return
+        daemon = Daemon(ctx.home, config=ctx.config, clock=ctx.clock)
+        try:
+            sess = daemon.checkpoint_session(active["id"],
+                                            next_action=getattr(args, "next", ""),
+                                            blocker=getattr(args, "blocker", ""))
+            print(f"checkpointed session: {sess['id'][:8]}")
+            if getattr(args, "next", ""):
+                print(f"next action: {args.next}")
+            if getattr(args, "blocker", ""):
+                print(f"blocker:     {args.blocker}")
+        finally:
+            daemon.release_lock()
+            daemon.db.close()
     elif args.sub == "end":
         if not active:
             print("no active session")
@@ -736,6 +769,9 @@ def cmd_parking(args, ctx):
             age = (ctx.clock.now_utc()
                    - parse_iso(row["created_at"])).days
             print(f"- [{row['kind']}] {row['question']} ({age} days)")
+    elif args.sub == "clean":
+        archived = ctx.parking.auto_archive_expired(max_age_days=getattr(args, "ttl", 7.0))
+        print(f"DLQ TTL clean: composted {len(archived)} stale items (>={getattr(args, 'ttl', 7.0)}d).")
 
 
 def cmd_parking_dispose(args, ctx):
@@ -1620,6 +1656,99 @@ def cmd_digest_v070(args, ctx):
     print(f"digest written: {out}")
 
 
+# ---------------------------------------------------------------- guard kit (D-071..D-089)
+def cmd_retention(args, ctx):
+    from .content_store import ContentStore
+    from .retention import cmd_retention as _run_retention
+    store = ContentStore(str(ctx.home / "guard_content.sqlite3"))
+    ret_cfg = ctx.config.get("retention", {})
+    return _run_retention(args, ret_cfg, store)
+
+
+def cmd_guard_status(args, ctx):
+    from .content_store import ContentStore
+    from .chat_guard import GuardState, GuardMode, snapshot_for_digest
+    import time
+    store = ContentStore(str(ctx.home / "guard_content.sqlite3"))
+    raw = store.kv_get("guard_state")
+    if not raw:
+        print("guard state: dormant / not initialized")
+        return
+    st = GuardState.from_snapshot(raw)
+    snap = snapshot_for_digest(st, time.time())
+    print(f"Guard Mode: {st.mode.value}")
+    print(f"Prompt budget: {snap.get('prompt_budget_remaining', 0)} / {snap.get('prompt_budget_limit', 0)}")
+    print(f"Burst active: {snap.get('burst_toll_active', False)}")
+    print(f"Debt: {snap.get('debt_accumulated', 0.0):.2f}")
+    print(f"Sidecar armed: {st.sidecar_armed}")
+
+
+def cmd_canary(args, ctx):
+    import os
+    from pathlib import Path
+    from .canary import check_e2_canary, audit_hosts_entries
+    canary_cfg = ctx.config.get("canary", {})
+    hostname = canary_cfg.get("e2_hostname", "dhriti-canary.invalid")
+    res = check_e2_canary(hostname)
+    print(f"E2 canary ({hostname}): status={res.get('status')} ok={res.get('ok')} detail={res.get('detail')}")
+    if getattr(args, "hosts_audit", False):
+        hosts_path = (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "drivers" / "etc" / "hosts"
+                      if os.name == "nt" else Path("/etc/hosts"))
+        content = hosts_path.read_text(encoding="utf-8", errors="ignore") if hosts_path.exists() else ""
+        report = audit_hosts_entries(content)
+        findings = report.get("findings", [])
+        print(f"Hosts file audit ({hosts_path}): {len(findings)} findings (bypass_risk={report.get('bypass_risk')})")
+        for f in findings:
+            line_str = f"line {f.get('line')}" if f.get('line') else "general"
+            print(f"  [{f.get('kind')}] {line_str}: {f.get('detail')}")
+
+
+def cmd_conform(args, ctx):
+    from .conform import build_normative, stdlib_check, pm4py_check
+    today = getattr(args, "date", None) or _local_today(ctx)
+    events = ctx.ledger.events(since_utc=today)
+    normalized = [{"type": e.get("event_type", ""), "ts": e.get("occurred_at_utc", "")} for e in events]
+    window = ctx.config.get("day_window", {"start": "10:00", "end": "21:00", "day_close": "20:00"})
+    stages = build_normative(window)
+    res = stdlib_check(normalized, stages)
+    print(f"Conformance report for {today}: conformant={res.get('conformant')}")
+    for d in res.get("deviations", []):
+        print(f"  deviation: {d['kind']} in {d.get('stage')} ({d.get('detail')})")
+    if getattr(args, "pm4py", False):
+        pm = pm4py_check(normalized)
+        print(f"PM4Py token replay: {pm}")
+
+
+def cmd_crosscheck(args, ctx):
+    from .observer_crosscheck import poll_activitywatch, browser_minutes_from_aw, hourly_conflict_scan
+    today = _local_today(ctx)
+    nav_events = [e for e in ctx.ledger.events(since_utc=today) if "nav" in e.get("event_type", "")]
+    nav_count = len(nav_events)
+    aw_data = poll_activitywatch()
+    browser_mins = browser_minutes_from_aw((aw_data or {}).get("events"))
+    conflicts = hourly_conflict_scan([{"hour": "today", "aw_browser_minutes": browser_mins, "ext_nav_events": nav_count}])
+    print(f"Sensor crosscheck: AW minutes={browser_mins:.1f}, extension navs={nav_count}")
+    if conflicts:
+        print(f"Sensor conflicts detected: {conflicts}")
+    else:
+        print("No sensor conflict detected.")
+
+
+def cmd_app(args, ctx):
+    """Launch the Dhriti desktop application window (Chromium app mode)."""
+    from .app import launch_desktop_app
+    launch_desktop_app()
+
+
+def cmd_sidecar(args, ctx):
+    """Run loopback classifier sidecar (escalate-only sensor)."""
+    from .bridge import ensure_token
+    from .classifier_sidecar.server import serve
+    token = ensure_token(ctx.home)
+    port = getattr(args, "port", 8765)
+    serve(port=port, token=token)
+
+
 # ---------------------------------------------------------------- plumbing
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -1656,8 +1785,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_day)
 
     p = sub.add_parser("session", help="work sessions")
-    p.add_argument("sub", choices=["start", "end", "status"])
+    p.add_argument("sub", choices=["start", "end", "status", "checkpoint"])
     p.add_argument("--task", default="")
+    p.add_argument("--next", default="", help="immediate next physical action (Resume Capsule)")
+    p.add_argument("--blocker", default="", help="current stuck point / blocker")
     p.add_argument("--profile", default="coding")
     p.add_argument("--condition", default=None,
                    help="experiment condition tag A-E")
@@ -1771,6 +1902,8 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--date", default=None)
     rv = psub.add_parser("review",
                          help="surface older open items (cold)")
+    cl = psub.add_parser("clean", help="dead-letter queue TTL prune for stale items")
+    cl.add_argument("--ttl", type=float, default=7.0, help="TTL in days (default: 7.0)")
     p.set_defaults(func=cmd_parking)
 
     p = sub.add_parser("parking-dispose", help="dispose a parked item")
@@ -1994,6 +2127,40 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--config", required=True)
     p.add_argument("--weeks", type=int, default=1)
     p.set_defaults(func=cmd_policy_replay)
+
+    # Guard Kit commands (D-071..D-089)
+    p = sub.add_parser("retention", help="purge expired raw text (D-075)")
+    p.add_argument("--purge-raw-after", type=int, default=None)
+    p.add_argument("--execute", action="store_true")
+    p.set_defaults(func=cmd_retention)
+
+    p = sub.add_parser("guard", help="conversation guard status and mode")
+    gsub = p.add_subparsers(dest="guard_cmd")
+    g = gsub.add_parser("status")
+    g.set_defaults(func=cmd_guard_status)
+    p.set_defaults(func=cmd_guard_status)
+
+    p = sub.add_parser("canary", help="canary checks (D-081/D-087)")
+    csub = p.add_subparsers(dest="canary_cmd")
+    c = csub.add_parser("check")
+    c.add_argument("--hosts-audit", action="store_true")
+    c.set_defaults(func=cmd_canary)
+    p.set_defaults(func=cmd_canary)
+
+    p = sub.add_parser("conform", help="deviation check against normative contract (D-083)")
+    p.add_argument("--date", default=None)
+    p.add_argument("--pm4py", action="store_true")
+    p.set_defaults(func=cmd_conform)
+
+    p = sub.add_parser("crosscheck", help="sensor disagreement scan (D-080)")
+    p.set_defaults(func=cmd_crosscheck)
+
+    p = sub.add_parser("app", help="launch dedicated Dhriti desktop application window")
+    p.set_defaults(func=cmd_app)
+
+    p = sub.add_parser("sidecar", help="run loopback classifier sidecar (escalate-only sensor)")
+    p.add_argument("--port", type=int, default=8765, help="port to bind (default: 8765)")
+    p.set_defaults(func=cmd_sidecar)
 
     return parser
 

@@ -72,6 +72,26 @@ DEFAULT_PROFILES = {
                                "news", "shopping", "entertainment"],
         "research_bounds": {"max_minutes": 15, "max_sources": 5},
     },
+    "placement_prep": {
+        "allowed_domains": [
+            "gitam.edu", "login.gitam.edu", "vtop.gitam.edu",
+            "linkedin.com", "www.linkedin.com",
+            "quantguide.io", "www.quantguide.io",
+            "github.com", "gist.github.com",
+            "chatgpt.com", "chat.openai.com", "claude.ai",
+            "gemini.google.com", "chat.deepseek.com",
+            "music.youtube.com",
+            "docs.oracle.com", "geeksforgeeks.org", "leetcode.com",
+            "hackerrank.com", "stackoverflow.com",
+        ],
+        "allowed_apps": [
+            "code.exe", "code", "java.exe", "javac.exe", "python.exe",
+            "python3", "pwsh.exe", "powershell.exe", "wt.exe", "cmd.exe",
+            "chrome.exe", "msedge.exe", "brave.exe",
+        ],
+        "blocked_categories": ["games", "shopping", "entertainment"],
+        "research_bounds": {"max_minutes": 25, "max_sources": 6},
+    },
 }
 
 # Editable category lists. Domains match on the registrable suffix

@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Dhriti ChatGuard",
+  "version": "0.1.0",
+  "description": "Content-blind-by-default conversation guard. Structural governors always; semantic layer is an armed, optional sensor (L-9).",
+  "permissions": ["storage", "alarms", "webRequest"],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://claude.ai/*"
+  ],
+  "background": { "service_worker": "chatguard_background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": ["chatguard_content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

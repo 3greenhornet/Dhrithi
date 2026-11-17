@@ -12,31 +12,28 @@ silently. The mind obeys or breaks glass. That is the whole product.
 
 ---
 
+## Architecture Overview
+
+![Dhriti Architecture](docs/dhriti_architecture.png)
+
+---
+
 ## What this repository is
 
-The v1 ("Lite tier") build of the design carried in
-`source-material/` — the 95-page Project Dhriti knowledge dump, the
-research dossier, the decision register, the source register and the
-manual audit queue — **docked with the implementation plan v2.0 and
-Specimen 001** (the raw avoidance-loop transcript of 2026-11-03; see
-`analysis/specimens/`). Every item from those materials is either
-**implemented here**, **a deliberate audit-gated placeholder**, or
-**explicitly excluded with a reason** — the full mapping is
-`docs/TRACEABILITY.md`, the v2.1 docking record is
-`docs/DECISIONS_PROPOSED.md`.
+The v0.7.0 build of Dhriti docked with Guard Kit v1.1, the 204-page Project Dhriti
+knowledge dossier, decision register (D-001..D-090), and Specimen 001.
 
-| Piece | Status |
-|---|---|
-| Core (contracts, state machine, day-window, break-glass + emergency path, proof, ledger, bootcamp/taper, reports) | **implemented + 116 passing tests**, pure Python stdlib, zero dependencies |
-| Cold-state surfaces (main-belief contracts D-030, parking lot, six-question review + conditional leisure question, weekly digest) | **implemented** — the mirror half of the system |
-| The behavioral-reference batch (stage ratio D-046, declared leisure D-047, evening observation D-048 ‹off›, earned evening D-049 ‹off›, design laws L-1..L-6) | **implemented (v0.3.0)** — the specimen's own vocabulary |
-| E1 enforcement (MV3 extension "Dhriti Wall": domain blocking + **surface suppression D-024 incl. Google AI Mode D-044** + tab closure at arming) | **implemented**; one manual step: paste the bridge token |
-| E2 (hosts DNS block) | generator live; apply/remove = one admin PowerShell script |
-| Observation (ActivityWatch / Sysmon / Screenpipe) | real clients + narrow config shipped; disabled until you install (guides included) |
-| External backends (FocusMe, Cold Turkey, Plucky, Focuser) | config-driven placeholder adapters, refused until your audit passes (your rule, D-005/D-006) |
-| Analysis (process mining, N-of-1 measures, labeling, **specimen coding**) | implemented in pure Python; PM4Py optional |
-| Formal model (TLA+) | spec written; TLC run is your manual step |
-| Vision-model proof | **disabled placeholder** — needs your API key; can never be the sole proof |
+| Piece | Status | Implementation Details |
+|---|---|---|
+| **Core Runtime** | **v0.7.0 Active** | Contracts, state machines, day-window, break-glass friction ladder, evidence verifier, append-only hash chain, bootcamp taper. Pure Python stdlib (Zero-Breakage Principle). |
+| **Desktop Application** | **Integrated** | Standalone Chromium window (`Launch-Dhriti-App.bat`) in `--app` mode with live countdown, prompt budget meters, action drawers, and auto-token binding. |
+| **AI Conversation Guard** | **Active (Guard Kit v1.1)** | ChatGuard content scripts for ChatGPT/Claude/Gemini/DeepSeek, send gate, burst toll limiter, response length governor, "Allow & Learn" active learning, and completion tail dimming. |
+| **Vector Engine & Sidecar** | **2026 Accelerated Stack** | `fastembed` ONNX CPU embeddings (~15ms inference), `sqlite-vec` hardware-accelerated KNN, and Dual-Anchor Margin Scoring ($\text{Sim}(p, A_{\text{block}}) - \text{Sim}(p, A_{\text{safe}})$). |
+| **Anti-Springboard Math** | **Implemented** | Algorithmic inversion of Pinterest Pixie random walks, YouTube UCB uncertainty inflation, and MMR marginal divergence to halt curiosity rabbit holes. |
+| **Return Anchor** | **Implemented** | Session Resume Capsule (`next_action`, `blocker`, `checkpoint()`) eliminating cognitive cold-start friction upon returning to work. |
+| **Google Images Vertical Exile** | **Implemented (D-082)** | Layer-0 Windows registry policy (incognito closure + DoH off + URLBlocklist) + 3 defense rings. See `docs/GOOGLE_IMAGES_EXILE.md`. |
+| **Cold-State Mirror** | **Implemented (Vidura)** | Recall-before-reveal saved intent mirror, search-escape detector, declared leisure vs drift, and Life Mirror offline alternatives. |
+| **Serendipity Instrumentation** | **Reference (D-090)** | Standalone simulation of Thompson sampling, UCB1, MMR, and slot routing in `scripts/dhriti_reveal_policy_reference.py`. |
 
 ## Quick start
 

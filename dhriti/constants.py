@@ -284,6 +284,34 @@ DEFAULT_CONFIG = {
     "report": {
         "dir": "reports",
     },
+    # Dhriti Guard Kit (v1.1 additions per D-071..D-089)
+    "guard": {
+        "prompt_budget_per_pass": 15,
+        "burst": {"window_minutes": 10, "threshold": 3,
+                  "toll_seconds": 10, "cooldown_minutes": 10},
+        "debt": {"ceiling": 10.0, "accrual_per_event": 1.0,
+                 "daily_decay": 0.5},
+        "taper_schmitt": {"down_days": 3, "up_immediate": True},
+        "length_limit_chars": 300,
+        "pivot_budget": {"full_lock": 0, "reduced_lock": 1,
+                         "checkpoint": None, "advisory": None},
+    },
+    "guard_sidecar": {
+        "enabled": False,  # L-6: cold-state consent; off by default
+        "host": "127.0.0.1",
+        "port": 8765,
+    },
+    "retention": {
+        "raw_text_days": 14,  # D-075: purge raw text after 14 days
+    },
+    "canary": {
+        "e2_hostname": "dhriti-canary.invalid",
+        "dom": True,
+    },
+    "metrics": {
+        "park_break_floor": 2.0,
+        "novelty_threshold": 3,
+    },
 }
 
 

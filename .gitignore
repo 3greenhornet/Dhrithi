@@ -1,19 +1,60 @@
-# Dhriti home contents (personal experiment data - never commit)
-dhriti.sqlite3*
-dhriti.sqlite3-wal
-dhriti.sqlite3-shm
-bridge_token
+# ==============================================================================
+# Dhriti .gitignore — Secrets, Personal Data, Caches, & Runtime Artifacts
+# ==============================================================================
+
+# Personal & Runtime Experiment Data (Never Commit Personal Records)
+*.sqlite3*
+*.sqlite
+*.db
+guard_content.sqlite3*
+bridge_token*
+*.token
 daemon.lock
 hosts/
 extension_last_seen
 reports/
 profiles/ignite.*.json
+*.log
 
-# Python
+# Environment variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Local models and vector cache
+.cache/
+models/
+*.onnx
+
+# Python bytecode, builds, and test caches
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
+*$py.class
 *.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Codebase snapshots & dumps
+*repomix*
+dhrithi-repomix.md
 
 # Demo output is regenerated, not tracked
 examples/demo/out/
