@@ -25,10 +25,14 @@
     }
   }
 
-  // Pentatonic Japanese Akebono / Pythagorean chime scale frequencies (Hz)
+  // Expanded Pentatonic Japanese Akebono / Pythagorean chime scale frequencies (Hz) across 2.5 octaves
   const CHIME_FREQS = [
-    261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50
+    196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 392.00, 440.00, 493.88,
+    523.25, 587.33, 659.25, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51
   ];
+
+  let lastChimeTime = 0;
+  const MIN_CHIME_INTERVAL = 0.045; // 45ms throttle prevents audio buffer clipping
 
   /**
    * Resonant physical wind chime note
@@ -40,18 +44,21 @@
     initAudio();
     if (!ctx) return;
 
+    const now = ctx.currentTime;
+    if (now - lastChimeTime < MIN_CHIME_INTERVAL) return;
+    lastChimeTime = now;
+
     const baseFreq = typeof noteIdx === "number" && noteIdx < CHIME_FREQS.length
       ? CHIME_FREQS[Math.abs(noteIdx) % CHIME_FREQS.length]
       : (typeof noteIdx === "number" ? noteIdx : 440);
 
-    const now = ctx.currentTime;
     const vel = Math.max(0.1, Math.min(1.0, velocity));
 
     // Wind chime harmonic partials (modal ratios for tubular bells: 1.0, 2.76, 5.40)
     const partials = [
-      { mult: 1.00, gain: 0.60 * vel, decay: 2.2 },
-      { mult: 2.76, gain: 0.35 * vel, decay: 1.5 },
-      { mult: 5.40, gain: 0.15 * vel, decay: 0.9 },
+      { mult: 1.00, gain: 0.50 * vel, decay: 2.0 },
+      { mult: 2.76, gain: 0.28 * vel, decay: 1.3 },
+      { mult: 5.40, gain: 0.12 * vel, decay: 0.8 },
     ];
 
     partials.forEach(({ mult, gain, decay }) => {
@@ -61,7 +68,7 @@
       osc.type = "sine";
       osc.frequency.setValueAtTime(baseFreq * mult, now);
 
-      g.gain.setValueAtTime(gain * 0.4, now);
+      g.gain.setValueAtTime(gain * 0.35, now);
       g.gain.exponentialRampToValueAtTime(0.0001, now + decay);
 
       osc.connect(g);
