@@ -349,16 +349,19 @@ body.mode-dashboard .tile-face-back {
   align-items: flex-end;
   justify-content: flex-start;
   padding: 16px;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, filter 0.25s ease;
 }
 
 .tactile-tile:hover .tile-face-front {
   box-shadow: 
-    0 20px 38px rgba(0, 0, 0, 0.48),
-    0 8px 14px rgba(0, 0, 0, 0.28),
-    inset 0 1px 2px rgba(255, 255, 255, 0.6);
-  border-color: rgba(255, 255, 255, 0.45);
-  transform: translateY(-3px) scale(1.008);
+    0 24px 48px rgba(0, 0, 0, 0.55),
+    0 10px 20px rgba(0, 0, 0, 0.35),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.75),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.55);
+  filter: brightness(1.06);
+  /* DO NOT transform or scale: CSS transform breaks background-attachment: fixed */
+  transform: none !important;
 }
 
 .tile-front-badge {
@@ -564,6 +567,64 @@ body.mode-dashboard .poem-section {
   color: var(--text-muted);
 }
 
+.icon-text-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.icon-text-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.poetrydb-status-pill {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.author-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+  padding: 7px 14px;
+  border-radius: 16px;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.author-chip:hover {
+  background: var(--accent-indigo);
+  border-color: var(--accent-indigo);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
 .poem-canvas-container {
   width: 100%;
   max-width: 1400px;
@@ -665,7 +726,7 @@ body.mode-dashboard .poem-section {
   color: #cbd5e1;
   padding: 8px 0;
   font-family: var(--font-serif);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 700;
   border-radius: 8px;
   cursor: pointer;
@@ -687,11 +748,11 @@ body.mode-dashboard .poem-section {
 
 .pomo-btn {
   flex: 1;
-  padding: 12px 0;
+  padding: 13px 0;
   border-radius: 10px;
   border: none;
   font-family: var(--font-serif);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   letter-spacing: 0.5px;
@@ -721,19 +782,19 @@ body.mode-dashboard .poem-section {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .metric-label {
   font-family: var(--font-serif);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   color: #94a3b8;
 }
 
 .metric-val {
   font-family: var(--font-serif);
-  font-size: 16.5px;
+  font-size: 17.5px;
   font-weight: 700;
   color: #ffffff;
 }
@@ -764,18 +825,18 @@ body.mode-dashboard .poem-section {
 
 /* Return Anchor / Resume Capsule */
 .capsule-box {
-  background: rgba(0, 0, 0, 0.32);
+  background: rgba(0, 0, 0, 0.38);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 12px 14px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .capsule-key {
   font-family: var(--font-display);
-  font-size: 12.5px;
+  font-size: 13px;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 1.8px;
   color: var(--accent-amber);
   margin-bottom: 4px;
   font-weight: 400;
@@ -783,10 +844,10 @@ body.mode-dashboard .poem-section {
 
 .capsule-value {
   font-family: var(--font-serif);
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 400;
   color: #f1f5f9;
-  line-height: 1.5;
+  line-height: 1.6;
   word-break: break-word;
 }
 
@@ -800,11 +861,11 @@ body.mode-dashboard .poem-section {
 .drawer-btn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 11px 14px;
+  padding: 13px 16px;
   border-radius: 10px;
   color: #f8fafc;
   font-family: var(--font-serif);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -830,12 +891,12 @@ body.mode-dashboard .poem-section {
 
 .audit-item {
   font-family: var(--font-serif);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 400;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.6;
   border-left: 3px solid var(--accent-cyan);
-  padding-left: 10px;
+  padding-left: 12px;
 }
 
 .audit-time {

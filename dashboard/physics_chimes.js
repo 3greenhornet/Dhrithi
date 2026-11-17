@@ -239,12 +239,12 @@
 
       // 2. Organically Staggered Top Drop:
       // Each chain has an intentionally different drop length before Stanza 1
-      // Chain 0: 4 beads (~60px)  -> Stanza 1 sits near top
-      // Chain 1: 12 beads (~180px) -> Stanza 1 sits 120px lower
-      // Chain 2: 6 beads (~90px)  -> Stanza 1 sits midway
-      // Chain 3: 14 beads (~210px) -> Stanza 1 sits deep
-      // No two stanza blocks across parallel chains are at the same height!
-      const topDropSequence = [4, 12, 6, 14, 5, 10];
+      // Creating pronounced vertical contrast between adjacent chains
+      // Chain 0: 3 beads (~48px)   -> Stanza 1 sits very high (Y ~ 116px)
+      // Chain 1: 15 beads (~240px) -> Stanza 1 sits deep down (Y ~ 308px, a full 192px lower than Chain 0!)
+      // Chain 2: 7 beads (~112px)  -> Stanza 1 sits mid-level (Y ~ 180px, in between!)
+      // Chain 3: 14 beads (~224px) -> Stanza 1 sits lower-mid
+      const topDropSequence = [3, 15, 7, 14, 4, 11];
       const topCount = topDropSequence[this.chainIndex % topDropSequence.length];
 
       for (let i = 0; i < topCount; i++) {
@@ -268,7 +268,11 @@
       // 4. Organically Staggered Bridge Chain between Stanza 1 and Stanza 2
       // Different vertical link count for each chain
       curY += s1HalfHeight + clearance;
-      const midDropSequence = [7, 13, 6, 11, 8, 12];
+      // Staggered Bridge Chain between Stanza 1 and Stanza 2:
+      // Chain 0: 6 beads (~96px)   -> Stanza 2 sits around Y ~ 330px
+      // Chain 1: 14 beads (~224px) -> Stanza 2 sits down around Y ~ 640px!
+      // Chain 2: 8 beads (~128px)  -> Stanza 2 sits around Y ~ 430px
+      const midDropSequence = [6, 14, 8, 13, 7, 12];
       const midCount = midDropSequence[this.chainIndex % midDropSequence.length];
 
       for (let i = 0; i < midCount; i++) {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dhriti — Tactile Dual-Mode Focus Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Arvo:ital,wght@0,400;0,700;1,400;1,700&family=Poiret+One&display=swap" rel="stylesheet">
@@ -412,6 +412,10 @@
         Beaded cultural doorway curtain woven with organic staggered stanzas & multi-shape chimes.<br>
         <strong class="arvo-bold">Glide cursor across doorway beads to part strings • Drag stanza cards to swing & play chimes.</strong>
       </p>
+      <div style="margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+        <button class="icon-text-btn" id="btn-fetch-poetrydb-quick">✨ Fetch Poem (PoetryDB API)</button>
+        <span class="poetrydb-status-pill arvo-regular-italic" id="poetrydb-status-pill">PoetryDB: Rabindranath Tagore — Where the Mind is Without Fear</span>
+      </div>
     </div>
     <div class="poem-canvas-container">
       <canvas id="chimes-canvas"></canvas>
@@ -439,6 +443,7 @@
         <nav class="settings-tabs-nav">
           <button class="tab-btn active" data-tab="tab-art">🖼️ Art & Gallery</button>
           <button class="tab-btn" data-tab="tab-quotes">💬 Hourly Quotes</button>
+          <button class="tab-btn" data-tab="tab-poems">📜 Poetry & PoetryDB</button>
           <button class="tab-btn" data-tab="tab-pomodoro">⏱️ Pomodoro Timer</button>
           <button class="tab-btn" data-tab="tab-bridge">🌐 Dhriti Bridge</button>
         </nav>
@@ -482,6 +487,38 @@
             <label class="form-label">Active Rotation List</label>
             <div class="item-manager-list" id="quotes-manager-list">
               <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+          <!-- Tab 3: Poetry & PoetryDB -->
+          <div class="tab-pane" id="tab-poems">
+            <h3 style="margin-bottom: 8px;">Public Domain Poetry (PoetryDB API)</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+              Live integration with PoetryDB (free, keyless, open-source). Fetches classic public-domain poetry and automatically mounts it into the suspended chimes installation.
+            </p>
+            <div style="margin-bottom: 16px;">
+              <button class="btn-primary" id="btn-fetch-poetrydb-modal" style="padding: 10px 18px; font-size: 14px;">✨ Fetch Random Poem from PoetryDB</button>
+              <div class="poetrydb-status-pill arvo-regular-italic" id="poetrydb-status-modal" style="margin-top: 8px;">Ready to query PoetryDB</div>
+            </div>
+            
+            <label class="form-label">Featured Authors (Instant Load)</label>
+            <div class="author-chip-grid" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+              <button class="author-chip" data-author="Emily Dickinson">Emily Dickinson</button>
+              <button class="author-chip" data-author="Percy Bysshe Shelley">Percy Bysshe Shelley</button>
+              <button class="author-chip" data-author="John Keats">John Keats</button>
+              <button class="author-chip" data-author="William Wordsworth">William Wordsworth</button>
+              <button class="author-chip" data-author="Edgar Allan Poe">Edgar Allan Poe</button>
+              <button class="author-chip" data-author="William Blake">William Blake</button>
+              <button class="author-chip" data-author="Lord Byron">Lord Byron</button>
+              <button class="author-chip" data-author="Walt Whitman">Walt Whitman</button>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Search by Poet Name</label>
+              <div class="form-row">
+                <input type="text" class="form-input" id="custom-author-input" placeholder="e.g. Shakespeare, Milton, Tennyson...">
+                <button class="btn-primary" id="btn-search-author">Search</button>
+              </div>
             </div>
           </div>
 
@@ -531,8 +568,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="audio_synth.js"></script>
-  <script src="physics_chimes.js"></script>
-  <script src="app.js"></script>
+  <script src="audio_synth.js?v=3"></script>
+  <script src="physics_chimes.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

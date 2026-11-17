@@ -292,7 +292,9 @@
       state.currentArtIndex = (state.currentArtIndex + 1) % state.artworks.length;
       applyArtwork(state.currentArtIndex);
 
-      if (window.DhritiChimes && window.DhritiChimes.nextPoemPreset) {
+      if (PoetryDB) {
+        PoetryDB.fetchRandomPoem();
+      } else if (window.DhritiChimes && window.DhritiChimes.nextPoemPreset) {
         window.DhritiChimes.nextPoemPreset();
       }
 
@@ -561,6 +563,194 @@
     }
   }
 
+  // --- PoetryDB API Service ---
+  const PoetryDB = {
+    isFetching: false,
+    currentPoem: null,
+
+    async fetchRandomPoem() {
+      if (this.isFetching) return;
+      this.isFetching = true;
+      this.updateStatus('Fetching poem from PoetryDB...');
+
+      try {
+        const res = await fetch('https://poetrydb.org/random/8');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data) || !data.length) throw new Error('Empty response');
+
+        // Filter for poems with 6 to 36 non-empty lines
+        const validPoems = data.filter(p => {
+          const validLines = (p.lines || []).filter(l => l.trim().length > 0);
+          return validLines.length >= 6 && validLines.length <= 36;
+        });
+
+        const selected = validPoems.length > 0
+          ? validPoems[Math.floor(Math.random() * validPoems.length)]
+          : data[0];
+
+        const formatted = this.parsePoemToStanzas(selected);
+        this.currentPoem = formatted;
+
+        if (window.DhritiPoemChimes) {
+          window.DhritiPoemChimes.setPoem(formatted);
+        }
+
+        this.updateStatus(`Loaded: "${formatted.title}" by ${formatted.author}`);
+        if (window.DhritiAudio) {
+          window.DhritiAudio.playCompletionBell();
+        }
+      } catch (err) {
+        console.warn('[PoetryDB] Fetch failed or offline, cycling curated presets:', err);
+        if (window.DhritiPoemChimes && window.DhritiPoemChimes.nextPoemPreset) {
+          window.DhritiPoemChimes.nextPoemPreset();
+        }
+        const active = window.DhritiPoemChimes ? window.DhritiPoemChimes.getInstance()?.activePoem : null;
+        this.updateStatus(active ? `Offline Archive: "${active.title}"` : 'Loaded offline preset');
+      } finally {
+        this.isFetching = false;
+      }
+    },
+
+    async fetchByAuthor(authorName) {
+      if (!authorName || this.isFetching) return;
+      this.isFetching = true;
+      this.updateStatus(`Searching PoetryDB for ${authorName}...`);
+
+      try {
+        const res = await fetch(`https://poetrydb.org/author/${encodeURIComponent(authorName)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data) || !data.length) throw new Error('No poems found');
+
+        const validPoems = data.filter(p => {
+          const validLines = (p.lines || []).filter(l => l.trim().length > 0);
+          return validLines.length >= 6 && validLines.length <= 36;
+        });
+
+        const pool = validPoems.length > 0 ? validPoems : data;
+        const selected = pool[Math.floor(Math.random() * pool.length)];
+
+        const formatted = this.parsePoemToStanzas(selected);
+        this.currentPoem = formatted;
+
+        if (window.DhritiPoemChimes) {
+          window.DhritiPoemChimes.setPoem(formatted);
+        }
+
+        this.updateStatus(`Loaded: "${formatted.title}" by ${formatted.author}`);
+        if (window.DhritiAudio) {
+          window.DhritiAudio.playCompletionBell();
+        }
+      } catch (err) {
+        console.warn(`[PoetryDB] Author query failed for ${authorName}:`, err);
+        this.updateStatus(`Could not reach PoetryDB for ${authorName}`);
+      } finally {
+        this.isFetching = false;
+      }
+    },
+
+    parsePoemToStanzas(raw) {
+      const title = raw.title || 'Untitled Reflection';
+      const author = raw.author || 'PoetryDB Collection';
+      const lines = raw.lines || [];
+
+      const stanzas = [];
+      let currentStanza = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === '') {
+          if (currentStanza.length > 0) {
+            stanzas.push(currentStanza);
+            currentStanza = [];
+          }
+        } else {
+          currentStanza.push(line);
+          if (currentStanza.length >= 4) {
+            stanzas.push(currentStanza);
+            currentStanza = [];
+          }
+        }
+        if (stanzas.length >= 6) break;
+      }
+
+      if (currentStanza.length > 0 && stanzas.length < 6) {
+        stanzas.push(currentStanza);
+      }
+
+      if (stanzas.length === 1 && stanzas[0].length >= 4) {
+        const half = Math.ceil(stanzas[0].length / 2);
+        stanzas.push(stanzas[0].splice(half));
+      }
+
+      return {
+        title,
+        author,
+        stanzas: stanzas.length > 0 ? stanzas : [['Where the mind is without fear', 'and the head is held high;']]
+      };
+    },
+
+    updateStatus(msg) {
+      const el1 = document.getElementById('poetrydb-status-pill');
+      if (el1) el1.textContent = msg;
+      const el2 = document.getElementById('poetrydb-status-modal');
+      if (el2) el2.textContent = msg;
+    }
+  };
+
+  window.DhritiPoetryDB = PoetryDB;
+
+  function bindPoetryDBEvents() {
+    const btnQuick = document.getElementById('btn-fetch-poetrydb-quick');
+    if (btnQuick) {
+      btnQuick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        PoetryDB.fetchRandomPoem();
+      });
+    }
+
+    const btnModal = document.getElementById('btn-fetch-poetrydb-modal');
+    if (btnModal) {
+      btnModal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        PoetryDB.fetchRandomPoem();
+      });
+    }
+
+    const chips = document.querySelectorAll('.author-chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const author = chip.getAttribute('data-author');
+        if (author) {
+          PoetryDB.fetchByAuthor(author);
+        }
+      });
+    });
+
+    const btnSearchAuthor = document.getElementById('btn-search-author');
+    const inputAuthor = document.getElementById('custom-author-input');
+    if (btnSearchAuthor && inputAuthor) {
+      btnSearchAuthor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const query = inputAuthor.value.trim();
+        if (query) {
+          PoetryDB.fetchByAuthor(query);
+        }
+      });
+      inputAuthor.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const query = inputAuthor.value.trim();
+          if (query) {
+            PoetryDB.fetchByAuthor(query);
+          }
+        }
+      });
+    }
+  }
+
   // --- Bootstrapping ---
   function init() {
     initDOMCache();
@@ -570,6 +760,7 @@
     bindPomodoroEvents();
     bindSettingsModal();
     bindDrawerActions();
+    bindPoetryDBEvents();
 
     // Init Chimes Canvas
     if (window.DhritiChimes) {
