@@ -597,14 +597,19 @@
     bubble.style.left = `${left}vw`;
 
     bubble.innerHTML = `
-      <div class="bubble-icon">✦</div>
+      <div class="bubble-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </div>
       <div class="bubble-content">
         <span class="bubble-tag">Life Alternative (${alt.category})</span>
         <span class="bubble-text">${alt.label}</span>
       </div>
       <div class="bubble-actions">
-        <button class="bubble-btn bubble-btn-did" title="Mark Done">did it ✓</button>
-        <button class="bubble-btn bubble-btn-dismiss" title="Dismiss">✕</button>
+        <button class="bubble-btn bubble-btn-did" title="Mark Done">done</button>
+        <button class="bubble-btn bubble-btn-dismiss" title="Dismiss">dismiss</button>
       </div>
     `;
 
