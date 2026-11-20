@@ -70,12 +70,12 @@
     }
   }
 
-  // --- Ideal Standard Configuration (Harmonious Roomy Draped Installation matching Play panel) ---
+  // --- Ideal Standard Configuration (Spacious, Roomy Draped Installation) ---
   const CONFIG = {
-    width: 492,
-    height: 468,
-    gridW: 36,
-    gridH: 40,
+    width: 1080,
+    height: 760,
+    gridW: 32,
+    gridH: 38,
     gravity: 0.20,
     damping: 0.990,
     iterationsPerFrame: 5,
@@ -109,18 +109,23 @@
     contain(w, h) {
       if (this.pinned) return;
       const radius = 4;
-      if (this.pos.x < radius) {
-        this.pos.x = radius;
+      const minX = -originX + radius;
+      const maxX = (canvasW - originX) - radius;
+      const minY = -originY + radius;
+      const maxY = (canvasH - originY) - radius;
+
+      if (this.pos.x < minX) {
+        this.pos.x = minX;
         this.oldPos.x = this.pos.x + Math.abs(this.oldPos.x - this.pos.x) * 0.8;
-      } else if (this.pos.x > w - radius) {
-        this.pos.x = w - radius;
+      } else if (this.pos.x > maxX) {
+        this.pos.x = maxX;
         this.oldPos.x = this.pos.x - Math.abs(this.oldPos.x - this.pos.x) * 0.8;
       }
-      if (this.pos.y < radius) {
-        this.pos.y = radius;
+      if (this.pos.y < minY) {
+        this.pos.y = minY;
         this.oldPos.y = this.pos.y + Math.abs(this.oldPos.y - this.pos.y) * 0.8;
-      } else if (this.pos.y > h - radius) {
-        this.pos.y = h - radius;
+      } else if (this.pos.y > maxY) {
+        this.pos.y = maxY;
         this.oldPos.y = this.pos.y - Math.abs(this.oldPos.y - this.pos.y) * 0.8;
       }
     }
@@ -145,7 +150,7 @@
       this.acceleration.reset();
 
       if (CONFIG.contain) {
-        this.contain(CONFIG.width, CONFIG.height);
+        this.contain(canvasW, canvasH);
       }
     }
 
@@ -751,8 +756,8 @@
     const container = canvas.parentElement;
     if (!container) return;
 
-    canvasW = container.clientWidth || 1200;
-    canvasH = container.clientHeight || 650;
+    canvasW = container.clientWidth || window.innerWidth || 1400;
+    canvasH = container.clientHeight || Math.max(window.innerHeight * 0.90, 820);
     dpr = window.devicePixelRatio || 1;
 
     canvas.width = Math.ceil(canvasW * dpr);

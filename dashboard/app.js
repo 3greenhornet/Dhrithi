@@ -1453,30 +1453,36 @@
     setInterval(cycleQuote, 3600000);
   }
 
-  // --- Wire Chimes Play Configuration Panel ---
+  // --- Wire Chimes Play / Customise Configuration Panel ---
   function wireChimesPlayPanel() {
     const panel = document.getElementById('chimes-play-panel');
     const collapseBtn = document.getElementById('tp-collapse-toggle');
     const togglePanelBtn = document.getElementById('btn-toggle-play-panel');
     const titleBar = document.querySelector('.tp-title-bar');
 
-    const togglePanel = () => {
-      if (!panel) return;
-      panel.classList.toggle('is-collapsed');
-    };
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (panel) panel.style.display = 'none';
+      });
+    }
 
-    if (collapseBtn) collapseBtn.addEventListener('click', e => { e.stopPropagation(); togglePanel(); });
-    if (titleBar) titleBar.addEventListener('click', togglePanel);
+    if (titleBar) {
+      titleBar.addEventListener('click', () => {
+        if (!panel) return;
+        panel.classList.toggle('is-collapsed');
+      });
+    }
+
     if (togglePanelBtn) {
       togglePanelBtn.addEventListener('click', () => {
         if (!panel) return;
-        if (panel.style.display === 'none') {
+        const isHidden = panel.style.display === 'none' || getComputedStyle(panel).display === 'none';
+        if (isHidden) {
           panel.style.display = 'block';
           panel.classList.remove('is-collapsed');
-        } else if (panel.classList.contains('is-collapsed')) {
-          panel.classList.remove('is-collapsed');
         } else {
-          panel.classList.add('is-collapsed');
+          panel.style.display = 'none';
         }
       });
     }

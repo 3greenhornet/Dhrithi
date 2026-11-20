@@ -273,12 +273,12 @@
       </p>
       <div style="margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
         <button class="icon-text-btn" id="btn-fetch-poetrydb-quick">Fetch Poem (PoetryDB API)</button>
-        <button class="icon-text-btn" id="btn-toggle-play-panel" title="Toggle Cloth & Sound Configuration">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
+        <button class="icon-text-btn chimes-config-trigger" id="btn-toggle-play-panel" title="Customise Cloth & Sound Configuration">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 3px;">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
-          Play Controls
+          Customise
         </button>
         <button class="icon-text-btn bubble-toggle-pill" id="btn-toggle-thought-bubbles" title="Toggle Screensaver Floating Thought Bubbles (OFF / AUTO / ON)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
@@ -291,11 +291,11 @@
       </div>
     </div>
     <div class="poem-canvas-container">
-      <!-- Authentic Tweakpane-Styled Play Configuration Panel (Niyam Vora Standards) -->
-      <div class="chimes-play-panel" id="chimes-play-panel">
+      <!-- Configuration Panel (Closed by default, opens on Customise click) -->
+      <div class="chimes-play-panel" id="chimes-play-panel" style="display: none;">
         <div class="tp-title-bar">
-          <span class="tp-title">Play</span>
-          <button type="button" class="tp-collapse-btn" id="tp-collapse-toggle" title="Toggle panel">()</button>
+          <span class="tp-title">Customise</span>
+          <button type="button" class="tp-collapse-btn" id="tp-collapse-toggle" title="Close panel">✕</button>
         </div>
 
         <div class="tp-content" id="tp-content">
@@ -336,29 +336,29 @@
             <div class="tp-row">
               <label class="tp-label">Width</label>
               <div class="tp-control slider-num-pair">
-                <input type="range" class="tp-slider" id="tp-slider-width" min="100" max="1400" step="1" value="492">
-                <input type="number" class="tp-num-input" id="tp-num-width" min="100" max="1400" step="1" value="492">
+                <input type="range" class="tp-slider" id="tp-slider-width" min="300" max="1600" step="10" value="1080">
+                <input type="number" class="tp-num-input" id="tp-num-width" min="300" max="1600" step="10" value="1080">
               </div>
             </div>
             <div class="tp-row">
               <label class="tp-label">Height</label>
               <div class="tp-control slider-num-pair">
-                <input type="range" class="tp-slider" id="tp-slider-height" min="80" max="1000" step="1" value="468">
-                <input type="number" class="tp-num-input" id="tp-num-height" min="80" max="1000" step="1" value="468">
+                <input type="range" class="tp-slider" id="tp-slider-height" min="300" max="1200" step="10" value="760">
+                <input type="number" class="tp-num-input" id="tp-num-height" min="300" max="1200" step="10" value="760">
               </div>
             </div>
             <div class="tp-row">
               <label class="tp-label">Columns</label>
               <div class="tp-control slider-num-pair">
-                <input type="range" class="tp-slider" id="tp-slider-gridW" min="2" max="100" step="1" value="36">
-                <input type="number" class="tp-num-input" id="tp-num-gridW" min="2" max="100" step="1" value="36">
+                <input type="range" class="tp-slider" id="tp-slider-gridW" min="10" max="60" step="1" value="32">
+                <input type="number" class="tp-num-input" id="tp-num-gridW" min="10" max="60" step="1" value="32">
               </div>
             </div>
             <div class="tp-row">
               <label class="tp-label">Rows</label>
               <div class="tp-control slider-num-pair">
-                <input type="range" class="tp-slider" id="tp-slider-gridH" min="2" max="80" step="1" value="40">
-                <input type="number" class="tp-num-input" id="tp-num-gridH" min="2" max="80" step="1" value="40">
+                <input type="range" class="tp-slider" id="tp-slider-gridH" min="10" max="60" step="1" value="38">
+                <input type="number" class="tp-num-input" id="tp-num-gridH" min="10" max="60" step="1" value="38">
               </div>
             </div>
             <div class="tp-row-action">
