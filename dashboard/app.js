@@ -666,21 +666,26 @@
     });
   }
 
-  // --- Life Alternatives View ---
+  // --- Life Alternatives View (Surfaced exclusively via Thought Bubbles D-092) ---
   function renderLifeAlts() {
     if (!DOM.lifeAltList) return;
     DOM.lifeAltList.innerHTML = '';
-    state.lifeAlts.forEach(alt => {
-      const item = document.createElement('div');
-      item.className = 'task-item-row';
-      item.innerHTML = `
-        <div>
-          <span class="task-name">${alt.label}</span>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Min duration: ${alt.duration}m • Category: ${alt.category}</div>
-        </div>
-        <span class="card-badge info">Active</span>
+    const shapes = ['shape-cloud', 'shape-oval', 'shape-rect'];
+    state.lifeAlts.forEach((alt, idx) => {
+      const chip = document.createElement('div');
+      const shape = shapes[idx % shapes.length];
+      chip.className = `bubble-alt-chip ${shape}`;
+      chip.innerHTML = `
+        <div class="chip-quote">“${alt.label}”</div>
+        <div class="chip-meta">${alt.duration ? alt.duration + 'm' : 'Offline'} • ${alt.category || 'Rest'}</div>
       `;
-      DOM.lifeAltList.appendChild(item);
+      chip.title = "Click to release this thought bubble across the screen";
+      chip.addEventListener('click', () => {
+        if (window.DhritiBubbles && typeof window.DhritiBubbles.spawnNow === 'function') {
+          window.DhritiBubbles.spawnNow(alt.label);
+        }
+      });
+      DOM.lifeAltList.appendChild(chip);
     });
   }
 
@@ -1298,15 +1303,32 @@
       DOM.btnSaveLifeAlt.addEventListener('click', () => {
         const label = DOM.newLifeLabel.value.trim();
         if (!label) return;
-        state.lifeAlts.push({
+        const newAlt = {
           id: `life-${Date.now()}`,
           label: label,
           category: DOM.newLifeCategory.value,
           duration: parseInt(DOM.newLifeDuration.value, 10)
-        });
+        };
+        state.lifeAlts.push(newAlt);
+        try {
+          localStorage.setItem('dhriti_life_alts', JSON.stringify(state.lifeAlts));
+        } catch (e) {}
+        if (window.DhritiBubbles && typeof window.DhritiBubbles.refreshFeed === 'function') {
+          window.DhritiBubbles.refreshFeed();
+        }
         DOM.newLifeLabel.value = '';
         DOM.lifeModal.classList.remove('active');
         renderLifeAlts();
+      });
+    }
+
+    // Release Test Thought Bubble button
+    const btnTestBubble = document.getElementById('btn-trigger-test-bubble');
+    if (btnTestBubble) {
+      btnTestBubble.addEventListener('click', () => {
+        if (window.DhritiBubbles && typeof window.DhritiBubbles.spawnNow === 'function') {
+          window.DhritiBubbles.spawnNow();
+        }
       });
     }
 
@@ -1501,6 +1523,7 @@
 
   // --- Initialization ---
   function init() {
+    window.DhritiState = state;
     initDOM();
     wireEvents();
     updateTimerDisplay();

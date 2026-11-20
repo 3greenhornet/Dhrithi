@@ -186,92 +186,13 @@ body.mode-dashboard .painting-canvas-underlay {
   filter: blur(var(--dash-bg-blur, 5px)) brightness(var(--dash-bg-brightness, 0.88)) saturate(0.95);
 }
 
-/* Floating Thought Bubbles Layer (Life Mirror D-092) */
-.bubble-layer {
+/* Floating Screensaver Thought Bubbles Layer (Life Mirror D-092) */
+#thought-bubble-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 85;
-}
-
-.life-bubble {
-  position: absolute;
-  pointer-events: auto;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 24px;
-  padding: 14px 20px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  cursor: grab;
-  animation: bubble-float 6s ease-in-out infinite alternate;
-  transition: transform 0.3s ease, opacity 0.5s ease;
-}
-
-@keyframes bubble-float {
-  0% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(0.5deg); }
-  100% { transform: translateY(4px) rotate(-0.5deg); }
-}
-
-.bubble-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--badge-bg);
-  color: var(--accent-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.bubble-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.bubble-tag {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.bubble-text {
-  font-size: 13.5px;
-  font-family: var(--font-serif);
-  color: var(--text-main);
-  font-weight: 500;
-}
-
-.bubble-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 8px;
-}
-
-.bubble-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--glass-border);
-  color: var(--text-main);
-  border-radius: 8px;
-  padding: 4px 8px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.bubble-btn:hover {
-  background: var(--accent-primary);
-  color: #ffffff;
+  overflow: hidden;
 }
 
 /* Floating Mini-Timer Pill */
@@ -2473,4 +2394,112 @@ body.theme-light .thought-bubble.shape-cloud::after {
     transform: translate(calc(var(--drift-x, 2vw) * -1), -68vh) scale(1.02);
     opacity: 0;
   }
+}
+
+/* =========================================================================
+   Quote Toggle Bar & Dual-Mode Thought Bubble Toggle Pills
+   ========================================================================= */
+.quote-toggle-bar {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.bubble-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(14, 18, 30, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.bubble-toggle-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+body.theme-light .bubble-toggle-pill {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 184, 148, 0.35);
+  color: #0f172a;
+}
+
+.bubble-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.bubble-toggle-dot.state-off {
+  background-color: #64748b;
+  box-shadow: none;
+}
+
+.bubble-toggle-dot.state-auto {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.65);
+}
+
+.bubble-toggle-dot.state-on {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.75);
+}
+
+/* Bubbles Pool Showcase (replaces static list rectangles) */
+.bubbles-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.bubble-alt-chip {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 20px 20px 20px 6px;
+  padding: 14px 18px;
+  transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+
+body.theme-light .bubble-alt-chip {
+  background: rgba(248, 250, 252, 0.85);
+  border-color: rgba(0, 184, 148, 0.35);
+}
+
+.bubble-alt-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+}
+
+.bubble-alt-chip .chip-quote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--text-main);
+}
+
+.bubble-alt-chip .chip-meta {
+  font-size: 11px;
+  color: var(--accent-secondary);
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
