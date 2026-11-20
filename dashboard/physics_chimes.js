@@ -238,13 +238,12 @@
       this.particles.push(anchor);
 
       // 2. Organically Staggered Top Drop:
-      // Each chain has an intentionally different drop length before Stanza 1
-      // Creating pronounced vertical contrast between adjacent chains
-      // Chain 0: 3 beads (~48px)   -> Stanza 1 sits very high (Y ~ 116px)
-      // Chain 1: 15 beads (~240px) -> Stanza 1 sits deep down (Y ~ 308px, a full 192px lower than Chain 0!)
-      // Chain 2: 7 beads (~112px)  -> Stanza 1 sits mid-level (Y ~ 180px, in between!)
-      // Chain 3: 14 beads (~224px) -> Stanza 1 sits lower-mid
-      const topDropSequence = [3, 15, 7, 14, 4, 11];
+      // Tasteful, organic vertical variation (adjacent blocks differ by 20-35px)
+      // Chain 0: 4 beads (~56px) -> Stanza 1 sits at Y ~ 125px
+      // Chain 1: 6 beads (~84px) -> Stanza 1 sits at Y ~ 155px
+      // Chain 2: 5 beads (~70px) -> Stanza 1 sits at Y ~ 140px
+      // Keeps both stanzas comfortably visible in the upper viewport without excessive downward scrolling!
+      const topDropSequence = [4, 6, 5, 7, 4, 6];
       const topCount = topDropSequence[this.chainIndex % topDropSequence.length];
 
       for (let i = 0; i < topCount; i++) {
@@ -268,11 +267,11 @@
       // 4. Organically Staggered Bridge Chain between Stanza 1 and Stanza 2
       // Different vertical link count for each chain
       curY += s1HalfHeight + clearance;
-      // Staggered Bridge Chain between Stanza 1 and Stanza 2:
-      // Chain 0: 6 beads (~96px)   -> Stanza 2 sits around Y ~ 330px
-      // Chain 1: 14 beads (~224px) -> Stanza 2 sits down around Y ~ 640px!
-      // Chain 2: 8 beads (~128px)  -> Stanza 2 sits around Y ~ 430px
-      const midDropSequence = [6, 14, 8, 13, 7, 12];
+      // Moderate Staggered Bridge Chain between Stanza 1 and Stanza 2:
+      // Chain 0: 5 beads (~70px) -> Stanza 2 sits at Y ~ 290px
+      // Chain 1: 6 beads (~84px) -> Stanza 2 sits at Y ~ 330px
+      // Chain 2: 5 beads (~70px) -> Stanza 2 sits at Y ~ 305px
+      const midDropSequence = [5, 6, 5, 7, 6, 5];
       const midCount = midDropSequence[this.chainIndex % midDropSequence.length];
 
       for (let i = 0; i < midCount; i++) {
@@ -297,9 +296,9 @@
       this.particles.push(s2);
       this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s2, clearance + s2HalfHeight));
 
-      // 6. Trailing tail beads (varying fringe)
+      // 6. Trailing tail beads (modest fringe)
       curY += s2HalfHeight + clearance;
-      const tailDropSequence = [6, 11, 5, 9, 7, 10];
+      const tailDropSequence = [4, 5, 4, 6, 5, 4];
       const tailCount = tailDropSequence[this.chainIndex % tailDropSequence.length];
 
       for (let i = 0; i < tailCount; i++) {

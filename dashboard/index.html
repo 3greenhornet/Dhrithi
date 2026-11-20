@@ -17,13 +17,34 @@
   <!-- Top Floating Header Bar -->
   <header class="top-header">
     <div class="header-left">
-      <button class="icon-btn" id="btn-settings" title="Dashboard & Art Settings">⚙️</button>
+      <button class="icon-btn" id="btn-settings" title="Dashboard & Art Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
       <div class="mode-badge" id="mode-badge">
         <span class="status-dot" id="status-dot"></span>
         Art & Poem Mode
       </div>
     </div>
     <div class="header-right">
+      <button class="icon-btn" id="btn-theme-toggle" title="Toggle Dark / Light Theme" style="margin-right: 10px;">
+        <svg id="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <svg id="theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
       <div class="mode-badge" style="font-family: var(--font-mono); font-size: 11px; opacity: 0.85;">
         DHRITI v0.7.0
       </div>
@@ -44,7 +65,7 @@
           </div>
           <div class="tile-face tile-face-back" style="justify-content: space-between;">
             <div class="widget-header">
-              <span class="widget-title">⏱️ Pomodoro Engine</span>
+              <span class="widget-title">Pomodoro Engine</span>
               <span class="widget-badge info" id="pomo-label">Focus Interval</span>
             </div>
             <div class="pomo-display">
@@ -76,7 +97,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">⚓ Return Anchor (D-090 Capsule)</span>
+              <span class="widget-title">Return Anchor (D-090 Capsule)</span>
               <span class="widget-badge warning">Sovereign Ready</span>
             </div>
             <div class="capsule-box">
@@ -99,7 +120,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🎭 Stage Ratio & The Wall</span>
+              <span class="widget-title">Stage Ratio & Wall Principle</span>
               <span class="widget-badge success">88% Stage (Output)</span>
             </div>
             <div class="metric-label" style="margin-bottom: 6px;">Stage (Generative Output) vs Audience (Passive Input)</div>
@@ -128,7 +149,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🎯 Active Focus Session</span>
+              <span class="widget-title">Active Focus Session</span>
               <span class="widget-badge success">Live Session</span>
             </div>
             <div class="metric-row">
@@ -158,7 +179,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🛡️ ChatGuard</span>
+              <span class="widget-title">ChatGuard Budget</span>
               <span class="widget-badge success">Healthy</span>
             </div>
             <div class="metric-row">
@@ -188,7 +209,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🌅 Day Window</span>
+              <span class="widget-title">Day Window & Curfew</span>
               <span class="widget-badge info">Open</span>
             </div>
             <div class="metric-row">
@@ -218,7 +239,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">📝 Audit Trail</span>
+              <span class="widget-title">Audit Trail Ledger</span>
               <span class="widget-badge info">Ledger</span>
             </div>
             <div class="audit-feed">
@@ -253,20 +274,20 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">📥 Quick Drawers</span>
+              <span class="widget-title">Quick Action Drawers</span>
               <span class="widget-badge info">Fast Triage</span>
             </div>
             <div class="drawer-btn-grid" style="gap: 8px;">
               <button class="drawer-btn" id="btn-drawer-park">
-                <span>📦 Park Thought / Tab</span>
+                <span>Park Thought / Tab</span>
                 <span>→</span>
               </button>
               <button class="drawer-btn" id="btn-drawer-leisure">
-                <span>☕ Declare 20m Leisure</span>
+                <span>Declare 20m Leisure</span>
                 <span>→</span>
               </button>
               <button class="drawer-btn" id="btn-drawer-research">
-                <span>🔬 Open Research Box</span>
+                <span>Open Research Sandbox</span>
                 <span>→</span>
               </button>
             </div>
@@ -286,7 +307,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">📌 Quick Scratchpad</span>
+              <span class="widget-title">Quick Scratchpad</span>
               <span class="widget-badge info">Local</span>
             </div>
             <textarea class="scratchpad-textarea" placeholder="Jot down active mental notes or next concrete code line..."></textarea>
@@ -305,7 +326,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">⚡ Velocity</span>
+              <span class="widget-title">Focus Velocity</span>
               <span class="widget-badge success">94 / 100</span>
             </div>
             <div class="metric-row">
@@ -336,7 +357,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">☕ Leisure vs Drift</span>
+              <span class="widget-title">Leisure vs Drift</span>
               <span class="widget-badge success">Zero Drift</span>
             </div>
             <div class="metric-row">
@@ -363,7 +384,7 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">🔒 Cold-State Consent & Security</span>
+              <span class="widget-title">Cold-State Security Envelope</span>
               <span class="widget-badge info">Sovereign Local</span>
             </div>
             <div class="metric-row">
@@ -413,7 +434,7 @@
         <strong class="arvo-bold">Glide cursor across doorway beads to part strings • Drag stanza cards to swing & play chimes.</strong>
       </p>
       <div style="margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
-        <button class="icon-text-btn" id="btn-fetch-poetrydb-quick">✨ Fetch Poem (PoetryDB API)</button>
+        <button class="icon-text-btn" id="btn-fetch-poetrydb-quick">Fetch Poem (PoetryDB API)</button>
         <span class="poetrydb-status-pill arvo-regular-italic" id="poetrydb-status-pill">PoetryDB: Rabindranath Tagore — Where the Mind is Without Fear</span>
       </div>
     </div>
@@ -432,7 +453,10 @@
     <div class="settings-modal">
       <div class="settings-header">
         <div class="settings-title">
-          <span>⚙️</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
           <span>Dashboard & Gallery Configuration</span>
         </div>
         <button class="icon-btn" id="btn-close-settings" style="width: 34px; height: 34px; font-size: 14px;">✕</button>
@@ -441,18 +465,88 @@
         
         <!-- Tab Navigation -->
         <nav class="settings-tabs-nav">
-          <button class="tab-btn active" data-tab="tab-art">🖼️ Art & Gallery</button>
-          <button class="tab-btn" data-tab="tab-quotes">💬 Hourly Quotes</button>
-          <button class="tab-btn" data-tab="tab-poems">📜 Poetry & PoetryDB</button>
-          <button class="tab-btn" data-tab="tab-pomodoro">⏱️ Pomodoro Timer</button>
-          <button class="tab-btn" data-tab="tab-bridge">🌐 Dhriti Bridge</button>
+          <button class="tab-btn active" data-tab="tab-appearance">Appearance & Theme</button>
+          <button class="tab-btn" data-tab="tab-art">Art & Gallery</button>
+          <button class="tab-btn" data-tab="tab-quotes">Hourly Quotes</button>
+          <button class="tab-btn" data-tab="tab-poems">Poetry & PoetryDB</button>
+          <button class="tab-btn" data-tab="tab-pomodoro">Pomodoro Timer</button>
+          <button class="tab-btn" data-tab="tab-bridge">Dhriti Bridge</button>
         </nav>
 
         <!-- Tab Contents -->
         <div class="settings-tab-content">
+
+          <!-- Tab 0: Appearance & Theme -->
+          <div class="tab-pane active" id="tab-appearance">
+            <h3 style="margin-bottom: 8px;">Theme & Canvas Appearance</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+              Toggle between executive Dark Mode (deep purple/navy) and Light Mode (pure white/cyan), and fine-tune your background painting's brightness, blur, and opacity during focus sessions.
+            </p>
+
+            <div class="form-group">
+              <label class="form-label">Theme Mode</label>
+              <div class="theme-choice-grid">
+                <div class="theme-choice-card active" id="theme-card-dark" data-theme="dark">
+                  <div class="theme-card-preview dark-preview">
+                    <span class="preview-badge">Purple & Navy</span>
+                  </div>
+                  <div class="theme-card-info">
+                    <div class="theme-name">Executive Dark</div>
+                    <div class="theme-desc">Solid deep navy cards (#20253b) with vibrant purple values (#8b78f6) and lavender accents.</div>
+                  </div>
+                </div>
+                <div class="theme-choice-card" id="theme-card-light" data-theme="light">
+                  <div class="theme-card-preview light-preview">
+                    <span class="preview-badge">White & Cyan</span>
+                  </div>
+                  <div class="theme-card-info">
+                    <div class="theme-name">Minimal Light</div>
+                    <div class="theme-desc">Pure white cards (#ffffff) with crisp cyan/emerald accents and airy readability.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <h4 style="margin: 22px 0 10px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main);">
+              Dashboard Underlay Background Controls
+            </h4>
+
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <span class="slider-title">Background Brightness</span>
+                <span class="slider-value-pill" id="val-bg-brightness">88%</span>
+              </div>
+              <input type="range" class="styled-range-slider" id="slider-bg-brightness" min="40" max="120" value="88" step="1">
+              <div class="slider-hint">Controls the brightness of the artwork underlay when in Dashboard Mode.</div>
+            </div>
+
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <span class="slider-title">Background Blur Filter</span>
+                <span class="slider-value-pill" id="val-bg-blur">5 px</span>
+              </div>
+              <input type="range" class="styled-range-slider" id="slider-bg-blur" min="0" max="25" value="5" step="1">
+              <div class="slider-hint">Softens the background painting behind widgets to ensure clean, razor-sharp contrast.</div>
+            </div>
+
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <span class="slider-title">Background Opacity</span>
+                <span class="slider-value-pill" id="val-bg-opacity">88%</span>
+              </div>
+              <input type="range" class="styled-range-slider" id="slider-bg-opacity" min="20" max="100" value="88" step="1">
+              <div class="slider-hint">Sets the transparency of the background underlay against the canvas floor.</div>
+            </div>
+
+            <div style="margin-top: 18px;">
+              <button class="btn-primary" id="btn-reset-underlay" style="background: var(--btn-sec-bg); color: var(--btn-sec-text); border: 1px solid var(--card-border-back); padding: 8px 16px; font-size: 12px; border-radius: 8px; cursor: pointer;">
+                Reset Underlay to Defaults
+              </button>
+            </div>
+          </div>
           
           <!-- Tab 1: Art & Gallery -->
-          <div class="tab-pane active" id="tab-art">
+          <div class="tab-pane" id="tab-art">
             <h3 style="margin-bottom: 8px;">Background Painting Sets</h3>
             <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
               Select a preset artwork or paste an image URL to set the underlying painting.
@@ -497,7 +591,7 @@
               Live integration with PoetryDB (free, keyless, open-source). Fetches classic public-domain poetry and automatically mounts it into the suspended chimes installation.
             </p>
             <div style="margin-bottom: 16px;">
-              <button class="btn-primary" id="btn-fetch-poetrydb-modal" style="padding: 10px 18px; font-size: 14px;">✨ Fetch Random Poem from PoetryDB</button>
+              <button class="btn-primary" id="btn-fetch-poetrydb-modal" style="padding: 10px 18px; font-size: 14px;">Fetch Random Poem from PoetryDB</button>
               <div class="poetrydb-status-pill arvo-regular-italic" id="poetrydb-status-modal" style="margin-top: 8px;">Ready to query PoetryDB</div>
             </div>
             

@@ -76,6 +76,12 @@
   // --- App State ---
   const state = {
     mode: 'picture', // 'picture' | 'dashboard'
+    theme: 'dark', // 'dark' (executive purple/navy) | 'light' (pure white/cyan)
+    underlay: {
+      brightness: 88,
+      blur: 5,
+      opacity: 88
+    },
     currentArtIndex: 0,
     artworks: [],
     quotes: [],
@@ -136,8 +142,18 @@
     DOM.modeBadge = document.getElementById('mode-badge');
     DOM.statusDot = document.getElementById('status-dot');
     DOM.btnSettings = document.getElementById('btn-settings');
+    DOM.btnThemeToggle = document.getElementById('btn-theme-toggle');
     DOM.settingsOverlay = document.getElementById('settings-overlay');
     DOM.btnCloseSettings = document.getElementById('btn-close-settings');
+    DOM.themeCardDark = document.getElementById('theme-card-dark');
+    DOM.themeCardLight = document.getElementById('theme-card-light');
+    DOM.sliderBrightness = document.getElementById('slider-bg-brightness');
+    DOM.sliderBlur = document.getElementById('slider-bg-blur');
+    DOM.sliderOpacity = document.getElementById('slider-bg-opacity');
+    DOM.valBrightness = document.getElementById('val-bg-brightness');
+    DOM.valBlur = document.getElementById('val-bg-blur');
+    DOM.valOpacity = document.getElementById('val-bg-opacity');
+    DOM.btnResetUnderlay = document.getElementById('btn-reset-underlay');
     DOM.pomoTime = document.getElementById('pomo-time');
     DOM.pomoLabel = document.getElementById('pomo-label');
     DOM.btnPomoToggle = document.getElementById('btn-pomo-toggle');
@@ -150,6 +166,48 @@
     DOM.inputNewQuoteText = document.getElementById('new-quote-text');
     DOM.inputNewQuoteAuthor = document.getElementById('new-quote-author');
     DOM.btnAddQuote = document.getElementById('btn-add-quote');
+  }
+
+  // --- Theme & Live Underlay Appearance Engine ---
+  function applyTheme(themeName) {
+    state.theme = themeName === 'light' ? 'light' : 'dark';
+    document.body.classList.remove('theme-dark', 'theme-light');
+    document.body.classList.add(`theme-${state.theme}`);
+    localStorage.setItem('dhriti_theme', state.theme);
+
+    // Update settings modal theme cards
+    if (DOM.themeCardDark && DOM.themeCardLight) {
+      if (state.theme === 'dark') {
+        DOM.themeCardDark.classList.add('active');
+        DOM.themeCardLight.classList.remove('active');
+      } else {
+        DOM.themeCardLight.classList.add('active');
+        DOM.themeCardDark.classList.remove('active');
+      }
+    }
+  }
+
+  function applyUnderlaySettings(settings, save = true) {
+    if (settings.brightness !== undefined) state.underlay.brightness = Number(settings.brightness);
+    if (settings.blur !== undefined) state.underlay.blur = Number(settings.blur);
+    if (settings.opacity !== undefined) state.underlay.opacity = Number(settings.opacity);
+
+    const root = document.documentElement;
+    root.style.setProperty('--dash-bg-brightness', (state.underlay.brightness / 100).toString());
+    root.style.setProperty('--dash-bg-blur', `${state.underlay.blur}px`);
+    root.style.setProperty('--dash-bg-opacity', (state.underlay.opacity / 100).toString());
+
+    if (DOM.sliderBrightness) DOM.sliderBrightness.value = state.underlay.brightness;
+    if (DOM.sliderBlur) DOM.sliderBlur.value = state.underlay.blur;
+    if (DOM.sliderOpacity) DOM.sliderOpacity.value = state.underlay.opacity;
+
+    if (DOM.valBrightness) DOM.valBrightness.textContent = `${state.underlay.brightness}%`;
+    if (DOM.valBlur) DOM.valBlur.textContent = `${state.underlay.blur} px`;
+    if (DOM.valOpacity) DOM.valOpacity.textContent = `${state.underlay.opacity}%`;
+
+    if (save) {
+      localStorage.setItem('dhriti_underlay_settings', JSON.stringify(state.underlay));
+    }
   }
 
   // --- Local Storage Hydration ---
@@ -166,6 +224,23 @@
       state.quotes = savedQuotes ? JSON.parse(savedQuotes) : [...DEFAULT_QUOTES];
     } catch (e) {
       state.quotes = [...DEFAULT_QUOTES];
+    }
+
+    // Hydrate Theme
+    const savedTheme = localStorage.getItem('dhriti_theme') || 'dark';
+    applyTheme(savedTheme);
+
+    // Hydrate Underlay settings
+    try {
+      const savedUnderlay = localStorage.getItem('dhriti_underlay_settings');
+      if (savedUnderlay) {
+        const parsed = JSON.parse(savedUnderlay);
+        applyUnderlaySettings(parsed, false);
+      } else {
+        applyUnderlaySettings({ brightness: 88, blur: 5, opacity: 88 }, false);
+      }
+    } catch (e) {
+      applyUnderlaySettings({ brightness: 88, blur: 5, opacity: 88 }, false);
     }
 
     // Set initial artwork
@@ -429,6 +504,8 @@
     DOM.btnSettings.addEventListener('click', () => {
       renderGalleryManager();
       renderQuotesManager();
+      applyTheme(state.theme);
+      applyUnderlaySettings(state.underlay, false);
       DOM.settingsOverlay.classList.add('active');
     });
 
@@ -441,6 +518,46 @@
         DOM.settingsOverlay.classList.remove('active');
       }
     });
+
+    // Header Theme Toggle Button
+    if (DOM.btnThemeToggle) {
+      DOM.btnThemeToggle.addEventListener('click', () => {
+        const next = state.theme === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+      });
+    }
+
+    // Modal Theme Selection Cards
+    if (DOM.themeCardDark) {
+      DOM.themeCardDark.addEventListener('click', () => applyTheme('dark'));
+    }
+    if (DOM.themeCardLight) {
+      DOM.themeCardLight.addEventListener('click', () => applyTheme('light'));
+    }
+
+    // Modal Live Underlay Range Sliders
+    if (DOM.sliderBrightness) {
+      DOM.sliderBrightness.addEventListener('input', (e) => {
+        applyUnderlaySettings({ brightness: e.target.value });
+      });
+    }
+    if (DOM.sliderBlur) {
+      DOM.sliderBlur.addEventListener('input', (e) => {
+        applyUnderlaySettings({ blur: e.target.value });
+      });
+    }
+    if (DOM.sliderOpacity) {
+      DOM.sliderOpacity.addEventListener('input', (e) => {
+        applyUnderlaySettings({ opacity: e.target.value });
+      });
+    }
+
+    // Reset Underlay Button
+    if (DOM.btnResetUnderlay) {
+      DOM.btnResetUnderlay.addEventListener('click', () => {
+        applyUnderlaySettings({ brightness: 88, blur: 5, opacity: 88 });
+      });
+    }
 
     // Tab navigation
     const tabs = document.querySelectorAll('.settings-tabs-nav .tab-btn');
