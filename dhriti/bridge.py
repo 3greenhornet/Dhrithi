@@ -18,9 +18,12 @@ Security posture (docs/ENFORCEMENT_LEVELS.md):
 The token file is created at init with 0600 permissions.
 """
 
+import base64
 import json
+import re
 import secrets
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -107,9 +110,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/app.js", "/dashboard/app.js",
             "/physics_chimes.js", "/dashboard/physics_chimes.js",
             "/audio_synth.js", "/dashboard/audio_synth.js",
-            "/popup.css", "/popup.js", "/popup.html", "/extension"
+            "/popup.css", "/popup.js", "/popup.html", "/extension",
+            "/api/gallery/images", "/api/gallery/upload", "/api/gallery/delete"
         )
-        if ok or self.path.startswith("/healthz") or path in dashboard_paths:
+        if (ok or self.path.startswith("/healthz") or path in dashboard_paths
+                or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -183,6 +188,36 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if js_file.exists():
                 self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
                 return
+        elif path.startswith("/gallery/") or path.startswith("/dashboard/gallery/"):
+            rel_name = path.replace("/dashboard/gallery/", "").replace("/gallery/", "")
+            clean_name = Path(rel_name).name
+            gallery_file = dashboard_dir / "gallery" / clean_name
+            if gallery_file.exists() and gallery_file.is_file():
+                ext = gallery_file.suffix.lower()
+                mimes = {
+                    ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                    ".png": "image/png", ".webp": "image/webp",
+                    ".gif": "image/gif", ".svg": "image/svg+xml"
+                }
+                self._send_bytes(200, gallery_file.read_bytes(), mimes.get(ext, "application/octet-stream"))
+                return
+            self._send(404, {"error": "image not found"})
+            return
+        elif path == "/api/gallery/images":
+            gallery_dir = dashboard_dir / "gallery"
+            gallery_dir.mkdir(parents=True, exist_ok=True)
+            images = []
+            for f in sorted(gallery_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+                if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"):
+                    images.append({
+                        "id": f"local-{f.stem}",
+                        "title": f.stem.replace("_", " ").replace("-", " ").title(),
+                        "filename": f.name,
+                        "url": f"/gallery/{f.name}",
+                        "size": f.stat().st_size
+                    })
+            self._send(200, {"images": images})
+            return
 
         if not self._authorized():
             self._send(401, {"error": "bad or missing X-Dhriti-Token"})
@@ -209,7 +244,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._send(401, {"error": "bad or missing X-Dhriti-Token"})
             return
         length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > 1_000_000:
+        max_bytes = 50_000_000 if path == "/api/gallery/upload" else 1_000_000
+        if length <= 0 or length > max_bytes:
             self._send(400, {"error": "invalid body size"})
             return
         try:
@@ -217,7 +253,58 @@ class BridgeHandler(BaseHTTPRequestHandler):
         except Exception:
             self._send(400, {"error": "invalid JSON"})
             return
-        if path == "/events" and self.on_event is not None:
+
+        if path == "/api/gallery/upload":
+            dashboard_dir = Path(__file__).parent.parent / "dashboard"
+            gallery_dir = dashboard_dir / "gallery"
+            gallery_dir.mkdir(parents=True, exist_ok=True)
+
+            raw_name = payload.get("filename", "image.jpg")
+            safe_stem = re.sub(r'[^a-zA-Z0-9_\-]', '_', Path(raw_name).stem)
+            ext = Path(raw_name).suffix.lower()
+            if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"):
+                ext = ".jpg"
+            filename = f"{safe_stem}_{int(time.time())}{ext}"
+            target_path = gallery_dir / filename
+
+            data_str = payload.get("data", "")
+            if "," in data_str:
+                data_str = data_str.split(",", 1)[1]
+            try:
+                img_bytes = base64.b64decode(data_str)
+                target_path.write_bytes(img_bytes)
+            except Exception as e:
+                self._send(400, {"error": f"failed to decode image data: {e}"})
+                return
+
+            self._send(200, {
+                "ok": True,
+                "image": {
+                    "id": f"local-{target_path.stem}",
+                    "title": payload.get("title") or safe_stem.replace("_", " ").title(),
+                    "filename": filename,
+                    "url": f"/gallery/{filename}",
+                    "size": len(img_bytes)
+                }
+            })
+            return
+
+        elif path == "/api/gallery/delete":
+            dashboard_dir = Path(__file__).parent.parent / "dashboard"
+            filename = Path(payload.get("filename", "")).name
+            target_path = dashboard_dir / "gallery" / filename
+            if target_path.exists() and target_path.is_file():
+                try:
+                    target_path.unlink()
+                    self._send(200, {"ok": True, "deleted": filename})
+                    return
+                except Exception as e:
+                    self._send(500, {"error": f"failed to delete: {e}"})
+                    return
+            self._send(404, {"error": "file not found"})
+            return
+
+        elif path == "/events" and self.on_event is not None:
             events = payload.get("events", [payload])
             ingested, errors = 0, []
             for event in events[:100]:

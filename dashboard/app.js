@@ -104,6 +104,9 @@
     },
     currentArtIndex: 0,
     artworks: DEFAULT_ARTWORKS,
+    localArtworks: [],
+    activeArtId: localStorage.getItem('dhriti_active_art') || 'art-1',
+    cycleUserUploads: localStorage.getItem('dhriti_cycle_user_uploads') === 'true',
     quotes: DEFAULT_QUOTES,
     currentQuoteIndex: 0,
     lifeAlts: DEFAULT_LIFE_ALTS,
@@ -244,6 +247,24 @@
     DOM.ledgerContainer = document.getElementById('ledger-events-container');
     DOM.topicsBreakdownContainer = document.getElementById('topics-breakdown-container');
     DOM.coOccurrenceContainer = document.getElementById('co-occurrence-chips-container');
+
+    // Settings tabs & Local Gallery Studio elements
+    DOM.settingsTabs = document.querySelectorAll('.settings-tabs-nav .tab-btn');
+    DOM.tabPanes = document.querySelectorAll('.settings-tab-content .tab-pane');
+    DOM.artUploadDropzone = document.getElementById('art-upload-dropzone');
+    DOM.localArtFileInput = document.getElementById('local-art-file-input');
+    DOM.btnBrowseImages = document.getElementById('btn-browse-images');
+    DOM.uploadProgressWrap = document.getElementById('upload-progress-wrap');
+    DOM.uploadProgressFill = document.getElementById('upload-progress-fill');
+    DOM.uploadProgressText = document.getElementById('upload-progress-text');
+    DOM.localImagesCountPill = document.getElementById('local-images-count-pill');
+    DOM.checkCycleUserUploads = document.getElementById('check-cycle-user-uploads');
+    DOM.btnRefreshGallery = document.getElementById('btn-refresh-gallery');
+    DOM.localArtGrid = document.getElementById('local-art-grid');
+    DOM.galleryServerStatus = document.getElementById('gallery-server-status');
+    DOM.galleryStatusText = document.getElementById('gallery-status-text');
+    DOM.customArtUrl = document.getElementById('custom-art-url');
+    DOM.btnAddArt = document.getElementById('btn-add-art');
   }
 
   // --- Dual-Mode Router ---
@@ -839,12 +860,356 @@
     }
   }
 
+  // --- Local Artwork & Image Studio Engine ---
+
+  function wireSettingsTabs() {
+    if (!DOM.settingsTabs) return;
+    DOM.settingsTabs.forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        DOM.settingsTabs.forEach(b => b.classList.remove('active'));
+        DOM.tabPanes.forEach(p => p.classList.remove('active'));
+        tabBtn.classList.add('active');
+        const targetId = tabBtn.dataset.tab;
+        const targetPane = document.getElementById(targetId);
+        if (targetPane) targetPane.classList.add('active');
+      });
+    });
+  }
+
+  async function loadGallery() {
+    let serverImages = [];
+    let isServer = false;
+    try {
+      const resp = await fetch('/api/gallery/images');
+      if (resp.ok) {
+        const data = await resp.json();
+        serverImages = data.images || [];
+        isServer = true;
+      }
+    } catch (e) {
+      // Standalone mode
+    }
+
+    if (isServer) {
+      if (DOM.galleryServerStatus) {
+        DOM.galleryServerStatus.classList.remove('offline');
+        if (DOM.galleryStatusText) DOM.galleryStatusText.textContent = 'Local Server Permanent Storage';
+      }
+      state.localArtworks = serverImages;
+      try {
+        localStorage.setItem('dhriti_server_gallery_cache', JSON.stringify(serverImages));
+      } catch (err) {}
+    } else {
+      if (DOM.galleryServerStatus) {
+        DOM.galleryServerStatus.classList.add('offline');
+        if (DOM.galleryStatusText) DOM.galleryStatusText.textContent = 'Browser Storage (Offline/Static)';
+      }
+      try {
+        const saved = localStorage.getItem('dhriti_local_gallery');
+        state.localArtworks = saved ? JSON.parse(saved) : [];
+      } catch (err) {
+        state.localArtworks = [];
+      }
+    }
+
+    renderLocalArtGrid();
+    renderPresetArtGrid();
+    applyActiveArtwork();
+  }
+
+  function renderLocalArtGrid() {
+    if (!DOM.localArtGrid) return;
+    DOM.localArtGrid.innerHTML = '';
+
+    const count = state.localArtworks.length;
+    if (DOM.localImagesCountPill) {
+      DOM.localImagesCountPill.textContent = `${count} uploaded image${count === 1 ? '' : 's'}`;
+    }
+
+    if (count === 0) {
+      DOM.localArtGrid.innerHTML = `
+        <div class="gallery-empty-state">
+          <span>No local images uploaded yet. Drop image files into the zone above to store your set permanently.</span>
+        </div>
+      `;
+      return;
+    }
+
+    state.localArtworks.forEach(img => {
+      const card = document.createElement('div');
+      const isActive = state.activeArtId === img.id;
+      card.className = `local-art-card ${isActive ? 'active' : ''}`;
+
+      const sizeStr = img.size ? (img.size > 1048576 ? `${(img.size / 1048576).toFixed(1)} MB` : `${Math.round(img.size / 1024)} KB`) : 'Local';
+
+      card.innerHTML = `
+        <img class="local-art-thumb" src="${img.url}" alt="${img.title}" loading="lazy">
+        <div class="local-art-info">
+          <div>
+            <div class="local-art-name" title="${img.title}">${img.title}</div>
+            <div class="local-art-size">${sizeStr} • Local disk</div>
+          </div>
+          <div class="local-art-actions">
+            <button type="button" class="btn-set-active">${isActive ? 'Active' : 'Use Art'}</button>
+            <button type="button" class="btn-delete-art" title="Delete image">Delete</button>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('.btn-set-active').addEventListener('click', () => setActiveArtwork(img));
+      card.querySelector('.local-art-thumb').addEventListener('click', () => setActiveArtwork(img));
+      card.querySelector('.btn-delete-art').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteArtwork(img);
+      });
+
+      DOM.localArtGrid.appendChild(card);
+    });
+  }
+
+  function renderPresetArtGrid() {
+    if (!DOM.artPresetGrid) return;
+    DOM.artPresetGrid.innerHTML = '';
+    DEFAULT_ARTWORKS.forEach(art => {
+      const card = document.createElement('div');
+      const isActive = state.activeArtId === art.id;
+      card.className = `art-preset-card ${isActive ? 'active' : ''}`;
+      card.style.backgroundImage = `url('${art.url}')`;
+      card.title = art.title;
+      card.addEventListener('click', () => setActiveArtwork(art));
+      DOM.artPresetGrid.appendChild(card);
+    });
+  }
+
+  function setActiveArtwork(art) {
+    if (!art || !art.url) return;
+    state.activeArtId = art.id;
+    localStorage.setItem('dhriti_active_art', art.id);
+
+    document.documentElement.style.setProperty('--bg-image', `url('${art.url}')`);
+    document.body.style.setProperty('--bg-image', `url('${art.url}')`);
+
+    renderLocalArtGrid();
+    renderPresetArtGrid();
+    if (window.DhritiAudio) window.DhritiAudio.playChime(4, 0.28);
+  }
+
+  function applyActiveArtwork() {
+    const savedId = state.activeArtId;
+    let found = state.localArtworks.find(a => a.id === savedId);
+    if (!found) {
+      found = DEFAULT_ARTWORKS.find(a => a.id === savedId) || DEFAULT_ARTWORKS[0];
+    }
+    if (found && found.url) {
+      document.documentElement.style.setProperty('--bg-image', `url('${found.url}')`);
+      document.body.style.setProperty('--bg-image', `url('${found.url}')`);
+    }
+  }
+
+  async function handleBatchImageUpload(files) {
+    if (!files || files.length === 0) return;
+    const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (validFiles.length === 0) {
+      alert('Please select valid image files (JPEG, PNG, WEBP, GIF, SVG).');
+      return;
+    }
+
+    if (DOM.uploadProgressWrap) DOM.uploadProgressWrap.style.display = 'block';
+    let processed = 0;
+    const total = validFiles.length;
+
+    for (const file of validFiles) {
+      if (DOM.uploadProgressText) {
+        DOM.uploadProgressText.textContent = `Saving ${file.name} (${processed + 1}/${total}) permanently...`;
+      }
+      if (DOM.uploadProgressFill) {
+        DOM.uploadProgressFill.style.width = `${Math.round(((processed + 0.3) / total) * 100)}%`;
+      }
+
+      const dataUrl = await readFileAsDataURL(file);
+      let uploadedImage = null;
+
+      try {
+        const resp = await fetch('/api/gallery/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            title: file.name.replace(/\.[^/.]+$/, '').replace(/[_\-]/g, ' '),
+            data: dataUrl
+          })
+        });
+        if (resp.ok) {
+          const resData = await resp.json();
+          if (resData.ok && resData.image) {
+            uploadedImage = resData.image;
+          }
+        }
+      } catch (e) {
+        // Fallback to local offline client storage
+      }
+
+      if (!uploadedImage) {
+        uploadedImage = {
+          id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          title: file.name.replace(/\.[^/.]+$/, '').replace(/[_\-]/g, ' '),
+          filename: file.name,
+          url: dataUrl,
+          size: file.size
+        };
+        try {
+          const current = JSON.parse(localStorage.getItem('dhriti_local_gallery') || '[]');
+          current.unshift(uploadedImage);
+          localStorage.setItem('dhriti_local_gallery', JSON.stringify(current));
+        } catch (err) {}
+      }
+
+      if (!state.localArtworks.some(img => img.filename === uploadedImage.filename && img.id === uploadedImage.id)) {
+        state.localArtworks.unshift(uploadedImage);
+      }
+
+      processed++;
+      if (DOM.uploadProgressFill) {
+        DOM.uploadProgressFill.style.width = `${Math.round((processed / total) * 100)}%`;
+      }
+    }
+
+    if (state.localArtworks.length > 0) {
+      setActiveArtwork(state.localArtworks[0]);
+    }
+
+    setTimeout(() => {
+      if (DOM.uploadProgressWrap) DOM.uploadProgressWrap.style.display = 'none';
+      if (DOM.uploadProgressFill) DOM.uploadProgressFill.style.width = '0%';
+    }, 1200);
+
+    renderLocalArtGrid();
+    if (window.DhritiAudio) window.DhritiAudio.playChime(6, 0.45);
+  }
+
+  function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function deleteArtwork(img) {
+    if (!confirm(`Permanently delete "${img.title}" from your local gallery?`)) return;
+
+    try {
+      await fetch('/api/gallery/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: img.filename })
+      });
+    } catch (e) {}
+
+    state.localArtworks = state.localArtworks.filter(a => a.id !== img.id && a.filename !== img.filename);
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('dhriti_local_gallery') || '[]');
+      const filtered = saved.filter(a => a.id !== img.id && a.filename !== img.filename);
+      localStorage.setItem('dhriti_local_gallery', JSON.stringify(filtered));
+    } catch (err) {}
+
+    if (state.activeArtId === img.id) {
+      setActiveArtwork(DEFAULT_ARTWORKS[0]);
+    } else {
+      renderLocalArtGrid();
+    }
+  }
+
+  function wireGalleryStudio() {
+    if (DOM.btnBrowseImages && DOM.localArtFileInput) {
+      DOM.btnBrowseImages.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        DOM.localArtFileInput.click();
+      });
+    }
+
+    if (DOM.artUploadDropzone) {
+      DOM.artUploadDropzone.addEventListener('click', (e) => {
+        if (e.target !== DOM.btnBrowseImages && DOM.localArtFileInput) {
+          DOM.localArtFileInput.click();
+        }
+      });
+
+      const dropzone = DOM.artUploadDropzone;
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('drag-active');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('drag-active');
+        });
+      });
+
+      dropzone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+          handleBatchImageUpload(dt.files);
+        }
+      });
+    }
+
+    if (DOM.localArtFileInput) {
+      DOM.localArtFileInput.addEventListener('change', e => {
+        handleBatchImageUpload(e.target.files);
+        DOM.localArtFileInput.value = '';
+      });
+    }
+
+    if (DOM.btnRefreshGallery) {
+      DOM.btnRefreshGallery.addEventListener('click', loadGallery);
+    }
+
+    if (DOM.checkCycleUserUploads) {
+      DOM.checkCycleUserUploads.checked = state.cycleUserUploads;
+      DOM.checkCycleUserUploads.addEventListener('change', e => {
+        state.cycleUserUploads = e.target.checked;
+        localStorage.setItem('dhriti_cycle_user_uploads', e.target.checked);
+      });
+    }
+
+    if (DOM.btnAddArt && DOM.customArtUrl) {
+      DOM.btnAddArt.addEventListener('click', () => {
+        const url = DOM.customArtUrl.value.trim();
+        if (!url) return;
+        const customItem = {
+          id: `url-${Date.now()}`,
+          title: 'Custom Web Image',
+          filename: 'web_image.jpg',
+          url: url,
+          size: 0
+        };
+        state.localArtworks.unshift(customItem);
+        setActiveArtwork(customItem);
+        DOM.customArtUrl.value = '';
+      });
+    }
+  }
+
   // --- Artwork & Quote Rotation ---
   function cycleArtwork() {
-    state.currentArtIndex = (state.currentArtIndex + 1) % state.artworks.length;
-    const art = state.artworks[state.currentArtIndex];
-    document.documentElement.style.setProperty('--bg-image', `url('${art.url}')`);
-    if (window.DhritiAudio) window.DhritiAudio.playChime(state.currentArtIndex * 2, 0.4);
+    if (state.cycleUserUploads && state.localArtworks.length > 0) {
+      state.currentArtIndex = (state.currentArtIndex + 1) % state.localArtworks.length;
+      setActiveArtwork(state.localArtworks[state.currentArtIndex]);
+    } else {
+      const pool = DEFAULT_ARTWORKS;
+      state.currentArtIndex = (state.currentArtIndex + 1) % pool.length;
+      setActiveArtwork(pool[state.currentArtIndex]);
+    }
   }
 
   function cycleQuote() {
@@ -1038,6 +1403,10 @@
     // Wire Play Configuration Panel (Niyam Vora Chimes Standards)
     wireChimesPlayPanel();
 
+    // Wire Settings Tabs & Local Gallery Studio
+    wireSettingsTabs();
+    wireGalleryStudio();
+
     // Hourly quote rotation
     setInterval(cycleQuote, 3600000);
   }
@@ -1164,6 +1533,7 @@
     updateTimerDisplay();
     updateUnderlayStyles();
     startBubbleScheduler();
+    loadGallery();
   }
 
   if (document.readyState === 'loading') {

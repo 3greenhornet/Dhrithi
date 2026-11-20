@@ -1176,16 +1176,73 @@
               <input type="range" class="styled-range-slider" id="slider-bg-opacity" min="20" max="100" value="88">
             </div>
           </div>
-          <!-- Tab: Art -->
+          <!-- Tab: Art & Local Image Studio -->
           <div class="tab-pane" id="tab-art">
-            <div class="form-group">
-              <label class="form-label">Add Custom Painting URL</label>
-              <div class="form-row">
-                <input type="text" class="form-input" id="custom-art-url" placeholder="https://images.unsplash.com/...">
-                <button class="btn-primary" id="btn-add-art">Add Art</button>
+            <div class="gallery-studio-header">
+              <div>
+                <div class="gallery-studio-title arvo-bold">Local Artwork & Image Studio</div>
+                <div class="gallery-studio-subtitle">Upload sets of images directly from your computer. Files are stored permanently in your local server gallery.</div>
+              </div>
+              <div class="gallery-status-badge" id="gallery-server-status">
+                <span class="status-indicator-dot"></span>
+                <span id="gallery-status-text">Local Server Permanent Storage</span>
               </div>
             </div>
+
+            <!-- Drag & Drop / Batch File Upload Zone -->
+            <div class="upload-dropzone" id="art-upload-dropzone">
+              <input type="file" id="local-art-file-input" multiple accept="image/*" style="display: none;">
+              <div class="dropzone-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <div class="dropzone-text">
+                <span class="dropzone-primary-text">Drag & drop your set of images here, or <button type="button" class="btn-browse-link" id="btn-browse-images">browse local files</button></span>
+                <span class="dropzone-secondary-text">Select multiple images at once (JPEG, PNG, WEBP, GIF, SVG) — permanently saved to local disk</span>
+              </div>
+              <div class="upload-progress-bar-wrap" id="upload-progress-wrap" style="display: none;">
+                <div class="upload-progress-fill" id="upload-progress-fill"></div>
+                <span class="upload-progress-text" id="upload-progress-text">Saving to local gallery...</span>
+              </div>
+            </div>
+
+            <!-- Uploaded Images Controls Bar -->
+            <div class="gallery-toolbar">
+              <div class="gallery-toolbar-left">
+                <span class="gallery-count-pill" id="local-images-count-pill">0 uploaded images</span>
+                <label class="gallery-cycle-label">
+                  <input type="checkbox" id="check-cycle-user-uploads" class="styled-checkbox">
+                  <span>Auto-cycle through my uploaded image set</span>
+                </label>
+              </div>
+              <div class="gallery-toolbar-right">
+                <button type="button" class="btn-sec btn-sm" id="btn-refresh-gallery" title="Sync local gallery from disk">Sync Gallery</button>
+              </div>
+            </div>
+
+            <!-- My Local Uploads Grid -->
+            <div class="gallery-subheading arvo-regular">My Local Uploaded Images</div>
+            <div class="local-art-grid" id="local-art-grid">
+              <div class="gallery-empty-state" id="gallery-empty-state">
+                <span>No local images uploaded yet. Drop image files into the zone above to store your set permanently.</span>
+              </div>
+            </div>
+
+            <!-- Curated Masterpieces Divider -->
+            <div class="gallery-subheading arvo-regular" style="margin-top: 24px;">Curated Museum Masterpieces</div>
             <div class="art-preset-grid" id="art-preset-grid"></div>
+
+            <!-- Secondary Fallback: Web URL Import -->
+            <details class="gallery-url-accordion" style="margin-top: 16px;">
+              <summary class="gallery-url-summary">Or add custom image via Web URL</summary>
+              <div class="form-row" style="margin-top: 10px;">
+                <input type="text" class="form-input" id="custom-art-url" placeholder="https://images.unsplash.com/...">
+                <button class="btn-sec" id="btn-add-art">Add URL</button>
+              </div>
+            </details>
           </div>
           <!-- Tab: Quotes -->
           <div class="tab-pane" id="tab-quotes">
