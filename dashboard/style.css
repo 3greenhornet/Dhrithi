@@ -522,10 +522,10 @@ body.theme-light .tactile-tile:hover .tile-face-front {
   padding: 5px 12px;
   border-radius: 12px;
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   font-style: italic;
-  letter-spacing: 0.8px;
+  letter-spacing: 1.2px;
   color: #ffffff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.6);
 }
@@ -543,7 +543,7 @@ body.theme-light .tactile-tile:hover .tile-face-front {
   justify-content: space-between;
 }
 
-/* Mode 1 Back Tile Typography with Arvo and Poiret One */
+/* Mode 1 Back Tile Typography with Poiret One bold & italic */
 .widget-header {
   display: flex;
   justify-content: space-between;
@@ -552,9 +552,11 @@ body.theme-light .tactile-tile:hover .tile-face-front {
 }
 
 .widget-title {
-  font-family: var(--font-serif);
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: 18px;
   font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.8px;
   color: var(--text-main);
 }
 
@@ -1025,6 +1027,68 @@ body.theme-light .poem-section-subtitle strong {
   padding: 24px 16px 20px 16px;
   z-index: 30;
   overflow-y: auto;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.28s ease, width 0.28s ease;
+}
+
+.sidebar-toggle-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--sidebar-border);
+  color: var(--text-main);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+}
+
+.app-shell.sidebar-collapsed .shell-sidebar {
+  transform: translateX(-100%);
+  margin-left: -250px;
+  min-width: 0;
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+.sidebar-expand-tab {
+  position: fixed;
+  top: 76px;
+  left: 14px;
+  z-index: 95;
+  background: var(--card-bg-back);
+  border: 1px solid var(--sidebar-border);
+  color: var(--accent-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+}
+
+.sidebar-expand-tab:hover {
+  background: var(--accent-primary);
+  color: #ffffff;
+  transform: scale(1.08);
 }
 
 .sidebar-header {
@@ -1168,6 +1232,14 @@ body.theme-light .poem-section-subtitle strong {
   min-height: 100vh;
   padding: 40px 36px 80px 36px;
   overflow-y: auto;
+  transition: all 0.28s ease;
+}
+
+.app-shell.sidebar-collapsed .shell-content {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: 0;
+  padding: 40px 48px 80px 48px;
 }
 
 .shell-view {
@@ -1186,14 +1258,18 @@ body.theme-light .poem-section-subtitle strong {
 }
 
 .view-title {
-  font-family: var(--font-sans);
-  font-size: 26px;
+  font-family: var(--font-display);
+  font-size: 32px;
   font-weight: 700;
+  font-style: italic;
+  letter-spacing: 1.5px;
   color: var(--text-main);
   margin-bottom: 6px;
 }
 
 .view-subtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
   font-size: 14px;
   color: var(--text-muted);
 }
@@ -1227,23 +1303,29 @@ body.theme-light .poem-section-subtitle strong {
 }
 
 .stat-meta {
-  font-size: 12.5px;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  font-style: italic;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.2px;
   margin-bottom: 12px;
 }
 
 .stat-figure {
-  font-size: 38px;
+  font-family: var(--font-display);
+  font-size: 42px;
   font-weight: 700;
+  font-style: normal;
   color: var(--accent-primary);
   line-height: 1.1;
   margin-bottom: 8px;
 }
 
 .stat-note {
+  font-family: var(--font-serif);
+  font-style: italic;
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -1278,10 +1360,12 @@ body.theme-light .poem-section-subtitle strong {
 }
 
 .card-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  font-style: italic;
   color: var(--text-main);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.8px;
 }
 
 .card-badge {
@@ -2502,4 +2586,35 @@ body.theme-light .bubble-alt-chip {
   color: var(--accent-secondary);
   font-weight: 600;
   letter-spacing: 0.5px;
+}
+
+/* =========================================================================
+   Strict Dashboard Mode Isolation & Redundant Icon Removal
+   ========================================================================= */
+
+/* Hide duplicate header settings icon in Dashboard mode (accessed from sidebar) */
+body.mode-dashboard #btn-settings {
+  display: none !important;
+}
+
+/* Strictly ensure no thought bubbles appear inside dashboard workstations */
+body.mode-dashboard #thought-bubble-layer,
+body.in-dashboard #thought-bubble-layer,
+body.mode-dashboard .thought-bubble,
+.app-shell #thought-bubble-layer {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Purge any old button-based life bubbles or dismiss affordances completely */
+.life-bubble,
+.bubble-actions,
+.bubble-btn,
+.bubble-btn-did,
+.bubble-btn-dismiss {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

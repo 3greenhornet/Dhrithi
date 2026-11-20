@@ -125,6 +125,16 @@
   }
 
   function shouldRun() {
+    // STRICTLY NEVER run inside the Dashboard Shell (Mode 2)
+    if (document.body.classList.contains("mode-dashboard") ||
+        document.body.classList.contains("in-dashboard")) {
+      return false;
+    }
+    const shell = document.getElementById("app-shell");
+    if (shell && shell.style.display !== "none") {
+      return false;
+    }
+
     if (mode === "off") return false;
     if (mode === "on") return true;
     if (mode === "auto") {
@@ -255,6 +265,12 @@
     updateAllToggleUIs();
   }
 
+  function clearBubbles() {
+    clearTimeout(spawnTimer);
+    spawnTimer = null;
+    if (layer) layer.innerHTML = "";
+  }
+
   // Expose global controller
   window.DhritiBubbles = {
     getMode: () => mode,
@@ -266,6 +282,8 @@
     },
     cycleMode: cycleMode,
     spawnNow: (text) => spawnBubble(text),
+    clear: clearBubbles,
+    updateLoopState: updateLoopState,
     refreshFeed: refreshFeed
   };
 

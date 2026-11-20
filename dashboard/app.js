@@ -283,6 +283,9 @@
       DOM.appShell.style.display = 'flex';
       DOM.modeBadgeText.textContent = 'Dashboard Shell';
       DOM.btnToggleText.textContent = 'Art & Poem Mode';
+      if (window.DhritiBubbles && typeof window.DhritiBubbles.clear === 'function') {
+        window.DhritiBubbles.clear();
+      }
       showView(state.currentView || 'desk');
       drawDonutChart();
       renderTopicBars();
@@ -292,6 +295,10 @@
       DOM.appShell.style.display = 'none';
       DOM.modeBadgeText.textContent = 'Art & Poem Mode';
       DOM.btnToggleText.textContent = 'Enter Dashboard Shell';
+      if (window.DhritiBubbles && typeof window.DhritiBubbles.updateLoopState === 'function') {
+        window.DhritiBubbles.updateLoopState();
+      }
+      drawDonutChart();
     }
   }
 
@@ -376,48 +383,50 @@
     root.style.setProperty('--dash-bg-opacity', state.underlay.opacity / 100);
   }
 
-  // --- Donut Chart Renderer (Canvas-based) ---
+  // --- Donut Chart Renderer (Canvas-based for Desk & Mode 1 Tile 2) ---
   function drawDonutChart() {
-    if (!DOM.donutCanvas) return;
-    const ctx = DOM.donutCanvas.getContext('2d');
-    const w = DOM.donutCanvas.width;
-    const h = DOM.donutCanvas.height;
-    ctx.clearRect(0, 0, w, h);
+    const canvases = [DOM.donutCanvas, document.getElementById('tile-donut-stage-canvas')].filter(Boolean);
+    canvases.forEach(canvas => {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
 
-    const centerX = w / 2;
-    const centerY = h / 2;
-    const radius = 60;
-    const thickness = 18;
+      const centerX = w / 2;
+      const centerY = h / 2;
+      const radius = Math.min(centerX, centerY) - 18;
+      const thickness = 14;
 
-    const stagePct = 0.88;
-    const startAngle = -Math.PI / 2;
-    const stageAngle = startAngle + (Math.PI * 2 * stagePct);
+      const stagePct = 0.88;
+      const startAngle = -Math.PI / 2;
+      const stageAngle = startAngle + (Math.PI * 2 * stagePct);
 
-    // Track
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = state.theme === 'dark' ? '#2a304e' : '#e2e8f0';
-    ctx.lineWidth = thickness;
-    ctx.stroke();
+      // Track
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = state.theme === 'dark' ? '#2a304e' : '#e2e8f0';
+      ctx.lineWidth = thickness;
+      ctx.stroke();
 
-    // Stage Arc
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, startAngle, stageAngle);
-    ctx.strokeStyle = state.theme === 'dark' ? '#8b78f6' : '#00b894';
-    ctx.lineWidth = thickness;
-    ctx.lineCap = 'round';
-    ctx.stroke();
+      // Stage Arc
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, startAngle, stageAngle);
+      ctx.strokeStyle = state.theme === 'dark' ? '#8b78f6' : '#00b894';
+      ctx.lineWidth = thickness;
+      ctx.lineCap = 'round';
+      ctx.stroke();
 
-    // Center text
-    ctx.fillStyle = state.theme === 'dark' ? '#ffffff' : '#0f172a';
-    ctx.font = '700 22px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('88%', centerX, centerY - 2);
+      // Center text with Poiret One font
+      ctx.fillStyle = state.theme === 'dark' ? '#ffffff' : '#0f172a';
+      ctx.font = '700 22px "Poiret One", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('88%', centerX, centerY - 2);
 
-    ctx.fillStyle = state.theme === 'dark' ? '#a0a7c4' : '#64748b';
-    ctx.font = '500 11px system-ui, sans-serif';
-    ctx.fillText('STAGE', centerX, centerY + 16);
+      ctx.fillStyle = state.theme === 'dark' ? '#a0a7c4' : '#64748b';
+      ctx.font = 'italic 700 10px "Poiret One", sans-serif';
+      ctx.fillText('STAGE', centerX, centerY + 14);
+    });
   }
 
   // --- Topic-Time Stacked Bar Distribution (D-091 / L-11) ---
@@ -1292,6 +1301,19 @@
       });
     }
 
+    // Sidebar collapse / expand toggle
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    const btnExpandSidebarTab = document.getElementById('btn-expand-sidebar-tab');
+    function toggleSidebarCollapse() {
+      if (!DOM.appShell) return;
+      const isCollapsed = DOM.appShell.classList.toggle('sidebar-collapsed');
+      if (btnExpandSidebarTab) {
+        btnExpandSidebarTab.style.display = isCollapsed ? 'flex' : 'none';
+      }
+    }
+    if (btnToggleSidebar) btnToggleSidebar.addEventListener('click', toggleSidebarCollapse);
+    if (btnExpandSidebarTab) btnExpandSidebarTab.addEventListener('click', toggleSidebarCollapse);
+
     // Pick-Your-Poison modal
     if (DOM.btnOpenPoisonModal) DOM.btnOpenPoisonModal.addEventListener('click', openPickYourPoison);
     if (DOM.btnClosePoison) DOM.btnClosePoison.addEventListener('click', () => DOM.poisonModal.classList.remove('active'));
@@ -1529,6 +1551,7 @@
     updateTimerDisplay();
     updateUnderlayStyles();
     loadGallery();
+    drawDonutChart();
   }
 
   if (document.readyState === 'loading') {

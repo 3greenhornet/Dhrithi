@@ -88,140 +88,153 @@
     <!-- Tactile Bento Grid (Seamless Texture Projection on Front, Interactive Flip on Click) -->
     <div class="grid-board" id="grid-board">
 
-      <!-- 1. Pomodoro Focus Engine Tile -->
-      <div class="tile-wrapper bento-square-lg">
-        <div class="tactile-tile" data-tile-id="1">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">01 • Pomodoro Focus</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Pomodoro Focus</span>
-              <span class="widget-badge info">Ultradian</span>
-            </div>
-            <div class="pomo-display">
-              <div class="pomo-time" id="tile-pomo-time">25:00</div>
-              <div class="pomo-label">Deep Focus Zone</div>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-key">Acoustic Signal</div>
-              <div class="capsule-value">Synthesized modal singing bowl chime.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. Return Anchor Capsule Tile -->
+      <!-- 1. Return Anchor Capsule Tile (Mirrors The Desk Widget) -->
       <div class="tile-wrapper bento-wide">
         <div class="tactile-tile" data-tile-id="2">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">02 • Return Anchor</span>
+            <span class="tile-front-badge">01 • Return Anchor (D-090 Capsule)</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Return Anchor</span>
-              <span class="widget-badge success">Sovereign</span>
+              <span class="widget-title">Return Anchor (D-090)</span>
+              <span class="widget-badge success">Sovereign State</span>
             </div>
-            <div class="capsule-box">
+            <div class="capsule-box" style="margin-bottom: 8px;">
               <div class="capsule-key">Next Concrete Step</div>
               <div class="capsule-value" id="tile-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
             </div>
-            <div class="capsule-box" style="margin-top: 6px;">
+            <div class="capsule-box">
               <div class="capsule-key">Active Blocker</div>
-              <div class="capsule-value">None detected. Execution path unobstructed.</div>
+              <div class="capsule-value" id="tile-anchor-blocker">None detected. Sovereign execution path unobstructed.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 3. Stage Ratio Tile -->
-      <div class="tile-wrapper bento-wide">
+      <!-- 2. Stage Ratio Donut Tile (Mirrors The Desk Donut Chart) -->
+      <div class="tile-wrapper bento-square-lg">
         <div class="tactile-tile" data-tile-id="4">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">03 • Stage Ratio</span>
+            <span class="tile-front-badge">02 • Stage Ratio Donut (88%)</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Stage Ratio</span>
-              <span class="widget-badge success" id="tile-stage-badge">88% Output</span>
+              <span class="widget-title">Stage Ratio Donut</span>
+              <span class="widget-badge info">Output / Input</span>
             </div>
-            <div class="metric-label" style="margin-bottom: 6px;">Stage (Output) vs Audience (Input)</div>
-            <div class="ratio-bar" style="height: 12px; margin-bottom: 10px;">
-              <div class="ratio-stage" id="tile-ratio-bar-stage" style="width: 88%;"></div>
-              <div class="ratio-aud" id="tile-ratio-bar-aud" style="width: 12%;"></div>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">High generative throughput maintained.</div>
+            <div class="centered-body" style="padding-top: 6px;">
+              <canvas id="tile-donut-stage-canvas" width="130" height="130"></canvas>
+              <div class="donut-legend" style="margin-top: 8px;">
+                <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
+                <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 4. Active Session Tile -->
+      <!-- 3. Active Daily Contract Tile (Mirrors The Desk Contract Targets) -->
+      <div class="tile-wrapper bento-wide">
+        <div class="tactile-tile" data-tile-id="1">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">03 • Active Daily Contract (3 Targets)</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">Active Daily Contract</span>
+              <span class="widget-badge success">3 Targets</span>
+            </div>
+            <div class="metric-row" style="margin-bottom: 6px;">
+              <span class="metric-label">Tactile Lego Projection</span>
+              <span class="card-badge success">machine_check</span>
+            </div>
+            <div class="metric-row" style="margin-bottom: 6px;">
+              <span class="metric-label">Modern App Shell</span>
+              <span class="card-badge success">pytest_pass</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Life Mirror Thought Bubbles</span>
+              <span class="card-badge info">browser_verify</span>
+            </div>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-value">2 verified with machine proof.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Topic-Time Distribution Tile (Mirrors The Desk Domain Bars) -->
       <div class="tile-wrapper bento-wide">
         <div class="tactile-tile" data-tile-id="0">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">04 • Active Session</span>
+            <span class="tile-front-badge">04 • Topic-Time Distribution</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Active Session</span>
-              <span class="widget-badge info">Tracked</span>
+              <span class="widget-title">Topic-Time Distribution</span>
+              <span class="widget-badge info">Honest Metrics</span>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">Intent</span>
-              <span class="metric-val" id="tile-session-intent">Tactile App Shell & Topic Time</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Elapsed Focus</span>
-              <span class="metric-val">42 min</span>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">Zero cognitive leakage detected.</div>
+            <div class="topic-bars-container" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+              <div class="topic-bar-row">
+                <div class="topic-bar-header"><span class="topic-domain">github.com</span><span class="topic-dur">2.3h (140m)</span></div>
+                <div class="topic-track"><div class="topic-fill stage-fill" style="width: 78%;"></div></div>
+              </div>
+              <div class="topic-bar-row">
+                <div class="topic-bar-header"><span class="topic-domain">localhost:7311</span><span class="topic-dur">1.3h (80m)</span></div>
+                <div class="topic-track"><div class="topic-fill stage-fill" style="width: 44%;"></div></div>
+              </div>
+              <div class="topic-bar-row">
+                <div class="topic-bar-header"><span class="topic-domain">google.com/search</span><span class="topic-dur">0.4h (25m)</span></div>
+                <div class="topic-track"><div class="topic-fill aud-fill" style="width: 14%;"></div></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 5. ChatGuard Tile -->
+      <!-- 5. Decompression Zone Tile (Mirrors The Desk Decomp Widget) -->
       <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="3">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">05 • ChatGuard</span>
+            <span class="tile-front-badge">05 • Decompression Status</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">ChatGuard</span>
-              <span class="widget-badge success">Guarded</span>
+              <span class="widget-title">Decompression</span>
+              <span class="widget-badge warning">Transition Lock</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">15m Window</span>
-              <span class="metric-val">15m / 15m</span>
+              <span class="metric-label">Status</span>
+              <span class="metric-val">Armed on Finish</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Release</span>
+              <span class="metric-val">90m bounded</span>
             </div>
             <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">Prompt boundary active.</div>
+              <div class="capsule-value">Google search allowed; video blocked.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 6. Day Window Tile -->
+      <!-- 6. Focus Engine & Consecutive Days (Mirrors The Desk Stats) -->
       <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="5">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">06 • Day Window</span>
+            <span class="tile-front-badge">06 • Focus & 14 Day Streak</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Day Window</span>
-              <span class="widget-badge info">Open</span>
+              <span class="widget-title">Focus Engine</span>
+              <span class="widget-badge success">14 Days</span>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">Bounds</span>
-              <span class="metric-val">08:00 — 22:30</span>
+            <div class="pomo-display">
+              <div class="pomo-time" id="tile-pomo-time">25:00</div>
+              <div class="pomo-label">Ultradian Deep Focus</div>
             </div>
             <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">Evening protocol sets at 22:00.</div>
+              <div class="capsule-value">14 consecutive run days (L-2 record).</div>
             </div>
           </div>
         </div>
@@ -458,10 +471,9 @@
           <span class="brand-glyph">◈</span>
           <span class="brand-text">DHRITI</span>
         </div>
-        <div class="sidebar-status-tag">
-          <span class="status-indicator-dot"></span>
-          <span>SOVEREIGN</span>
-        </div>
+        <button type="button" class="sidebar-toggle-btn" id="btn-toggle-sidebar" title="Collapse Sidebar (‹)">
+          <span id="sidebar-toggle-arrow">‹</span>
+        </button>
       </div>
 
       <!-- Navigation Menu -->
@@ -530,6 +542,11 @@
 
     <!-- Main View Content Area -->
     <main class="shell-content" id="shell-content">
+
+      <!-- Floating Sidebar Re-expand Tab (Appears when sidebar collapsed) -->
+      <button type="button" class="sidebar-expand-tab" id="btn-expand-sidebar-tab" title="Open Sidebar (›)" style="display: none;">
+        <span>›</span>
+      </button>
 
       <!-- View 1: The Desk -->
       <section class="shell-view active" id="view-desk">
