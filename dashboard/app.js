@@ -1216,12 +1216,17 @@
       });
     }
 
-    // Tactile tile click in Mode 1 flips THAT individual tile locally (preserves artwork view!)
+    // Clicking tile in Mode 1 flips tile with audio and smoothly opens The Desk / target view in Dashboard
     DOM.tiles.forEach(tile => {
       tile.addEventListener('click', (e) => {
         e.stopPropagation();
-        tile.classList.toggle('is-flipped');
-        if (window.DhritiAudio) window.DhritiAudio.playFlipClick(0.6);
+        tile.classList.add('is-flipped');
+        if (window.DhritiAudio) window.DhritiAudio.playFlipClick(0.7);
+        const targetView = tile.getAttribute('data-view') || 'desk';
+        setTimeout(() => {
+          setMode('dashboard');
+          showView(targetView);
+        }, 180);
       });
     });
 

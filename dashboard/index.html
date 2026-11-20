@@ -38,7 +38,7 @@
         <span id="mode-badge-text">Art & Poem Mode</span>
       </div>
     </div>
-    <div class="header-center">
+    <div class="header-right">
       <div class="header-pomo-pill" id="header-pomo-pill" title="Click to view Pomodoro or toggle timer">
         <span class="pomo-dot" id="header-pomo-dot"></span>
         <span class="pomo-phase" id="header-pomo-phase">FOCUS</span>
@@ -53,8 +53,6 @@
           </svg>
         </button>
       </div>
-    </div>
-    <div class="header-right">
       <button class="nav-switch-btn" id="btn-toggle-dashboard-mode">
         <span id="btn-toggle-text">Enter Dashboard Shell</span>
       </button>
@@ -85,179 +83,179 @@
        ========================================================================= -->
   <main class="hero-viewport" id="hero-viewport">
 
-    <!-- Tactile Bento Grid (Seamless Texture Projection on Front, Interactive Flip on Click) -->
+    <!-- Tactile Bento Grid with 3-Column Architecture: Left Tiles | Center Quote | Right Tiles -->
     <div class="grid-board" id="grid-board">
 
-      <!-- 1. Return Anchor Capsule Tile (Mirrors The Desk Widget) -->
-      <div class="tile-wrapper bento-wide">
-        <div class="tactile-tile" data-tile-id="2">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">01 • Return Anchor (D-090 Capsule)</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Return Anchor (D-090)</span>
-              <span class="widget-badge success">Sovereign State</span>
+      <!-- Left Column: Desk Widgets (Tiles 1, 3, 5) -->
+      <div class="tile-column tile-column-left">
+        <!-- 1. Return Anchor Capsule Tile -->
+        <div class="tile-wrapper">
+          <div class="tactile-tile" data-tile-id="2" data-view="desk" title="Click to open The Desk (Return Anchor)">
+            <div class="tile-face tile-face-front">
+              <span class="tile-front-badge">01 • Return Anchor</span>
             </div>
-            <div class="capsule-box" style="margin-bottom: 8px;">
-              <div class="capsule-key">Next Concrete Step</div>
-              <div class="capsule-value" id="tile-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Active Blocker</div>
-              <div class="capsule-value" id="tile-anchor-blocker">None detected. Sovereign execution path unobstructed.</div>
+            <div class="tile-face tile-face-back">
+              <div class="widget-header">
+                <span class="widget-title">Return Anchor</span>
+                <span class="widget-badge success">Sovereign</span>
+              </div>
+              <div class="capsule-box" style="margin-bottom: 6px;">
+                <div class="capsule-key">Next Concrete Step</div>
+                <div class="capsule-value" id="tile-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
+              </div>
+              <div class="capsule-box">
+                <div class="capsule-key">Active Blocker</div>
+                <div class="capsule-value" id="tile-anchor-blocker">None detected. Sovereign execution path unobstructed.</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 2. Stage Ratio Donut Tile (Mirrors The Desk Donut Chart) -->
-      <div class="tile-wrapper bento-square-lg">
-        <div class="tactile-tile" data-tile-id="4">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">02 • Stage Ratio Donut (88%)</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Stage Ratio Donut</span>
-              <span class="widget-badge info">Output / Input</span>
+        <!-- 3. Active Daily Contract Tile -->
+        <div class="tile-wrapper">
+          <div class="tactile-tile" data-tile-id="1" data-view="tasks" title="Click to open Active Tasks Contract">
+            <div class="tile-face tile-face-front">
+              <span class="tile-front-badge">03 • Active Daily Contract</span>
             </div>
-            <div class="centered-body" style="padding-top: 6px;">
-              <canvas id="tile-donut-stage-canvas" width="130" height="130"></canvas>
-              <div class="donut-legend" style="margin-top: 8px;">
-                <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
-                <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
+            <div class="tile-face tile-face-back">
+              <div class="widget-header">
+                <span class="widget-title">Active Daily Contract</span>
+                <span class="widget-badge success">3 Targets</span>
+              </div>
+              <div class="metric-row" style="margin-bottom: 4px;">
+                <span class="metric-label">Tactile Lego Projection</span>
+                <span class="card-badge success">machine_check</span>
+              </div>
+              <div class="metric-row" style="margin-bottom: 4px;">
+                <span class="metric-label">Modern App Shell</span>
+                <span class="card-badge success">pytest_pass</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Life Mirror Thought Bubbles</span>
+                <span class="card-badge info">browser_verify</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Decompression Zone Tile -->
+        <div class="tile-wrapper">
+          <div class="tactile-tile" data-tile-id="3" data-view="guard" title="Click to open Decompression & Guard">
+            <div class="tile-face tile-face-front">
+              <span class="tile-front-badge">05 • Decompression Status</span>
+            </div>
+            <div class="tile-face tile-face-back">
+              <div class="widget-header">
+                <span class="widget-title">Decompression</span>
+                <span class="widget-badge warning">Transition Lock</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Status</span>
+                <span class="metric-val">Armed on Finish</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Release</span>
+                <span class="metric-val">90m bounded</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 3. Active Daily Contract Tile (Mirrors The Desk Contract Targets) -->
-      <div class="tile-wrapper bento-wide">
-        <div class="tactile-tile" data-tile-id="1">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">03 • Active Daily Contract (3 Targets)</span>
+      <!-- Center Column: Floating Quote & Bubbles Switch (Zero Overlap with Tiles!) -->
+      <div class="quote-center-column" id="floating-quote">
+        <div class="floating-quote-card">
+          <div class="quote-mark">“</div>
+          <div class="quote-text arvo-regular-italic" id="quote-text">
+            You have power over your mind - not outside events. Realize this, and you will find strength.
           </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Active Daily Contract</span>
-              <span class="widget-badge success">3 Targets</span>
-            </div>
-            <div class="metric-row" style="margin-bottom: 6px;">
-              <span class="metric-label">Tactile Lego Projection</span>
-              <span class="card-badge success">machine_check</span>
-            </div>
-            <div class="metric-row" style="margin-bottom: 6px;">
-              <span class="metric-label">Modern App Shell</span>
-              <span class="card-badge success">pytest_pass</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Life Mirror Thought Bubbles</span>
-              <span class="card-badge info">browser_verify</span>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">2 verified with machine proof.</div>
-            </div>
+          <div class="quote-author poiret-one-regular" id="quote-author">— Marcus Aurelius</div>
+          <div class="quote-refresh-hint arvo-regular-italic">Rotates hourly • Triple-click anywhere to cycle painting & poem</div>
+          <div class="quote-toggle-bar">
+            <button type="button" class="bubble-toggle-pill" id="btn-toggle-bubbles-image" title="Toggle Screensaver Floating Thought Bubbles (OFF / AUTO / ON)">
+              <span class="bubble-toggle-dot state-off" id="bubble-dot-image"></span>
+              <span>Thought Bubbles: <strong id="bubbles-mode-label-image">OFF</strong></span>
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- 4. Topic-Time Distribution Tile (Mirrors The Desk Domain Bars) -->
-      <div class="tile-wrapper bento-wide">
-        <div class="tactile-tile" data-tile-id="0">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">04 • Topic-Time Distribution</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Topic-Time Distribution</span>
-              <span class="widget-badge info">Honest Metrics</span>
+      <!-- Right Column: Desk Widgets (Tiles 2, 4, 6) -->
+      <div class="tile-column tile-column-right">
+        <!-- 2. Stage Ratio Donut Tile -->
+        <div class="tile-wrapper">
+          <div class="tactile-tile" data-tile-id="4" data-view="desk" title="Click to open The Desk (Stage Ratio)">
+            <div class="tile-face tile-face-front">
+              <span class="tile-front-badge">02 • Stage Ratio Donut (88%)</span>
             </div>
-            <div class="topic-bars-container" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
-              <div class="topic-bar-row">
-                <div class="topic-bar-header"><span class="topic-domain">github.com</span><span class="topic-dur">2.3h (140m)</span></div>
-                <div class="topic-track"><div class="topic-fill stage-fill" style="width: 78%;"></div></div>
+            <div class="tile-face tile-face-back">
+              <div class="widget-header">
+                <span class="widget-title">Stage Ratio Donut</span>
+                <span class="widget-badge info">Output / Input</span>
               </div>
-              <div class="topic-bar-row">
-                <div class="topic-bar-header"><span class="topic-domain">localhost:7311</span><span class="topic-dur">1.3h (80m)</span></div>
-                <div class="topic-track"><div class="topic-fill stage-fill" style="width: 44%;"></div></div>
-              </div>
-              <div class="topic-bar-row">
-                <div class="topic-bar-header"><span class="topic-domain">google.com/search</span><span class="topic-dur">0.4h (25m)</span></div>
-                <div class="topic-track"><div class="topic-fill aud-fill" style="width: 14%;"></div></div>
+              <div class="centered-body" style="padding-top: 4px;">
+                <canvas id="tile-donut-stage-canvas" width="120" height="120"></canvas>
+                <div class="donut-legend" style="margin-top: 6px;">
+                  <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
+                  <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 5. Decompression Zone Tile (Mirrors The Desk Decomp Widget) -->
-      <div class="tile-wrapper bento-square-sm">
-        <div class="tactile-tile" data-tile-id="3">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">05 • Decompression Status</span>
+        <!-- 4. Topic-Time Distribution Tile -->
+        <div class="tile-wrapper">
+          <div class="tactile-tile" data-tile-id="0" data-view="topics" title="Click to open Topics & Time Distribution">
+            <div class="tile-face tile-face-front">
+              <span class="tile-front-badge">04 • Topic-Time Distribution</span>
+            </div>
+            <div class="tile-face tile-face-back">
+              <div class="widget-header">
+                <span class="widget-title">Topic-Time</span>
+                <span class="widget-badge info">Honest Metrics</span>
+              </div>
+              <div class="topic-bars-container" style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
+                <div class="topic-bar-row">
+                  <div class="topic-bar-header"><span class="topic-domain">github.com</span><span class="topic-dur">2.3h</span></div>
+                  <div class="topic-track"><div class="topic-fill stage-fill" style="width: 78%;"></div></div>
+                </div>
+                <div class="topic-bar-row">
+                  <div class="topic-bar-header"><span class="topic-domain">localhost:7311</span><span class="topic-dur">1.3h</span></div>
+                  <div class="topic-track"><div class="topic-fill stage-fill" style="width: 44%;"></div></div>
+                </div>
+                <div class="topic-bar-row">
+                  <div class="topic-bar-header"><span class="topic-domain">google.com</span><span class="topic-dur">0.4h</span></div>
+                  <div class="topic-track"><div class="topic-fill aud-fill" style="width: 14%;"></div></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Decompression</span>
-              <span class="widget-badge warning">Transition Lock</span>
+        </div>
+
+        <!-- 6. Focus Engine & Consecutive Days -->
+        <div class="tile-wrapper">
+          <div class="tactile-tile" data-tile-id="5" data-view="focus" title="Click to open Pomodoro Focus Engine">
+            <div class="tile-face tile-face-front">
+              <span class="tile-front-badge">06 • Focus & 14 Day Streak</span>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">Status</span>
-              <span class="metric-val">Armed on Finish</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Release</span>
-              <span class="metric-val">90m bounded</span>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">Google search allowed; video blocked.</div>
+            <div class="tile-face tile-face-back">
+              <div class="widget-header">
+                <span class="widget-title">Focus Engine</span>
+                <span class="widget-badge success">14 Days</span>
+              </div>
+              <div class="pomo-display" style="margin: 4px 0;">
+                <div class="pomo-time" id="tile-pomo-time">25:00</div>
+                <div class="pomo-label">Ultradian Deep Focus</div>
+              </div>
+              <div class="capsule-box" style="margin-top: auto;">
+                <div class="capsule-value">14 consecutive run days (L-2 record).</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 6. Focus Engine & Consecutive Days (Mirrors The Desk Stats) -->
-      <div class="tile-wrapper bento-square-sm">
-        <div class="tactile-tile" data-tile-id="5">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">06 • Focus & 14 Day Streak</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Focus Engine</span>
-              <span class="widget-badge success">14 Days</span>
-            </div>
-            <div class="pomo-display">
-              <div class="pomo-time" id="tile-pomo-time">25:00</div>
-              <div class="pomo-label">Ultradian Deep Focus</div>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value">14 consecutive run days (L-2 record).</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Centered Translucent Floating Quote Card (Top Z-Index) -->
-    <div class="floating-quote-container" id="floating-quote">
-      <div class="floating-quote-card">
-        <div class="quote-mark">“</div>
-        <div class="quote-text arvo-regular-italic" id="quote-text">
-          You have power over your mind - not outside events. Realize this, and you will find strength.
-        </div>
-        <div class="quote-author poiret-one-regular" id="quote-author">— Marcus Aurelius</div>
-        <div class="quote-refresh-hint arvo-regular-italic">Rotates hourly • Triple-click anywhere to cycle painting & poem</div>
-        <div class="quote-toggle-bar">
-          <button type="button" class="bubble-toggle-pill" id="btn-toggle-bubbles-image" title="Toggle Screensaver Floating Thought Bubbles (OFF / AUTO / ON)">
-            <span class="bubble-toggle-dot state-off" id="bubble-dot-image"></span>
-            <span>Thought Bubbles: <strong id="bubbles-mode-label-image">OFF</strong></span>
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- Scroll Down Hint Pill -->
