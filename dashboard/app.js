@@ -1,19 +1,21 @@
 /**
- * Dhriti Tactile Dual-Mode Dashboard Controller
+ * Dhriti Tactile Dual-Mode Focus Dashboard & App Shell Controller (v0.7.0+)
  * Handles:
- * 1. Dual-mode transitions (Picture/Quote/Poem vs Focus Dashboard)
- * 2. Solitaire/Minesweeper corner-to-corner wave flip sweep
- * 3. Triple-click gestures (cycle art/poem in Mode 1, return in Mode 2)
- * 4. Pomodoro focus engine (25/5, 50/15, 100/30)
- * 5. Dynamic quote hourly rotation & customizable gallery
- * 6. Live Dhriti Bridge telemetry connector
- * 7. Frosted glass settings manager
+ * 1. Dual-mode transitions (Art, Quote & Suspended Poem vs Executive App Shell)
+ * 2. Solitaire wave sweep on tactile Lego blocks
+ * 3. Navigation across views (The Desk, Focus, Tasks, Completed, Topics, Parking, Mirror, Backlog, Guard, Stats, Ledger, Settings)
+ * 4. Procedural Pomodoro Engine with procedural alarms and ambient noise generator
+ * 5. Life Mirror floating thought bubbles (D-092) with uniform random selection & silent expiry
+ * 6. Dynamic Backlog & Pick-Your-Poison task balancer (D-093)
+ * 7. Live Topic-Time stacked bar distributions (D-091 / L-11)
+ * 8. Decompression Zone manager & Daily Lockdown controller (L-6 Asymmetric consent)
+ * 9. Dark Purple & Light Cyan theme toggles with live underlay dials
  */
 
 (function () {
   'use strict';
 
-  // --- Default Curated Datasets ---
+  // --- Curated Artwork Sets ---
   const DEFAULT_ARTWORKS = [
     {
       id: 'art-1',
@@ -42,6 +44,7 @@
     }
   ];
 
+  // --- Curated Quotes ---
   const DEFAULT_QUOTES = [
     {
       text: "You have power over your mind - not outside events. Realize this, and you will find strength.",
@@ -66,366 +69,501 @@
     {
       text: "One who has conquered the mind has already reached tranquility in cold and heat, joy and sorrow.",
       author: "Bhagavad Gita 6.7"
-    },
-    {
-      text: "Do not wait for extraordinary circumstances to do good action; try to use ordinary situations.",
-      author: "Jean Paul Richter"
     }
+  ];
+
+  // --- Declared Life Alternatives (D-092) ---
+  const DEFAULT_LIFE_ALTS = [
+    { id: 'life-1', label: 'Back exercises — min 10m', category: 'physical', duration: 10 },
+    { id: 'life-2', label: 'Walk around neighborhood — 15m', category: 'nature', duration: 15 },
+    { id: 'life-3', label: 'Acoustic guitar practice — 20m', category: 'offline_craft', duration: 20 },
+    { id: 'life-4', label: 'Deep breathing & posture reset — 5m', category: 'rest', duration: 5 },
+    { id: 'life-5', label: 'Read physical book chapter — 15m', category: 'reading', duration: 15 }
+  ];
+
+  // --- Backlog Repository (D-093) ---
+  const DEFAULT_BACKLOG = [
+    { id: 'task-101', title: 'Write zero-sample synthesized chime tests', units: 1.0, tier: 'medium' },
+    { id: 'task-102', title: 'Verify FTS5 virtual table synchronization', units: 2.0, tier: 'hard' },
+    { id: 'task-103', title: 'Review topic tokenization stopwords dictionary', units: 0.5, tier: 'light' },
+    { id: 'task-104', title: 'Refactor bridge decompression strike counter', units: 1.0, tier: 'medium' },
+    { id: 'task-105', title: 'Implement Vidura hierarchical topic tree tests', units: 2.0, tier: 'hard' },
+    { id: 'task-106', title: 'Format daily topic-time stacked bar renderer', units: 0.5, tier: 'light' },
+    { id: 'task-107', title: 'Full compiler optimization pass on audit chain', units: 3.0, tier: 'challenging' }
   ];
 
   // --- App State ---
   const state = {
     mode: 'picture', // 'picture' | 'dashboard'
-    theme: 'dark', // 'dark' (executive purple/navy) | 'light' (pure white/cyan)
+    currentView: 'desk',
+    theme: 'dark', // 'dark' | 'light'
     underlay: {
       brightness: 88,
       blur: 5,
       opacity: 88
     },
     currentArtIndex: 0,
-    artworks: [],
-    quotes: [],
+    artworks: DEFAULT_ARTWORKS,
+    quotes: DEFAULT_QUOTES,
     currentQuoteIndex: 0,
-    bridgeOnline: false,
-    bridgeHost: 'http://127.0.0.1:7311',
+    lifeAlts: DEFAULT_LIFE_ALTS,
+    backlog: DEFAULT_BACKLOG,
+    activeTasks: [
+      { id: 'task-1', title: 'Complete tactile Lego projection & Solitaire flip', units: 1.0, proof: 'machine_check', done: true },
+      { id: 'task-2', title: 'Modernize App Shell & Executive dark theme', units: 2.0, proof: 'pytest_pass', done: true },
+      { id: 'task-3', title: 'Wire procedural alarms and Life Mirror thought bubbles', units: 1.0, proof: 'browser_verify', done: false }
+    ],
+    completedTasks: [
+      { id: 'task-0', title: 'Implement separate Vidura SQLite storage and topic tree', proof: 'sha256:4f8e...ba12', timestamp: '11:20' },
+      { id: 'task-prev', title: 'Commit and push prior state before major additions', proof: 'git:658420a', timestamp: '12:45' }
+    ],
+    parkingItems: [
+      { id: 'park-1', text: 'Consider PyTorch WASM inference for local text embeddings', age_days: 1, type: 'spark' },
+      { id: 'park-2', text: 'Explore Japanese Pythagorean scale frequencies for chimes', age_days: 0, type: 'spark' }
+    ],
+    topicTime: [
+      { domain: 'github.com', category: 'Stage (Code & Docs)', duration_min: 140, is_stage: true },
+      { domain: 'localhost:7311', category: 'Stage (Dashboard & Bridge)', duration_min: 80, is_stage: true },
+      { domain: 'google.com/search', category: 'Stage (Docs Query)', duration_min: 25, is_stage: true },
+      { domain: 'random-blog.org', category: 'Audience (Drift Attempt)', duration_min: 12, is_stage: false }
+    ],
+    decompression: {
+      active: false,
+      remaining_min: 90,
+      strikes: 0,
+      max_strikes: 4
+    },
     pomodoro: {
-      mode: 'standard', // 'standard' (25/5), 'extended' (50/15), 'deep' (100/30)
+      mode: 'standard', // 'standard' | 'extended' | 'deep'
       presets: {
         standard: { focus: 25 * 60, break: 5 * 60 },
         extended: { focus: 50 * 60, break: 15 * 60 },
         deep: { focus: 100 * 60, break: 30 * 60 }
       },
-      phase: 'focus', // 'focus' | 'break'
+      phase: 'focus',
       remaining: 25 * 60,
       isRunning: false,
-      timerId: null
+      timerId: null,
+      noisePlaying: false,
+      alarmSound: 'singing_bowl'
     },
-    bridgeData: {
-      session: {
-        active: false,
-        intent: 'Deep System Architecture',
-        started_at: null,
-        duration_minutes: 42
-      },
-      anchor: {
-        next_action: 'Finalize tactile Solitaire flip sweep and link chimes engine',
-        blocker: 'None detected',
-        updated_at: 'Just now'
-      },
-      guard: {
-        budget_remaining: 15,
-        burst_cooldown: 0,
-        tier: 'Normal'
-      },
-      stage: {
-        stage_percent: 88,
-        audience_percent: 12,
-        drift_status: 'Guarded'
-      },
-      window: {
-        curfew: '22:00',
-        remaining_hours: 6.5
-      }
-    }
+    bubbleTimerId: null
   };
 
   // --- DOM Elements Cache ---
   const DOM = {};
 
-  function initDOMCache() {
+  function initDOM() {
     DOM.body = document.body;
+    DOM.heroViewport = document.getElementById('hero-viewport');
+    DOM.appShell = document.getElementById('app-shell');
     DOM.gridBoard = document.getElementById('grid-board');
     DOM.tiles = Array.from(document.querySelectorAll('.tactile-tile'));
     DOM.floatingQuote = document.getElementById('floating-quote');
     DOM.quoteText = document.getElementById('quote-text');
     DOM.quoteAuthor = document.getElementById('quote-author');
-    DOM.modeBadge = document.getElementById('mode-badge');
-    DOM.statusDot = document.getElementById('status-dot');
-    DOM.btnSettings = document.getElementById('btn-settings');
+    DOM.modeBadgeText = document.getElementById('mode-badge-text');
+    DOM.btnToggleMode = document.getElementById('btn-toggle-dashboard-mode');
+    DOM.btnToggleText = document.getElementById('btn-toggle-text');
     DOM.btnThemeToggle = document.getElementById('btn-theme-toggle');
+    DOM.themeIconDark = document.getElementById('theme-icon-dark');
+    DOM.themeIconLight = document.getElementById('theme-icon-light');
+    DOM.bubbleLayer = document.getElementById('bubble-layer');
+    DOM.miniTimerPill = document.getElementById('mini-timer-pill');
+    DOM.miniTimerDisplay = document.getElementById('mini-timer-display');
+    DOM.btnReturnArt = document.getElementById('btn-return-art');
+    DOM.navItems = Array.from(document.querySelectorAll('.nav-item'));
+    DOM.shellViews = Array.from(document.querySelectorAll('.shell-view'));
+
+    // Desk elements
+    DOM.deskTopicBars = document.getElementById('desk-topic-bars');
+    DOM.donutCanvas = document.getElementById('donut-stage-canvas');
+    DOM.quickParkInput = document.getElementById('quick-park-input');
+    DOM.btnQuickPark = document.getElementById('btn-quick-park');
+    DOM.quickParkFeedback = document.getElementById('quick-park-feedback');
+
+    // Focus elements
+    DOM.focusBigTimer = document.getElementById('focus-big-timer');
+    DOM.btnFocusStart = document.getElementById('btn-focus-start');
+    DOM.btnFocusReset = document.getElementById('btn-focus-reset');
+    DOM.focusPresetBtns = Array.from(document.querySelectorAll('.pomo-preset-btn'));
+    DOM.alarmSoundSelect = document.getElementById('alarm-sound-select');
+    DOM.btnTestAlarm = document.getElementById('btn-test-alarm');
+    DOM.btnToggleNoise = document.getElementById('btn-toggle-noise');
+    DOM.sliderNoiseVol = document.getElementById('slider-noise-vol');
+    DOM.valNoiseVol = document.getElementById('val-noise-vol');
+
+    // Tasks elements
+    DOM.contractTaskList = document.getElementById('contract-task-list');
+    DOM.completedTaskList = document.getElementById('completed-task-list');
+    DOM.btnOpenPoisonModal = document.getElementById('btn-open-poison-modal');
+    DOM.poisonModal = document.getElementById('poison-modal-overlay');
+    DOM.btnClosePoison = document.getElementById('btn-close-poison');
+    DOM.poisonOptionsGrid = document.getElementById('poison-options-grid');
+
+    // Parking & Mirror
+    DOM.parkingTimelineContainer = document.getElementById('parking-timeline-container');
+    DOM.lifeAltList = document.getElementById('life-alt-list');
+    DOM.btnAddLifeAlt = document.getElementById('btn-add-life-alt');
+    DOM.lifeModal = document.getElementById('life-modal-overlay');
+    DOM.btnCloseLife = document.getElementById('btn-close-life');
+    DOM.btnSaveLifeAlt = document.getElementById('btn-save-life-alt');
+    DOM.newLifeLabel = document.getElementById('new-life-label');
+    DOM.newLifeCategory = document.getElementById('new-life-category');
+    DOM.newLifeDuration = document.getElementById('new-life-duration');
+
+    // Backlog & Guard
+    DOM.backlogTableContainer = document.getElementById('backlog-table-container');
+    DOM.btnEvalAutofill = document.getElementById('btn-eval-autofill');
+    DOM.guardTestPrompt = document.getElementById('guard-test-prompt');
+    DOM.btnEvalPrompt = document.getElementById('btn-eval-prompt');
+    DOM.guardVerdictBox = document.getElementById('guard-verdict-box');
+
+    // Lockdown Modal
+    DOM.btnLockdown = document.getElementById('btn-lockdown');
+    DOM.lockdownModal = document.getElementById('lockdown-modal-overlay');
+    DOM.btnCloseLockdown = document.getElementById('btn-close-lockdown');
+    DOM.btnConfirmLockdown = document.getElementById('btn-confirm-lockdown');
+    DOM.btnCancelLockdown = document.getElementById('btn-cancel-lockdown');
+
+    // Settings elements
+    DOM.btnSettings = document.getElementById('btn-settings');
     DOM.settingsOverlay = document.getElementById('settings-overlay');
     DOM.btnCloseSettings = document.getElementById('btn-close-settings');
-    DOM.themeCardDark = document.getElementById('theme-card-dark');
-    DOM.themeCardLight = document.getElementById('theme-card-light');
-    DOM.sliderBrightness = document.getElementById('slider-bg-brightness');
-    DOM.sliderBlur = document.getElementById('slider-bg-blur');
-    DOM.sliderOpacity = document.getElementById('slider-bg-opacity');
-    DOM.valBrightness = document.getElementById('val-bg-brightness');
-    DOM.valBlur = document.getElementById('val-bg-blur');
-    DOM.valOpacity = document.getElementById('val-bg-opacity');
-    DOM.btnResetUnderlay = document.getElementById('btn-reset-underlay');
-    DOM.pomoTime = document.getElementById('pomo-time');
-    DOM.pomoLabel = document.getElementById('pomo-label');
-    DOM.btnPomoToggle = document.getElementById('btn-pomo-toggle');
-    DOM.btnPomoReset = document.getElementById('btn-pomo-reset');
-    DOM.pomoPresetBtns = document.querySelectorAll('.pomo-preset-btn');
-    DOM.artThumbGrid = document.getElementById('art-preset-grid');
-    DOM.customArtInput = document.getElementById('custom-art-url');
-    DOM.btnAddArt = document.getElementById('btn-add-art');
-    DOM.quotesList = document.getElementById('quotes-manager-list');
-    DOM.inputNewQuoteText = document.getElementById('new-quote-text');
-    DOM.inputNewQuoteAuthor = document.getElementById('new-quote-author');
-    DOM.btnAddQuote = document.getElementById('btn-add-quote');
+    DOM.shellSliderBrightness = document.getElementById('shell-slider-brightness');
+    DOM.shellSliderBlur = document.getElementById('shell-slider-blur');
+    DOM.shellSliderOpacity = document.getElementById('shell-slider-opacity');
+    DOM.shellValBrightness = document.getElementById('shell-val-brightness');
+    DOM.shellValBlur = document.getElementById('shell-val-blur');
+    DOM.shellValOpacity = document.getElementById('shell-val-opacity');
+    DOM.shellThemeCardDark = document.getElementById('shell-theme-card-dark');
+    DOM.shellThemeCardLight = document.getElementById('shell-theme-card-light');
+    DOM.artPresetGrid = document.getElementById('art-preset-grid');
+    DOM.quotesManagerList = document.getElementById('quotes-manager-list');
+    DOM.streakRibbon = document.getElementById('stats-streak-ribbon');
+    DOM.ledgerContainer = document.getElementById('ledger-events-container');
+    DOM.topicsBreakdownContainer = document.getElementById('topics-breakdown-container');
+    DOM.coOccurrenceContainer = document.getElementById('co-occurrence-chips-container');
   }
 
-  // --- Theme & Live Underlay Appearance Engine ---
-  function applyTheme(themeName) {
-    state.theme = themeName === 'light' ? 'light' : 'dark';
-    document.body.classList.remove('theme-dark', 'theme-light');
-    document.body.classList.add(`theme-${state.theme}`);
-    localStorage.setItem('dhriti_theme', state.theme);
-
-    // Update settings modal theme cards
-    if (DOM.themeCardDark && DOM.themeCardLight) {
-      if (state.theme === 'dark') {
-        DOM.themeCardDark.classList.add('active');
-        DOM.themeCardLight.classList.remove('active');
-      } else {
-        DOM.themeCardLight.classList.add('active');
-        DOM.themeCardDark.classList.remove('active');
-      }
-    }
-  }
-
-  function applyUnderlaySettings(settings, save = true) {
-    if (settings.brightness !== undefined) state.underlay.brightness = Number(settings.brightness);
-    if (settings.blur !== undefined) state.underlay.blur = Number(settings.blur);
-    if (settings.opacity !== undefined) state.underlay.opacity = Number(settings.opacity);
-
-    const root = document.documentElement;
-    root.style.setProperty('--dash-bg-brightness', (state.underlay.brightness / 100).toString());
-    root.style.setProperty('--dash-bg-blur', `${state.underlay.blur}px`);
-    root.style.setProperty('--dash-bg-opacity', (state.underlay.opacity / 100).toString());
-
-    if (DOM.sliderBrightness) DOM.sliderBrightness.value = state.underlay.brightness;
-    if (DOM.sliderBlur) DOM.sliderBlur.value = state.underlay.blur;
-    if (DOM.sliderOpacity) DOM.sliderOpacity.value = state.underlay.opacity;
-
-    if (DOM.valBrightness) DOM.valBrightness.textContent = `${state.underlay.brightness}%`;
-    if (DOM.valBlur) DOM.valBlur.textContent = `${state.underlay.blur} px`;
-    if (DOM.valOpacity) DOM.valOpacity.textContent = `${state.underlay.opacity}%`;
-
-    if (save) {
-      localStorage.setItem('dhriti_underlay_settings', JSON.stringify(state.underlay));
-    }
-  }
-
-  // --- Local Storage Hydration ---
-  function hydrateStorage() {
-    try {
-      const savedArt = localStorage.getItem('dhriti_artworks');
-      state.artworks = savedArt ? JSON.parse(savedArt) : [...DEFAULT_ARTWORKS];
-    } catch (e) {
-      state.artworks = [...DEFAULT_ARTWORKS];
-    }
-
-    try {
-      const savedQuotes = localStorage.getItem('dhriti_quotes');
-      state.quotes = savedQuotes ? JSON.parse(savedQuotes) : [...DEFAULT_QUOTES];
-    } catch (e) {
-      state.quotes = [...DEFAULT_QUOTES];
-    }
-
-    // Hydrate Theme
-    const savedTheme = localStorage.getItem('dhriti_theme') || 'dark';
-    applyTheme(savedTheme);
-
-    // Hydrate Underlay settings
-    try {
-      const savedUnderlay = localStorage.getItem('dhriti_underlay_settings');
-      if (savedUnderlay) {
-        const parsed = JSON.parse(savedUnderlay);
-        applyUnderlaySettings(parsed, false);
-      } else {
-        applyUnderlaySettings({ brightness: 88, blur: 5, opacity: 88 }, false);
-      }
-    } catch (e) {
-      applyUnderlaySettings({ brightness: 88, blur: 5, opacity: 88 }, false);
-    }
-
-    // Set initial artwork
-    applyArtwork(0);
-
-    // Compute hourly quote rotation
-    rotateQuoteHourly();
-  }
-
-  function applyArtwork(index) {
-    if (!state.artworks.length) return;
-    state.currentArtIndex = (index + state.artworks.length) % state.artworks.length;
-    const art = state.artworks[state.currentArtIndex];
-    document.documentElement.style.setProperty('--bg-image', `url('${art.url}')`);
-  }
-
-  function rotateQuoteHourly() {
-    if (!state.quotes.length) return;
-    // Current hour seed ensures all synchronized devices see same quote per hour
-    const hourSeed = Math.floor(Date.now() / (1000 * 60 * 60));
-    state.currentQuoteIndex = hourSeed % state.quotes.length;
-    renderQuote();
-  }
-
-  function renderQuote() {
-    if (!state.quotes.length || !DOM.quoteText) return;
-    const q = state.quotes[state.currentQuoteIndex];
-    DOM.quoteText.textContent = `“${q.text}”`;
-    DOM.quoteAuthor.textContent = `— ${q.author}`;
-  }
-
-  // --- Solitaire / Minesweeper Spatial Wave Flip Sweep ---
-  function flipToDashboard(originTile) {
-    if (state.mode === 'dashboard') return;
-    state.mode = 'dashboard';
-    DOM.body.classList.add('mode-dashboard');
-    DOM.modeBadge.innerHTML = `<span class="status-dot"></span> Focus Dashboard`;
-
-    // Calculate wave sweep delay using true Euclidean pixel distance from clicked tile center
-    const originRect = (originTile || DOM.tiles[0]).getBoundingClientRect();
-    const ox = originRect.left + originRect.width / 2;
-    const oy = originRect.top + originRect.height / 2;
-
-    DOM.tiles.forEach((tile) => {
-      const rect = tile.getBoundingClientRect();
-      const tx = rect.left + rect.width / 2;
-      const ty = rect.top + rect.height / 2;
-      const distance = Math.hypot(tx - ox, ty - oy);
-      const delay = Math.round(distance * 0.42);
-
-      setTimeout(() => {
-        tile.classList.add('flipped');
-        if (window.DhritiAudio) {
-          window.DhritiAudio.playCardFlip(1.0 + (distance / 700) * 0.4);
-        }
-      }, delay);
-    });
-  }
-
-  function returnToPictureMode(originTile) {
-    if (state.mode === 'picture') return;
-    state.mode = 'picture';
-    DOM.body.classList.remove('mode-dashboard');
-    DOM.modeBadge.innerHTML = `<span class="status-dot"></span> Art & Poem Mode`;
-
-    const originRect = (originTile || DOM.tiles[0]).getBoundingClientRect();
-    const ox = originRect.left + originRect.width / 2;
-    const oy = originRect.top + originRect.height / 2;
-
-    DOM.tiles.forEach((tile) => {
-      const rect = tile.getBoundingClientRect();
-      const tx = rect.left + rect.width / 2;
-      const ty = rect.top + rect.height / 2;
-      const distance = Math.hypot(tx - ox, ty - oy);
-      const delay = Math.round(distance * 0.35);
-
-      setTimeout(() => {
-        tile.classList.remove('flipped');
-        if (window.DhritiAudio) {
-          window.DhritiAudio.playCardFlip(1.4 - (distance / 700) * 0.35);
-        }
-      }, delay);
-    });
-
-    if (window.DhritiAudio) {
-      window.DhritiAudio.playChime(659.25, 0.4);
-    }
-  }
-
-  // --- Triple Click Detection ---
-  let clickCount = 0;
-  let clickResetTimer = null;
-
-  function registerTripleClickGesture() {
-    window.addEventListener('click', (e) => {
-      // Don't trigger if interacting inside settings modal or interactive controls
-      if (e.target.closest('#settings-overlay') || 
-          e.target.closest('.pomo-controls') || 
-          e.target.closest('.drawer-btn') ||
-          e.target.closest('button') ||
-          e.target.closest('input')) {
-        return;
-      }
-
-      clickCount++;
-      clearTimeout(clickResetTimer);
-      clickResetTimer = setTimeout(() => {
-        clickCount = 0;
-      }, 420);
-
-      if (clickCount >= 3) {
-        clickCount = 0;
-        handleTripleClick();
-      }
-    });
-  }
-
-  function handleTripleClick() {
-    if (state.mode === 'dashboard') {
-      // Return gesture from Dashboard to Picture Mode
-      returnToPictureMode(DOM.tiles[Math.floor(DOM.tiles.length / 2)]);
+  // --- Dual-Mode Router ---
+  function setMode(newMode) {
+    state.mode = newMode;
+    if (newMode === 'dashboard') {
+      DOM.body.classList.remove('mode-picture');
+      DOM.body.classList.add('mode-dashboard');
+      DOM.appShell.style.display = 'flex';
+      DOM.modeBadgeText.textContent = 'Dashboard Shell';
+      DOM.btnToggleText.textContent = 'Art & Poem Mode';
+      showView(state.currentView || 'desk');
+      drawDonutChart();
+      renderTopicBars();
     } else {
-      // Cycle to new background artwork and trigger fresh poem refresh
-      state.currentArtIndex = (state.currentArtIndex + 1) % state.artworks.length;
-      applyArtwork(state.currentArtIndex);
-
-      if (PoetryDB) {
-        PoetryDB.fetchRandomPoem();
-      } else if (window.DhritiChimes && window.DhritiChimes.nextPoemPreset) {
-        window.DhritiChimes.nextPoemPreset();
-      }
-
-      if (window.DhritiAudio) {
-        window.DhritiAudio.playCompletionBell();
-      }
+      DOM.body.classList.remove('mode-dashboard');
+      DOM.body.classList.add('mode-picture');
+      DOM.appShell.style.display = 'none';
+      DOM.modeBadgeText.textContent = 'Art & Poem Mode';
+      DOM.btnToggleText.textContent = 'Enter Dashboard Shell';
     }
   }
 
-  // --- Tile Click Binding ---
-  function bindTileClicks() {
-    DOM.tiles.forEach((tile) => {
-      tile.addEventListener('click', (e) => {
-        // In Picture mode: single click triggers the Solitaire wave sweep
-        if (state.mode === 'picture') {
-          flipToDashboard(tile);
+  function showView(viewId) {
+    state.currentView = viewId;
+    DOM.navItems.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === viewId);
+    });
+    DOM.shellViews.forEach(view => {
+      view.classList.toggle('active', view.id === `view-${viewId}`);
+    });
+
+    if (viewId === 'desk') {
+      drawDonutChart();
+      renderTopicBars();
+    } else if (viewId === 'tasks') {
+      renderContractTasks();
+    } else if (viewId === 'completed') {
+      renderCompletedTasks();
+    } else if (viewId === 'topics') {
+      renderTopicsView();
+    } else if (viewId === 'parking') {
+      renderParkingTimeline();
+    } else if (viewId === 'mirror') {
+      renderLifeAlts();
+    } else if (viewId === 'backlog') {
+      renderBacklogTable();
+    } else if (viewId === 'stats') {
+      renderStreakRibbon();
+    } else if (viewId === 'ledger') {
+      renderLedgerTable();
+    }
+  }
+
+  // --- Solitaire / Minesweeper Wave Sweep Flip ---
+  function flipToDashboard() {
+    if (state.mode === 'dashboard') return;
+    if (window.DhritiAudio) window.DhritiAudio.playFlipClick(0.8);
+
+    // Wave cascade flip on tactile tiles
+    DOM.tiles.forEach((tile, idx) => {
+      const delay = idx * 60;
+      setTimeout(() => {
+        tile.classList.add('is-flipped');
+        if (window.DhritiAudio && idx % 2 === 0) window.DhritiAudio.playChime(idx, 0.3);
+      }, delay);
+    });
+
+    setTimeout(() => {
+      setMode('dashboard');
+    }, DOM.tiles.length * 60 + 350);
+  }
+
+  function returnToArt() {
+    setMode('picture');
+    DOM.tiles.forEach(tile => tile.classList.remove('is-flipped'));
+    if (window.DhritiAudio) window.DhritiAudio.playChime(0, 0.4);
+  }
+
+  // --- Theme Controller ---
+  function setTheme(newTheme) {
+    state.theme = newTheme;
+    if (newTheme === 'light') {
+      DOM.body.classList.remove('theme-dark');
+      DOM.body.classList.add('theme-light');
+      DOM.themeIconDark.style.display = 'none';
+      DOM.themeIconLight.style.display = 'block';
+    } else {
+      DOM.body.classList.remove('theme-light');
+      DOM.body.classList.add('theme-dark');
+      DOM.themeIconDark.style.display = 'block';
+      DOM.themeIconLight.style.display = 'none';
+    }
+    updateUnderlayStyles();
+    drawDonutChart();
+  }
+
+  function updateUnderlayStyles() {
+    const root = document.documentElement;
+    root.style.setProperty('--dash-bg-brightness', state.underlay.brightness / 100);
+    root.style.setProperty('--dash-bg-blur', `${state.underlay.blur}px`);
+    root.style.setProperty('--dash-bg-opacity', state.underlay.opacity / 100);
+  }
+
+  // --- Donut Chart Renderer (Canvas-based) ---
+  function drawDonutChart() {
+    if (!DOM.donutCanvas) return;
+    const ctx = DOM.donutCanvas.getContext('2d');
+    const w = DOM.donutCanvas.width;
+    const h = DOM.donutCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const centerX = w / 2;
+    const centerY = h / 2;
+    const radius = 60;
+    const thickness = 18;
+
+    const stagePct = 0.88;
+    const startAngle = -Math.PI / 2;
+    const stageAngle = startAngle + (Math.PI * 2 * stagePct);
+
+    // Track
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = state.theme === 'dark' ? '#2a304e' : '#e2e8f0';
+    ctx.lineWidth = thickness;
+    ctx.stroke();
+
+    // Stage Arc
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, startAngle, stageAngle);
+    ctx.strokeStyle = state.theme === 'dark' ? '#8b78f6' : '#00b894';
+    ctx.lineWidth = thickness;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Center text
+    ctx.fillStyle = state.theme === 'dark' ? '#ffffff' : '#0f172a';
+    ctx.font = '700 22px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('88%', centerX, centerY - 2);
+
+    ctx.fillStyle = state.theme === 'dark' ? '#a0a7c4' : '#64748b';
+    ctx.font = '500 11px system-ui, sans-serif';
+    ctx.fillText('STAGE', centerX, centerY + 16);
+  }
+
+  // --- Topic-Time Stacked Bar Distribution (D-091 / L-11) ---
+  function renderTopicBars() {
+    if (!DOM.deskTopicBars) return;
+    DOM.deskTopicBars.innerHTML = '';
+
+    const maxMinutes = Math.max(...state.topicTime.map(t => t.duration_min), 1);
+
+    state.topicTime.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'topic-bar-row';
+
+      const hours = (item.duration_min / 60).toFixed(1);
+      const widthPct = Math.min(100, (item.duration_min / maxMinutes) * 100);
+
+      row.innerHTML = `
+        <div class="topic-bar-meta">
+          <span><strong>${item.domain}</strong> — ${item.category}</span>
+          <span>${hours}h (${item.duration_min}m)</span>
+        </div>
+        <div class="topic-bar-track">
+          <div class="topic-bar-seg ${item.is_stage ? 'stage' : 'audience'}" style="width: ${widthPct}%;"></div>
+        </div>
+      `;
+      DOM.deskTopicBars.appendChild(row);
+    });
+  }
+
+  // --- Active Tasks & Balancer (D-093) ---
+  function renderContractTasks() {
+    if (!DOM.contractTaskList) return;
+    DOM.contractTaskList.innerHTML = '';
+
+    state.activeTasks.forEach((task, idx) => {
+      const row = document.createElement('div');
+      row.className = 'task-item-row';
+      row.innerHTML = `
+        <div class="task-item-left">
+          <input type="checkbox" class="task-checkbox" data-index="${idx}" ${task.done ? 'checked' : ''}>
+          <span class="task-name" style="${task.done ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${task.title}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="task-units-badge">${task.units}u</span>
+          <span class="card-badge ${task.done ? 'success' : 'info'}">${task.proof}</span>
+        </div>
+      `;
+      DOM.contractTaskList.appendChild(row);
+    });
+
+    // Wire checkboxes
+    DOM.contractTaskList.querySelectorAll('.task-checkbox').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const i = parseInt(e.target.dataset.index, 10);
+        state.activeTasks[i].done = e.target.checked;
+        if (e.target.checked && window.DhritiAudio) {
+          window.DhritiAudio.playBell();
         }
+        renderContractTasks();
       });
     });
   }
 
-  // --- Pomodoro Engine ---
-  function updatePomoDisplay() {
-    const min = Math.floor(state.pomodoro.remaining / 60);
-    const sec = state.pomodoro.remaining % 60;
-    DOM.pomoTime.textContent = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-    DOM.pomoLabel.textContent = state.pomodoro.phase === 'focus' ? 'Focus Interval' : 'Break Recovery';
-    DOM.btnPomoToggle.textContent = state.pomodoro.isRunning ? 'Pause' : 'Start';
+  function renderCompletedTasks() {
+    if (!DOM.completedTaskList) return;
+    DOM.completedTaskList.innerHTML = '';
+    state.completedTasks.forEach(task => {
+      const row = document.createElement('div');
+      row.className = 'task-item-row';
+      row.innerHTML = `
+        <div>
+          <span class="task-name">${task.title}</span>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Verified at ${task.timestamp}</div>
+        </div>
+        <span class="card-badge success">${task.proof}</span>
+      `;
+      DOM.completedTaskList.appendChild(row);
+    });
+  }
+
+  // --- Pick Your Poison Equivalence Solver (D-093) ---
+  function openPickYourPoison() {
+    if (!DOM.poisonOptionsGrid) return;
+    DOM.poisonOptionsGrid.innerHTML = '';
+
+    // Generate 3 balanced equivalence options (each sum to ~2.0 - 2.5u)
+    const options = [
+      {
+        label: 'Option A: Analytical & Testing Focus',
+        units: 2.0,
+        items: ['Verify FTS5 virtual table synchronization (2u)']
+      },
+      {
+        label: 'Option B: Balanced Core & Review',
+        units: 2.0,
+        items: ['Write synthesized chime procedural tests (1u)', 'Review topic tokenizer stopwords (0.5u)', 'Format topic-time stacked bar (0.5u)']
+      },
+      {
+        label: 'Option C: Architecture Deep-Dive',
+        units: 2.5,
+        items: ['Implement Vidura topic tree tests (2u)', 'Review topic tokenizer stopwords (0.5u)']
+      }
+    ];
+
+    options.forEach(opt => {
+      const card = document.createElement('div');
+      card.className = 'poison-card';
+      card.innerHTML = `
+        <div class="poison-card-head">
+          <span>${opt.label}</span>
+          <span>${opt.units} Units</span>
+        </div>
+        <ul style="font-size: 13px; color: var(--text-muted); margin-left: 18px; margin-top: 6px;">
+          ${opt.items.map(it => `<li>${it}</li>`).join('')}
+        </ul>
+      `;
+      card.addEventListener('click', () => {
+        // Adopt option into active contract
+        opt.items.forEach(it => {
+          state.activeTasks.push({
+            id: `task-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            title: it,
+            units: 1.0,
+            proof: 'evidence_check',
+            done: false
+          });
+        });
+        DOM.poisonModal.classList.remove('active');
+        renderContractTasks();
+        if (window.DhritiAudio) window.DhritiAudio.playBell();
+      });
+      DOM.poisonOptionsGrid.appendChild(card);
+    });
+
+    DOM.poisonModal.classList.add('active');
+  }
+
+  // --- Pomodoro Focus Engine ---
+  function updateTimerDisplay() {
+    const mins = Math.floor(state.pomodoro.remaining / 60);
+    const secs = state.pomodoro.remaining % 60;
+    const str = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    if (DOM.focusBigTimer) DOM.focusBigTimer.textContent = str;
+    if (DOM.miniTimerDisplay) DOM.miniTimerDisplay.textContent = str;
+    const tilePomo = document.getElementById('tile-pomo-time');
+    if (tilePomo) tilePomo.textContent = str;
   }
 
   function togglePomodoro() {
     if (state.pomodoro.isRunning) {
       clearInterval(state.pomodoro.timerId);
       state.pomodoro.isRunning = false;
-      updatePomoDisplay();
+      DOM.btnFocusStart.textContent = 'Resume Focus';
+      DOM.miniTimerPill.style.display = 'none';
     } else {
       state.pomodoro.isRunning = true;
-      updatePomoDisplay();
+      DOM.btnFocusStart.textContent = 'Pause Focus';
+      DOM.miniTimerPill.style.display = 'flex';
+
       state.pomodoro.timerId = setInterval(() => {
         if (state.pomodoro.remaining > 0) {
           state.pomodoro.remaining--;
-          updatePomoDisplay();
+          updateTimerDisplay();
         } else {
-          // Timer reached 0
+          // Timer finished!
+          clearInterval(state.pomodoro.timerId);
+          state.pomodoro.isRunning = false;
+          DOM.btnFocusStart.textContent = 'Start Focus';
+          DOM.miniTimerPill.style.display = 'none';
+
           if (window.DhritiAudio) {
-            window.DhritiAudio.playCompletionBell();
+            window.DhritiAudio.playProceduralAlarm(state.pomodoro.alarmSound);
           }
-          // Switch phase
-          if (state.pomodoro.phase === 'focus') {
-            state.pomodoro.phase = 'break';
-            state.pomodoro.remaining = state.pomodoro.presets[state.pomodoro.mode].break;
-          } else {
-            state.pomodoro.phase = 'focus';
-            state.pomodoro.remaining = state.pomodoro.presets[state.pomodoro.mode].focus;
-          }
-          updatePomoDisplay();
         }
       }, 1000);
     }
@@ -434,463 +572,481 @@
   function resetPomodoro() {
     clearInterval(state.pomodoro.timerId);
     state.pomodoro.isRunning = false;
-    state.pomodoro.phase = 'focus';
-    state.pomodoro.remaining = state.pomodoro.presets[state.pomodoro.mode].focus;
-    updatePomoDisplay();
+    DOM.btnFocusStart.textContent = 'Start Focus';
+    DOM.miniTimerPill.style.display = 'none';
+    const preset = state.pomodoro.presets[state.pomodoro.mode];
+    state.pomodoro.remaining = preset.focus;
+    updateTimerDisplay();
   }
 
-  function switchPomoPreset(modeKey) {
-    if (!state.pomodoro.presets[modeKey]) return;
-    state.pomodoro.mode = modeKey;
-    DOM.pomoPresetBtns.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.preset === modeKey);
-    });
-    resetPomodoro();
-  }
+  // --- Life Mirror Floating Thought Bubbles (D-092) ---
+  function spawnLifeBubble() {
+    if (state.mode !== 'picture' || !DOM.bubbleLayer) return;
 
-  function bindPomodoroEvents() {
-    DOM.btnPomoToggle.addEventListener('click', (e) => {
+    // Pick uniform random from declared alternatives
+    const alt = state.lifeAlts[Math.floor(Math.random() * state.lifeAlts.length)];
+    if (!alt) return;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'life-bubble';
+
+    // Random non-colliding coordinates
+    const top = 15 + Math.random() * 55;
+    const left = 8 + Math.random() * 65;
+    bubble.style.top = `${top}vh`;
+    bubble.style.left = `${left}vw`;
+
+    bubble.innerHTML = `
+      <div class="bubble-icon">✦</div>
+      <div class="bubble-content">
+        <span class="bubble-tag">Life Alternative (${alt.category})</span>
+        <span class="bubble-text">${alt.label}</span>
+      </div>
+      <div class="bubble-actions">
+        <button class="bubble-btn bubble-btn-did" title="Mark Done">did it ✓</button>
+        <button class="bubble-btn bubble-btn-dismiss" title="Dismiss">✕</button>
+      </div>
+    `;
+
+    // Silent expiry after 45s without moralizing shame
+    const expiryTimer = setTimeout(() => {
+      dismissBubble(bubble);
+    }, 45000);
+
+    bubble.querySelector('.bubble-btn-did').addEventListener('click', (e) => {
       e.stopPropagation();
-      togglePomodoro();
+      clearTimeout(expiryTimer);
+      if (window.DhritiAudio) window.DhritiAudio.playBell();
+      dismissBubble(bubble);
     });
-    DOM.btnPomoReset.addEventListener('click', (e) => {
+
+    bubble.querySelector('.bubble-btn-dismiss').addEventListener('click', (e) => {
       e.stopPropagation();
-      resetPomodoro();
+      clearTimeout(expiryTimer);
+      dismissBubble(bubble);
     });
-    DOM.pomoPresetBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        switchPomoPreset(btn.dataset.preset);
-      });
-    });
+
+    DOM.bubbleLayer.appendChild(bubble);
   }
 
-  // --- Dhriti Bridge Telemetry Polling ---
-  async function pollBridgeTelemetry() {
-    try {
-      const res = await fetch(`${state.bridgeHost}/status`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        state.bridgeOnline = true;
-        DOM.statusDot.classList.remove('offline');
-        renderBridgeData(data);
-      } else {
-        throw new Error('Bridge non-200');
-      }
-    } catch (err) {
-      state.bridgeOnline = false;
-      DOM.statusDot.classList.add('offline');
-    }
+  function dismissBubble(bubbleEl) {
+    bubbleEl.style.opacity = '0';
+    bubbleEl.style.transform = 'scale(0.8)';
+    setTimeout(() => {
+      if (bubbleEl.parentNode) bubbleEl.parentNode.removeChild(bubbleEl);
+    }, 500);
   }
 
-  function renderBridgeData(data) {
-    // If telemetry returns active session, resume capsule, or guard data
-    if (data.session && data.session.active) {
-      const intentEl = document.getElementById('widget-session-intent');
-      if (intentEl) intentEl.textContent = data.session.intent || 'Active Focus';
-    }
-    if (data.capsule) {
-      const nextActionEl = document.getElementById('widget-capsule-next');
-      if (nextActionEl) nextActionEl.textContent = data.capsule.next_action || 'Resume working copy';
-    }
-    if (data.guard) {
-      const budgetEl = document.getElementById('widget-guard-budget');
-      if (budgetEl) budgetEl.textContent = `${data.guard.budget_remaining || 15}m`;
-    }
+  function startBubbleScheduler() {
+    if (state.bubbleTimerId) clearInterval(state.bubbleTimerId);
+    // Schedule bubble check every 35s
+    state.bubbleTimerId = setInterval(() => {
+      if (state.mode === 'picture' && DOM.bubbleLayer.children.length === 0) {
+        spawnLifeBubble();
+      }
+    }, 35000);
+    // Initial spawn after 4s
+    setTimeout(spawnLifeBubble, 4000);
   }
 
-  // --- Settings Modal & Gallery Management ---
-  function bindSettingsModal() {
-    DOM.btnSettings.addEventListener('click', () => {
-      renderGalleryManager();
-      renderQuotesManager();
-      applyTheme(state.theme);
-      applyUnderlaySettings(state.underlay, false);
-      DOM.settingsOverlay.classList.add('active');
-    });
-
-    DOM.btnCloseSettings.addEventListener('click', () => {
-      DOM.settingsOverlay.classList.remove('active');
-    });
-
-    DOM.settingsOverlay.addEventListener('click', (e) => {
-      if (e.target === DOM.settingsOverlay) {
-        DOM.settingsOverlay.classList.remove('active');
-      }
-    });
-
-    // Header Theme Toggle Button
-    if (DOM.btnThemeToggle) {
-      DOM.btnThemeToggle.addEventListener('click', () => {
-        const next = state.theme === 'dark' ? 'light' : 'dark';
-        applyTheme(next);
-      });
-    }
-
-    // Modal Theme Selection Cards
-    if (DOM.themeCardDark) {
-      DOM.themeCardDark.addEventListener('click', () => applyTheme('dark'));
-    }
-    if (DOM.themeCardLight) {
-      DOM.themeCardLight.addEventListener('click', () => applyTheme('light'));
-    }
-
-    // Modal Live Underlay Range Sliders
-    if (DOM.sliderBrightness) {
-      DOM.sliderBrightness.addEventListener('input', (e) => {
-        applyUnderlaySettings({ brightness: e.target.value });
-      });
-    }
-    if (DOM.sliderBlur) {
-      DOM.sliderBlur.addEventListener('input', (e) => {
-        applyUnderlaySettings({ blur: e.target.value });
-      });
-    }
-    if (DOM.sliderOpacity) {
-      DOM.sliderOpacity.addEventListener('input', (e) => {
-        applyUnderlaySettings({ opacity: e.target.value });
-      });
-    }
-
-    // Reset Underlay Button
-    if (DOM.btnResetUnderlay) {
-      DOM.btnResetUnderlay.addEventListener('click', () => {
-        applyUnderlaySettings({ brightness: 88, blur: 5, opacity: 88 });
-      });
-    }
-
-    // Tab navigation
-    const tabs = document.querySelectorAll('.settings-tabs-nav .tab-btn');
-    const panes = document.querySelectorAll('.settings-tab-content .tab-pane');
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        panes.forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        const target = document.getElementById(tab.dataset.tab);
-        if (target) target.classList.add('active');
-      });
-    });
-
-    // Add Art
-    DOM.btnAddArt.addEventListener('click', () => {
-      const url = DOM.customArtInput.value.trim();
-      if (url) {
-        state.artworks.push({
-          id: 'custom-' + Date.now(),
-          title: 'Custom Artwork',
-          url: url
-        });
-        localStorage.setItem('dhriti_artworks', JSON.stringify(state.artworks));
-        DOM.customArtInput.value = '';
-        renderGalleryManager();
-        applyArtwork(state.artworks.length - 1);
-      }
-    });
-
-    // Add Quote
-    DOM.btnAddQuote.addEventListener('click', () => {
-      const text = DOM.inputNewQuoteText.value.trim();
-      const author = DOM.inputNewQuoteAuthor.value.trim() || 'Anonymous';
-      if (text) {
-        state.quotes.push({ text, author });
-        localStorage.setItem('dhriti_quotes', JSON.stringify(state.quotes));
-        DOM.inputNewQuoteText.value = '';
-        DOM.inputNewQuoteAuthor.value = '';
-        renderQuotesManager();
-        state.currentQuoteIndex = state.quotes.length - 1;
-        renderQuote();
-      }
-    });
-  }
-
-  function renderGalleryManager() {
-    if (!DOM.artThumbGrid) return;
-    DOM.artThumbGrid.innerHTML = '';
-    state.artworks.forEach((art, index) => {
+  // --- Parking Timeline View ---
+  function renderParkingTimeline() {
+    if (!DOM.parkingTimelineContainer) return;
+    DOM.parkingTimelineContainer.innerHTML = '';
+    state.parkingItems.forEach((item, idx) => {
       const card = document.createElement('div');
-      card.className = `art-thumb ${index === state.currentArtIndex ? 'selected' : ''}`;
-      card.style.backgroundImage = `url('${art.url}')`;
-      card.innerHTML = `<span class="art-thumb-title">${art.title}</span>`;
-      card.addEventListener('click', () => {
-        applyArtwork(index);
-        renderGalleryManager();
-      });
-      DOM.artThumbGrid.appendChild(card);
-    });
-  }
-
-  function renderQuotesManager() {
-    if (!DOM.quotesList) return;
-    DOM.quotesList.innerHTML = '';
-    state.quotes.forEach((q, index) => {
-      const row = document.createElement('div');
-      row.className = 'item-row';
-      row.innerHTML = `
-        <div class="item-content">
-          <strong>“${q.text}”</strong>
-          <div class="item-sub">— ${q.author}</div>
+      card.className = 'task-item-row';
+      card.innerHTML = `
+        <div>
+          <span class="task-name">${item.text}</span>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">Age: ${item.age_days} day(s) • Type: ${item.type}</div>
         </div>
-        <button class="btn-danger" data-quote-idx="${index}">Delete</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" data-park-action="approve" data-index="${idx}">Approve to Contract</button>
+          <button class="btn-sec" style="padding: 6px 12px; font-size: 11px;" data-park-action="drop" data-index="${idx}">Drop</button>
+        </div>
       `;
-      row.querySelector('.btn-danger').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.quotes.length <= 1) return; // Keep at least one quote
-        state.quotes.splice(index, 1);
-        localStorage.setItem('dhriti_quotes', JSON.stringify(state.quotes));
-        renderQuotesManager();
-        state.currentQuoteIndex = 0;
-        renderQuote();
+      DOM.parkingTimelineContainer.appendChild(card);
+    });
+
+    DOM.parkingTimelineContainer.querySelectorAll('button[data-park-action]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const action = e.target.dataset.parkAction;
+        const i = parseInt(e.target.dataset.index, 10);
+        if (action === 'approve') {
+          state.activeTasks.push({
+            id: `task-${Date.now()}`,
+            title: state.parkingItems[i].text,
+            units: 1.0,
+            proof: 'cold_approved',
+            done: false
+          });
+        }
+        state.parkingItems.splice(i, 1);
+        renderParkingTimeline();
       });
-      DOM.quotesList.appendChild(row);
     });
   }
 
-  // --- Interactive Drawers ---
-  function bindDrawerActions() {
-    const btnPark = document.getElementById('btn-drawer-park');
-    const btnLeisure = document.getElementById('btn-drawer-leisure');
-    const btnResearch = document.getElementById('btn-drawer-research');
+  // --- Life Alternatives View ---
+  function renderLifeAlts() {
+    if (!DOM.lifeAltList) return;
+    DOM.lifeAltList.innerHTML = '';
+    state.lifeAlts.forEach(alt => {
+      const item = document.createElement('div');
+      item.className = 'task-item-row';
+      item.innerHTML = `
+        <div>
+          <span class="task-name">${alt.label}</span>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Min duration: ${alt.duration}m • Category: ${alt.category}</div>
+        </div>
+        <span class="card-badge info">Active</span>
+      `;
+      DOM.lifeAltList.appendChild(item);
+    });
+  }
 
-    if (btnPark) {
-      btnPark.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const item = prompt('Park thought/distraction for later:');
-        if (item) {
-          alert(`Parked in Dhriti Drawer: "${item}"`);
-        }
-      });
-    }
+  // --- Dynamic Backlog View ---
+  function renderBacklogTable() {
+    if (!DOM.backlogTableContainer) return;
+    DOM.backlogTableContainer.innerHTML = '';
+    state.backlog.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'task-item-row';
+      row.innerHTML = `
+        <span class="task-name">${item.title}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="task-units-badge">${item.units}u (${item.tier})</span>
+          <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" data-backlog-add="${idx}">Add to Day</button>
+        </div>
+      `;
+      DOM.backlogTableContainer.appendChild(row);
+    });
 
-    if (btnLeisure) {
-      btnLeisure.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mins = prompt('Declare leisure break duration (minutes):', '20');
-        if (mins) {
-          alert(`Declared leisure: ${mins} minutes protected from drift tracking.`);
-        }
+    DOM.backlogTableContainer.querySelectorAll('button[data-backlog-add]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const i = parseInt(e.target.dataset.backlogAdd, 10);
+        const item = state.backlog[i];
+        state.activeTasks.push({
+          id: item.id,
+          title: item.title,
+          units: item.units,
+          proof: 'evidence_check',
+          done: false
+        });
+        state.backlog.splice(i, 1);
+        renderBacklogTable();
       });
-    }
+    });
+  }
 
-    if (btnResearch) {
-      btnResearch.addEventListener('click', (e) => {
-        e.stopPropagation();
-        alert('Research Sandbox active: Cold-State consent enforced.');
-      });
+  // --- Prompt Inspection / Guard Governor ---
+  function evaluatePromptAlignment() {
+    const promptText = DOM.guardTestPrompt.value.trim();
+    if (!promptText) return;
+
+    const topicWords = ['dhriti', 'tactile', 'dashboard', 'architecture', 'token', 'sqlite', 'chime', 'bridge'];
+    const promptTokens = promptText.toLowerCase().split(/\W+/);
+    const overlap = promptTokens.filter(t => topicWords.includes(t));
+
+    DOM.guardVerdictBox.style.display = 'block';
+    if (overlap.length >= 1) {
+      DOM.guardVerdictBox.innerHTML = `
+        <div class="capsule-box" style="border-color: var(--accent-emerald);">
+          <div class="capsule-key" style="color: var(--accent-emerald);">Verdict: On-Topic (Aligned)</div>
+          <div class="capsule-value">Matching topic stems: [${overlap.join(', ')}]. Prompt accepted silently.</div>
+        </div>
+      `;
+    } else {
+      DOM.guardVerdictBox.innerHTML = `
+        <div class="capsule-box" style="border-color: var(--accent-amber);">
+          <div class="capsule-key" style="color: var(--accent-amber);">Verdict: Divergent (Topic Drift)</div>
+          <div class="capsule-value">No shared stems with active contract topic. In strict session, turn is held for cold review.</div>
+        </div>
+      `;
     }
   }
 
-  // --- PoetryDB API Service ---
-  const PoetryDB = {
-    isFetching: false,
-    currentPoem: null,
+  // --- Honest Stats View (L-2) ---
+  function renderStreakRibbon() {
+    if (!DOM.streakRibbon) return;
+    DOM.streakRibbon.innerHTML = '';
+    const days = [
+      'Nov 07', 'Nov 08', 'Nov 09', 'Nov 10', 'Nov 11', 'Nov 12', 'Nov 13',
+      'Nov 14', 'Nov 15', 'Nov 16', 'Nov 17', 'Nov 18', 'Nov 19', 'Nov 20'
+    ];
+    days.forEach(d => {
+      const cell = document.createElement('div');
+      cell.className = 'streak-day-cell met';
+      cell.innerHTML = `
+        <div class="streak-day-date">${d}</div>
+        <div class="streak-day-status">MET</div>
+      `;
+      DOM.streakRibbon.appendChild(cell);
+    });
+  }
 
-    async fetchRandomPoem() {
-      if (this.isFetching) return;
-      this.isFetching = true;
-      this.updateStatus('Fetching poem from PoetryDB...');
+  // --- Audit Ledger View ---
+  function renderLedgerTable() {
+    if (!DOM.ledgerContainer) return;
+    DOM.ledgerContainer.innerHTML = '';
+    const events = [
+      { ts: '13:05:12', action: 'TOPIC_DAY_HISTOGRAM_COMPUTED', hash: 'e3b0c442...98fc' },
+      { ts: '12:48:30', action: 'CONTRACT_PROOF_SUBMITTED', hash: 'a1b2c3d4...ef56' },
+      { ts: '12:15:00', action: 'POMODORO_INTERVAL_STARTED', hash: 'f6e5d4c3...b2a1' },
+      { ts: '11:30:22', action: 'LIFE_ALTERNATIVE_DECLARED', hash: '98765432...10fe' },
+      { ts: '08:00:00', action: 'DAY_WINDOW_OPENED', hash: '12345678...90ab' }
+    ];
+    events.forEach(ev => {
+      const row = document.createElement('div');
+      row.className = 'task-item-row';
+      row.innerHTML = `
+        <div>
+          <span class="task-name">${ev.action}</span>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Timestamp: ${ev.ts}</div>
+        </div>
+        <span class="card-badge info">${ev.hash}</span>
+      `;
+      DOM.ledgerContainer.appendChild(row);
+    });
+  }
 
-      try {
-        const res = await fetch('https://poetrydb.org/random/8');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!Array.isArray(data) || !data.length) throw new Error('Empty response');
+  // --- Topics & Co-occurrence View ---
+  function renderTopicsView() {
+    if (DOM.topicsBreakdownContainer) {
+      DOM.topicsBreakdownContainer.innerHTML = `
+        <div class="metric-row"><span class="metric-label">Compiler & Rust Architecture</span><span class="metric-val">120m</span></div>
+        <div class="metric-row"><span class="metric-label">Procedural Web Audio API</span><span class="metric-val">65m</span></div>
+        <div class="metric-row"><span class="metric-label">Verlet Physics & Doorway Beads</span><span class="metric-val">45m</span></div>
+        <div class="metric-row"><span class="metric-label">FTS5 SQLite Indexing</span><span class="metric-val">30m</span></div>
+      `;
+    }
+    if (DOM.coOccurrenceContainer) {
+      DOM.coOccurrenceContainer.innerHTML = `
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span class="author-chip">compiler + rust</span>
+          <span class="author-chip">audio + oscillator</span>
+          <span class="author-chip">chimes + verlet</span>
+          <span class="author-chip">fts5 + sqlite</span>
+          <span class="author-chip">springboard + search</span>
+        </div>
+      `;
+    }
+  }
 
-        // Filter for poems with 6 to 36 non-empty lines
-        const validPoems = data.filter(p => {
-          const validLines = (p.lines || []).filter(l => l.trim().length > 0);
-          return validLines.length >= 6 && validLines.length <= 36;
-        });
+  // --- Artwork & Quote Rotation ---
+  function cycleArtwork() {
+    state.currentArtIndex = (state.currentArtIndex + 1) % state.artworks.length;
+    const art = state.artworks[state.currentArtIndex];
+    document.documentElement.style.setProperty('--bg-image', `url('${art.url}')`);
+    if (window.DhritiAudio) window.DhritiAudio.playChime(state.currentArtIndex * 2, 0.4);
+  }
 
-        const selected = validPoems.length > 0
-          ? validPoems[Math.floor(Math.random() * validPoems.length)]
-          : data[0];
+  function cycleQuote() {
+    state.currentQuoteIndex = (state.currentQuoteIndex + 1) % state.quotes.length;
+    const q = state.quotes[state.currentQuoteIndex];
+    if (DOM.quoteText) DOM.quoteText.textContent = q.text;
+    if (DOM.quoteAuthor) DOM.quoteAuthor.textContent = `— ${q.author}`;
+  }
 
-        const formatted = this.parsePoemToStanzas(selected);
-        this.currentPoem = formatted;
+  // --- Wire Event Listeners ---
+  function wireEvents() {
+    // Mode toggles
+    DOM.btnToggleMode.addEventListener('click', () => {
+      if (state.mode === 'picture') flipToDashboard();
+      else returnToArt();
+    });
 
-        if (window.DhritiPoemChimes) {
-          window.DhritiPoemChimes.setPoem(formatted);
-        }
+    if (DOM.btnReturnArt) {
+      DOM.btnReturnArt.addEventListener('click', returnToArt);
+    }
 
-        this.updateStatus(`Loaded: "${formatted.title}" by ${formatted.author}`);
+    // Tactile tile click in Mode 1 flips to dashboard
+    DOM.tiles.forEach(tile => {
+      tile.addEventListener('click', () => {
+        if (state.mode === 'picture') flipToDashboard();
+      });
+    });
+
+    // Theme toggle
+    DOM.btnThemeToggle.addEventListener('click', () => {
+      setTheme(state.theme === 'dark' ? 'light' : 'dark');
+    });
+
+    // Navigation items
+    DOM.navItems.forEach(btn => {
+      btn.addEventListener('click', () => {
+        showView(btn.dataset.view);
+      });
+    });
+
+    // Quick park input
+    if (DOM.btnQuickPark) {
+      DOM.btnQuickPark.addEventListener('click', () => {
+        const text = DOM.quickParkInput.value.trim();
+        if (!text) return;
+        state.parkingItems.unshift({ id: `park-${Date.now()}`, text: text, age_days: 0, type: 'spark' });
+        DOM.quickParkInput.value = '';
+        DOM.quickParkFeedback.textContent = 'Parked in curiosity mail slot for cold review.';
+        setTimeout(() => { DOM.quickParkFeedback.textContent = ''; }, 3000);
+      });
+    }
+
+    // Focus engine
+    if (DOM.btnFocusStart) DOM.btnFocusStart.addEventListener('click', togglePomodoro);
+    if (DOM.btnFocusReset) DOM.btnFocusReset.addEventListener('click', resetPomodoro);
+
+    DOM.focusPresetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        DOM.focusPresetBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.pomodoro.mode = btn.dataset.preset;
+        resetPomodoro();
+      });
+    });
+
+    if (DOM.alarmSoundSelect) {
+      DOM.alarmSoundSelect.addEventListener('change', e => {
+        state.pomodoro.alarmSound = e.target.value;
+      });
+    }
+
+    if (DOM.btnTestAlarm) {
+      DOM.btnTestAlarm.addEventListener('click', () => {
         if (window.DhritiAudio) {
-          window.DhritiAudio.playCompletionBell();
+          window.DhritiAudio.playProceduralAlarm(state.pomodoro.alarmSound);
         }
-      } catch (err) {
-        console.warn('[PoetryDB] Fetch failed or offline, cycling curated presets:', err);
-        if (window.DhritiPoemChimes && window.DhritiPoemChimes.nextPoemPreset) {
-          window.DhritiPoemChimes.nextPoemPreset();
-        }
-        const active = window.DhritiPoemChimes ? window.DhritiPoemChimes.getInstance()?.activePoem : null;
-        this.updateStatus(active ? `Offline Archive: "${active.title}"` : 'Loaded offline preset');
-      } finally {
-        this.isFetching = false;
-      }
-    },
+      });
+    }
 
-    async fetchByAuthor(authorName) {
-      if (!authorName || this.isFetching) return;
-      this.isFetching = true;
-      this.updateStatus(`Searching PoetryDB for ${authorName}...`);
-
-      try {
-        const res = await fetch(`https://poetrydb.org/author/${encodeURIComponent(authorName)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!Array.isArray(data) || !data.length) throw new Error('No poems found');
-
-        const validPoems = data.filter(p => {
-          const validLines = (p.lines || []).filter(l => l.trim().length > 0);
-          return validLines.length >= 6 && validLines.length <= 36;
-        });
-
-        const pool = validPoems.length > 0 ? validPoems : data;
-        const selected = pool[Math.floor(Math.random() * pool.length)];
-
-        const formatted = this.parsePoemToStanzas(selected);
-        this.currentPoem = formatted;
-
-        if (window.DhritiPoemChimes) {
-          window.DhritiPoemChimes.setPoem(formatted);
-        }
-
-        this.updateStatus(`Loaded: "${formatted.title}" by ${formatted.author}`);
-        if (window.DhritiAudio) {
-          window.DhritiAudio.playCompletionBell();
-        }
-      } catch (err) {
-        console.warn(`[PoetryDB] Author query failed for ${authorName}:`, err);
-        this.updateStatus(`Could not reach PoetryDB for ${authorName}`);
-      } finally {
-        this.isFetching = false;
-      }
-    },
-
-    parsePoemToStanzas(raw) {
-      const title = raw.title || 'Untitled Reflection';
-      const author = raw.author || 'PoetryDB Collection';
-      const lines = raw.lines || [];
-
-      const stanzas = [];
-      let currentStanza = [];
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line === '') {
-          if (currentStanza.length > 0) {
-            stanzas.push(currentStanza);
-            currentStanza = [];
-          }
+    if (DOM.btnToggleNoise) {
+      DOM.btnToggleNoise.addEventListener('click', () => {
+        if (!window.DhritiAudio) return;
+        if (state.pomodoro.noisePlaying) {
+          window.DhritiAudio.stopNoise();
+          state.pomodoro.noisePlaying = false;
+          DOM.btnToggleNoise.textContent = 'Start Ambient Noise';
         } else {
-          currentStanza.push(line);
-          if (currentStanza.length >= 4) {
-            stanzas.push(currentStanza);
-            currentStanza = [];
-          }
-        }
-        if (stanzas.length >= 6) break;
-      }
-
-      if (currentStanza.length > 0 && stanzas.length < 6) {
-        stanzas.push(currentStanza);
-      }
-
-      if (stanzas.length === 1 && stanzas[0].length >= 4) {
-        const half = Math.ceil(stanzas[0].length / 2);
-        stanzas.push(stanzas[0].splice(half));
-      }
-
-      return {
-        title,
-        author,
-        stanzas: stanzas.length > 0 ? stanzas : [['Where the mind is without fear', 'and the head is held high;']]
-      };
-    },
-
-    updateStatus(msg) {
-      const el1 = document.getElementById('poetrydb-status-pill');
-      if (el1) el1.textContent = msg;
-      const el2 = document.getElementById('poetrydb-status-modal');
-      if (el2) el2.textContent = msg;
-    }
-  };
-
-  window.DhritiPoetryDB = PoetryDB;
-
-  function bindPoetryDBEvents() {
-    const btnQuick = document.getElementById('btn-fetch-poetrydb-quick');
-    if (btnQuick) {
-      btnQuick.addEventListener('click', (e) => {
-        e.stopPropagation();
-        PoetryDB.fetchRandomPoem();
-      });
-    }
-
-    const btnModal = document.getElementById('btn-fetch-poetrydb-modal');
-    if (btnModal) {
-      btnModal.addEventListener('click', (e) => {
-        e.stopPropagation();
-        PoetryDB.fetchRandomPoem();
-      });
-    }
-
-    const chips = document.querySelectorAll('.author-chip');
-    chips.forEach(chip => {
-      chip.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const author = chip.getAttribute('data-author');
-        if (author) {
-          PoetryDB.fetchByAuthor(author);
+          const type = document.querySelector('input[name="noise-type"]:checked').value;
+          const vol = parseInt(DOM.sliderNoiseVol.value, 10) / 100;
+          window.DhritiAudio.startNoise(type, vol);
+          state.pomodoro.noisePlaying = true;
+          DOM.btnToggleNoise.textContent = 'Stop Ambient Noise';
         }
       });
+    }
+
+    if (DOM.sliderNoiseVol) {
+      DOM.sliderNoiseVol.addEventListener('input', e => {
+        const v = parseInt(e.target.value, 10);
+        DOM.valNoiseVol.textContent = `${v}%`;
+        if (window.DhritiAudio) window.DhritiAudio.setNoiseVolume(v / 100);
+      });
+    }
+
+    // Pick-Your-Poison modal
+    if (DOM.btnOpenPoisonModal) DOM.btnOpenPoisonModal.addEventListener('click', openPickYourPoison);
+    if (DOM.btnClosePoison) DOM.btnClosePoison.addEventListener('click', () => DOM.poisonModal.classList.remove('active'));
+
+    // Life Mirror modal
+    if (DOM.btnAddLifeAlt) DOM.btnAddLifeAlt.addEventListener('click', () => DOM.lifeModal.classList.add('active'));
+    if (DOM.btnCloseLife) DOM.btnCloseLife.addEventListener('click', () => DOM.lifeModal.classList.remove('active'));
+    if (DOM.btnSaveLifeAlt) {
+      DOM.btnSaveLifeAlt.addEventListener('click', () => {
+        const label = DOM.newLifeLabel.value.trim();
+        if (!label) return;
+        state.lifeAlts.push({
+          id: `life-${Date.now()}`,
+          label: label,
+          category: DOM.newLifeCategory.value,
+          duration: parseInt(DOM.newLifeDuration.value, 10)
+        });
+        DOM.newLifeLabel.value = '';
+        DOM.lifeModal.classList.remove('active');
+        renderLifeAlts();
+      });
+    }
+
+    // Lockdown modal
+    if (DOM.btnLockdown) DOM.btnLockdown.addEventListener('click', () => DOM.lockdownModal.classList.add('active'));
+    if (DOM.btnCloseLockdown) DOM.btnCloseLockdown.addEventListener('click', () => DOM.lockdownModal.classList.remove('active'));
+    if (DOM.btnCancelLockdown) DOM.btnCancelLockdown.addEventListener('click', () => DOM.lockdownModal.classList.remove('active'));
+    if (DOM.btnConfirmLockdown) {
+      DOM.btnConfirmLockdown.addEventListener('click', () => {
+        DOM.lockdownModal.classList.remove('active');
+        alert('Daily Lockdown Engaged. Enforcement active until tomorrow morning.');
+      });
+    }
+
+    // Guard test prompt
+    if (DOM.btnEvalPrompt) DOM.btnEvalPrompt.addEventListener('click', evaluatePromptAlignment);
+
+    // Settings overlay
+    if (DOM.btnSettings) DOM.btnSettings.addEventListener('click', () => DOM.settingsOverlay.classList.add('active'));
+    if (DOM.btnCloseSettings) DOM.btnCloseSettings.addEventListener('click', () => DOM.settingsOverlay.classList.remove('active'));
+
+    // Settings Dials (Shell View)
+    if (DOM.shellSliderBrightness) {
+      DOM.shellSliderBrightness.addEventListener('input', e => {
+        state.underlay.brightness = parseInt(e.target.value, 10);
+        DOM.shellValBrightness.textContent = `${state.underlay.brightness}%`;
+        updateUnderlayStyles();
+      });
+    }
+    if (DOM.shellSliderBlur) {
+      DOM.shellSliderBlur.addEventListener('input', e => {
+        state.underlay.blur = parseInt(e.target.value, 10);
+        DOM.shellValBlur.textContent = `${state.underlay.blur} px`;
+        updateUnderlayStyles();
+      });
+    }
+    if (DOM.shellSliderOpacity) {
+      DOM.shellSliderOpacity.addEventListener('input', e => {
+        state.underlay.opacity = parseInt(e.target.value, 10);
+        DOM.shellValOpacity.textContent = `${state.underlay.opacity}%`;
+        updateUnderlayStyles();
+      });
+    }
+
+    if (DOM.shellThemeCardDark) DOM.shellThemeCardDark.addEventListener('click', () => setTheme('dark'));
+    if (DOM.shellThemeCardLight) DOM.shellThemeCardLight.addEventListener('click', () => setTheme('light'));
+
+    // Triple-click gesture
+    let clickCount = 0;
+    let clickTimer = null;
+    document.addEventListener('click', () => {
+      clickCount++;
+      if (clickCount === 1) {
+        clickTimer = setTimeout(() => { clickCount = 0; }, 400);
+      } else if (clickCount === 3) {
+        clearTimeout(clickTimer);
+        clickCount = 0;
+        if (state.mode === 'picture') {
+          cycleArtwork();
+          cycleQuote();
+        } else {
+          returnToArt();
+        }
+      }
     });
 
-    const btnSearchAuthor = document.getElementById('btn-search-author');
-    const inputAuthor = document.getElementById('custom-author-input');
-    if (btnSearchAuthor && inputAuthor) {
-      btnSearchAuthor.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const query = inputAuthor.value.trim();
-        if (query) {
-          PoetryDB.fetchByAuthor(query);
-        }
-      });
-      inputAuthor.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const query = inputAuthor.value.trim();
-          if (query) {
-            PoetryDB.fetchByAuthor(query);
-          }
-        }
-      });
-    }
+    // Hourly quote rotation
+    setInterval(cycleQuote, 3600000);
   }
 
-  // --- Bootstrapping ---
+  // --- Initialization ---
   function init() {
-    initDOMCache();
-    hydrateStorage();
-    bindTileClicks();
-    registerTripleClickGesture();
-    bindPomodoroEvents();
-    bindSettingsModal();
-    bindDrawerActions();
-    bindPoetryDBEvents();
-
-    // Init Chimes Canvas
-    if (window.DhritiChimes) {
-      window.DhritiChimes.init('chimes-canvas');
-    }
-
-    // Telemetry polling loop
-    pollBridgeTelemetry();
-    setInterval(pollBridgeTelemetry, 5000);
-
-    // Hourly Quote rotation check
-    setInterval(rotateQuoteHourly, 60000);
+    initDOM();
+    wireEvents();
+    updateTimerDisplay();
+    updateUnderlayStyles();
+    startBubbleScheduler();
   }
 
-  window.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
 })();

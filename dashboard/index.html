@@ -4,20 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dhriti — Tactile Dual-Mode Focus Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Arvo:ital,wght@0,400;0,700;1,400;1,700&family=Poiret+One&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="theme-dark mode-picture">
 
   <!-- Full-bleed Painting Background Underlay -->
   <div class="painting-canvas-underlay" id="painting-underlay"></div>
 
+  <!-- Floating Thought Bubbles Layer (Life Mirror D-092) -->
+  <div class="bubble-layer" id="bubble-layer"></div>
+
+  <!-- Floating Mini-Timer Pill (Active Pomodoro Glance) -->
+  <div class="mini-timer-pill" id="mini-timer-pill" style="display: none;">
+    <span class="mini-timer-dot"></span>
+    <span class="mini-timer-time" id="mini-timer-display">25:00</span>
+    <span class="mini-timer-label">Focus</span>
+  </div>
+
   <!-- Top Floating Header Bar -->
-  <header class="top-header">
+  <header class="top-header" id="top-header">
     <div class="header-left">
-      <button class="icon-btn" id="btn-settings" title="Dashboard & Art Settings">
+      <button class="icon-btn" id="btn-settings" title="Dashboard & Gallery Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -25,11 +35,14 @@
       </button>
       <div class="mode-badge" id="mode-badge">
         <span class="status-dot" id="status-dot"></span>
-        Art & Poem Mode
+        <span id="mode-badge-text">Art & Poem Mode</span>
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn" id="btn-theme-toggle" title="Toggle Dark / Light Theme" style="margin-right: 10px;">
+      <button class="nav-switch-btn" id="btn-toggle-dashboard-mode">
+        <span id="btn-toggle-text">Enter Dashboard Shell</span>
+      </button>
+      <button class="icon-btn" id="btn-theme-toggle" title="Toggle Dark / Light Theme">
         <svg id="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
@@ -45,103 +58,90 @@
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
       </button>
-      <div class="mode-badge" style="font-family: var(--font-mono); font-size: 11px; opacity: 0.85;">
+      <div class="mode-badge version-pill">
         DHRITI v0.7.0
       </div>
     </div>
   </header>
 
-  <!-- Mode 1 & 2 Main Hero Viewport -->
+  <!-- =========================================================================
+       MODE 1: Tactile Art, Quote & Suspended Poem Viewport
+       ========================================================================= -->
   <main class="hero-viewport" id="hero-viewport">
 
-    <!-- Tactile Bento Grid (Seamless Texture Projection on Front, Widgets on Back) -->
+    <!-- Tactile Bento Grid (Seamless Texture Projection on Front, Interactive Flip on Click) -->
     <div class="grid-board" id="grid-board">
 
-      <!-- 1. Pomodoro Focus Engine (Big 2x2 Square Bento) -->
+      <!-- 1. Pomodoro Focus Engine Tile -->
       <div class="tile-wrapper bento-square-lg">
         <div class="tactile-tile" data-tile-id="1">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">01 • Pomodoro Focus Engine</span>
+            <span class="tile-front-badge">01 • Pomodoro Focus</span>
           </div>
-          <div class="tile-face tile-face-back" style="justify-content: space-between;">
+          <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Pomodoro Engine</span>
-              <span class="widget-badge info" id="pomo-label">Focus Interval</span>
+              <span class="widget-title">Pomodoro Focus</span>
+              <span class="widget-badge info">Ultradian</span>
             </div>
             <div class="pomo-display">
-              <div class="pomo-time" id="pomo-time">25:00</div>
-              <div class="pomo-label">Deep Focus Zone Active</div>
+              <div class="pomo-time" id="tile-pomo-time">25:00</div>
+              <div class="pomo-label">Deep Focus Zone</div>
             </div>
-            <div class="pomo-presets">
-              <button class="pomo-preset-btn active" data-preset="standard">Standard 25/5</button>
-              <button class="pomo-preset-btn" data-preset="extended">Extended 50/15</button>
-              <button class="pomo-preset-btn" data-preset="deep">Deep Work 100/30</button>
-            </div>
-            <div class="pomo-controls">
-              <button class="pomo-btn primary" id="btn-pomo-toggle">Start Focus</button>
-              <button class="pomo-btn secondary" id="btn-pomo-reset">Reset</button>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Ultradian Rhythm Compliance</div>
-              <div class="capsule-value">Acoustic signal: Modal Tibetan singing bowl harmonic chime.</div>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-key">Acoustic Signal</div>
+              <div class="capsule-value">Synthesized modal singing bowl chime.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 2. Return Anchor & Resume Capsule (Wide 2-col Horizontal Bento) -->
+      <!-- 2. Return Anchor Capsule Tile -->
       <div class="tile-wrapper bento-wide">
         <div class="tactile-tile" data-tile-id="2">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">02 • Return Anchor & Resume Capsule</span>
+            <span class="tile-front-badge">02 • Return Anchor</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Return Anchor (D-090 Capsule)</span>
-              <span class="widget-badge warning">Sovereign Ready</span>
+              <span class="widget-title">Return Anchor</span>
+              <span class="widget-badge success">Sovereign</span>
             </div>
             <div class="capsule-box">
               <div class="capsule-key">Next Concrete Step</div>
-              <div class="capsule-value" id="widget-capsule-next">Finalize tactile Solitaire sweep flip and link chimes engine.</div>
+              <div class="capsule-value" id="tile-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
             </div>
-            <div class="capsule-box" style="margin-top: 4px;">
+            <div class="capsule-box" style="margin-top: 6px;">
               <div class="capsule-key">Active Blocker</div>
-              <div class="capsule-value">None detected. Sovereign execution path completely unobstructed.</div>
+              <div class="capsule-value">None detected. Execution path unobstructed.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 3. Stage Ratio & The Wall (Wide 2-col Horizontal Bento) -->
+      <!-- 3. Stage Ratio Tile -->
       <div class="tile-wrapper bento-wide">
         <div class="tactile-tile" data-tile-id="4">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">03 • Stage Ratio & Wall</span>
+            <span class="tile-front-badge">03 • Stage Ratio</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Stage Ratio & Wall Principle</span>
-              <span class="widget-badge success">88% Stage (Output)</span>
+              <span class="widget-title">Stage Ratio</span>
+              <span class="widget-badge success" id="tile-stage-badge">88% Output</span>
             </div>
-            <div class="metric-label" style="margin-bottom: 6px;">Stage (Generative Output) vs Audience (Passive Input)</div>
+            <div class="metric-label" style="margin-bottom: 6px;">Stage (Output) vs Audience (Input)</div>
             <div class="ratio-bar" style="height: 12px; margin-bottom: 10px;">
-              <div class="ratio-stage" style="width: 88%;" title="Stage 88%"></div>
-              <div class="ratio-aud" style="width: 12%;" title="Audience 12%"></div>
+              <div class="ratio-stage" id="tile-ratio-bar-stage" style="width: 88%;"></div>
+              <div class="ratio-aud" id="tile-ratio-bar-aud" style="width: 12%;"></div>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">Wall Principle Status</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">Fully Enforced</span>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-value" style="color: var(--text-muted);">
-                High generative throughput maintained. No unprompted feed consumption.
-              </div>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-value">High generative throughput maintained.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 4. Active Focus Session (Wide 2-col Horizontal Bento) -->
+      <!-- 4. Active Session Tile -->
       <div class="tile-wrapper bento-wide">
         <div class="tactile-tile" data-tile-id="0">
           <div class="tile-face tile-face-front">
@@ -149,29 +149,25 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Active Focus Session</span>
-              <span class="widget-badge success">Live Session</span>
+              <span class="widget-title">Active Session</span>
+              <span class="widget-badge info">Tracked</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">Current Intent</span>
-              <span class="metric-val" id="widget-session-intent">Core Architecture & Bento UI</span>
+              <span class="metric-label">Intent</span>
+              <span class="metric-val" id="tile-session-intent">Tactile App Shell & Topic Time</span>
             </div>
             <div class="metric-row">
               <span class="metric-label">Elapsed Focus</span>
               <span class="metric-val">42 min</span>
             </div>
-            <div class="progress-track" style="margin-bottom: 8px;">
-              <div class="progress-fill emerald" style="width: 70%;"></div>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Session Health</div>
-              <div class="capsule-value">Zero cognitive leakage detected. Sovereign focus lock active.</div>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-value">Zero cognitive leakage detected.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 5. ChatGuard Budget (Compact 1x1 Square Bento) -->
+      <!-- 5. ChatGuard Tile -->
       <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="3">
           <div class="tile-face tile-face-front">
@@ -179,29 +175,21 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">ChatGuard Budget</span>
-              <span class="widget-badge success">Healthy</span>
+              <span class="widget-title">ChatGuard</span>
+              <span class="widget-badge success">Guarded</span>
             </div>
             <div class="metric-row">
               <span class="metric-label">15m Window</span>
-              <span class="metric-val" id="widget-guard-budget">15m / 15m</span>
+              <span class="metric-val">15m / 15m</span>
             </div>
-            <div class="progress-track">
-              <div class="progress-fill" style="width: 100%;"></div>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Burst Cooldown</span>
-              <span class="metric-val">0s (Ready)</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Tier</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">Direct Human</span>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-value">Prompt boundary active.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 6. Day Window & Curfew (Compact 1x1 Square Bento) -->
+      <!-- 6. Day Window Tile -->
       <div class="tile-wrapper bento-square-sm">
         <div class="tactile-tile" data-tile-id="5">
           <div class="tile-face tile-face-front">
@@ -209,195 +197,15 @@
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Day Window & Curfew</span>
+              <span class="widget-title">Day Window</span>
               <span class="widget-badge info">Open</span>
             </div>
             <div class="metric-row">
               <span class="metric-label">Bounds</span>
               <span class="metric-val">08:00 — 22:30</span>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">To Curfew</span>
-              <span class="metric-val">6h 45m</span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill amber" style="width: 58%;"></div>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Evening Protocol</div>
-              <div class="capsule-value">Gentle ramp down at 22:00.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 7. Recent Micro-Logs & Audit Feed (Tall 1x2 Vertical Bento) -->
-      <div class="tile-wrapper bento-tall">
-        <div class="tactile-tile" data-tile-id="10">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">07 • Audit Logs</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Audit Trail Ledger</span>
-              <span class="widget-badge info">Ledger</span>
-            </div>
-            <div class="audit-feed">
-              <div class="audit-item" style="border-left-color: var(--accent-cyan);">
-                <span class="audit-time">15:45</span> Plumb-line chimes centered
-              </div>
-              <div class="audit-item" style="border-left-color: var(--accent-indigo);">
-                <span class="audit-time">15:30</span> Solitaire wave sweep tuned
-              </div>
-              <div class="audit-item" style="border-left-color: var(--accent-emerald);">
-                <span class="audit-time">15:10</span> Stage ratio calibrated (88%)
-              </div>
-              <div class="audit-item" style="border-left-color: var(--accent-amber);">
-                <span class="audit-time">14:45</span> D-090 reveal policy sealed
-              </div>
-              <div class="audit-item" style="border-left-color: var(--accent-rose);">
-                <span class="audit-time">14:15</span> Return Anchor snapshot saved
-              </div>
-            </div>
             <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-value" style="color: var(--text-dim); font-size: 12.5px;">Tamper-evident hash ledger synced.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 8. Quick Action Drawers & Triage (Tall 1x2 Vertical Bento) -->
-      <div class="tile-wrapper bento-tall">
-        <div class="tactile-tile" data-tile-id="7">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">08 • Fast Drawers</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Quick Action Drawers</span>
-              <span class="widget-badge info">Fast Triage</span>
-            </div>
-            <div class="drawer-btn-grid" style="gap: 8px;">
-              <button class="drawer-btn" id="btn-drawer-park">
-                <span>Park Thought / Tab</span>
-                <span>→</span>
-              </button>
-              <button class="drawer-btn" id="btn-drawer-leisure">
-                <span>Declare 20m Leisure</span>
-                <span>→</span>
-              </button>
-              <button class="drawer-btn" id="btn-drawer-research">
-                <span>Open Research Sandbox</span>
-                <span>→</span>
-              </button>
-            </div>
-            <div class="capsule-box" style="margin-top: auto;">
-              <div class="capsule-key">Instantaneous Offloading</div>
-              <div class="capsule-value">Parked ideas resurface strictly during cold-state review.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 9. Quick Scratchpad & Mode Switcher (Wide 2-col Horizontal Bento) -->
-      <div class="tile-wrapper bento-wide">
-        <div class="tactile-tile" data-tile-id="11">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">09 • Quick Scratchpad</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Quick Scratchpad</span>
-              <span class="widget-badge info">Local</span>
-            </div>
-            <textarea class="scratchpad-textarea" placeholder="Jot down active mental notes or next concrete code line..."></textarea>
-            <div style="font-family: var(--font-display); font-size: 13px; letter-spacing: 1.5px; color: var(--text-dim); text-align: center;">
-              Triple-click anywhere to flip back to Art & Poem Mode
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 10. Focus Velocity & Streak (Compact 1x1 Square Bento) -->
-      <div class="tile-wrapper bento-square-sm">
-        <div class="tactile-tile" data-tile-id="8">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">10 • Velocity</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Focus Velocity</span>
-              <span class="widget-badge success">94 / 100</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Streak</span>
-              <span class="metric-val">14 Days</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Checkpoints</span>
-              <span class="metric-val">8 Micro-logs</span>
-            </div>
-            <div class="progress-track" style="margin-bottom: 8px;">
-              <div class="progress-fill emerald" style="width: 94%;"></div>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-value" style="color: var(--text-muted);">
-                Momentum threshold exceeded. Focus depth sustained.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 11. Declared Leisure vs Drift (Compact 1x1 Square Bento) -->
-      <div class="tile-wrapper bento-square-sm">
-        <div class="tactile-tile" data-tile-id="6">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">11 • Leisure & Drift</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Leisure vs Drift</span>
-              <span class="widget-badge success">Zero Drift</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Sanctioned</span>
-              <span class="metric-val">0 / 60m</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Drift</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">0m</span>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Sanctioned Break</div>
-              <div class="capsule-value">Declare leisure explicitly before checking distractions.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 12. Cold-State Consent & Security Envelope (Wide 2-col Horizontal Bento) -->
-      <div class="tile-wrapper bento-wide">
-        <div class="tactile-tile" data-tile-id="9">
-          <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">12 • Cold-State Consent</span>
-          </div>
-          <div class="tile-face tile-face-back">
-            <div class="widget-header">
-              <span class="widget-title">Cold-State Security Envelope</span>
-              <span class="widget-badge info">Sovereign Local</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Cloud Exfiltration</span>
-              <span class="metric-val" style="color: var(--accent-emerald);">0 Bytes (Blocked)</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">Local Bridge Daemon</span>
-              <span class="metric-val">Port 7311 (Localhost Only)</span>
-            </div>
-            <div class="capsule-box">
-              <div class="capsule-key">Cryptographic Envelope</div>
-              <div class="capsule-value">Every key, token, and ledger record remains strictly isolated on your machine.</div>
+              <div class="capsule-value">Evening protocol sets at 22:00.</div>
             </div>
           </div>
         </div>
@@ -430,7 +238,7 @@
     <div class="poem-section-header">
       <h2 class="poem-section-title poiret-one-regular">Suspended Poem Installation</h2>
       <p class="poem-section-subtitle arvo-regular">
-        Beaded cultural doorway curtain woven with organic staggered stanzas & multi-shape chimes.<br>
+        Beaded doorway curtain woven with organic staggered stanzas & multi-shape chimes.<br>
         <strong class="arvo-bold">Glide cursor across doorway beads to part strings • Drag stanza cards to swing & play chimes.</strong>
       </p>
       <div style="margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
@@ -443,227 +251,813 @@
     </div>
   </section>
 
-  <!-- Ambient Bottom Translucent Note -->
-  <div class="return-note-fixed poiret-one-regular">
-    [Mode 1: Click block to wave-sweep flip • Mode 2: Triple-click anywhere to return]
+  <!-- Ambient Bottom Note -->
+  <div class="return-note-fixed poiret-one-regular" id="return-note-fixed">
+    [Mode 1: Click block or top button to enter Dashboard Shell • Triple-click anywhere to cycle artwork]
   </div>
 
-  <!-- Full-Screen Frosted Glass Settings Modal -->
+
+  <!-- =========================================================================
+       MODE 2: Modern Executive App Shell (The Desk & Full Workstation)
+       ========================================================================= -->
+  <div class="app-shell" id="app-shell" style="display: none;">
+
+    <!-- Persistent Left Navigation Sidebar -->
+    <aside class="shell-sidebar" id="shell-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <span class="brand-glyph">◈</span>
+          <span class="brand-text">DHRITI</span>
+        </div>
+        <div class="sidebar-status-tag">
+          <span class="status-indicator-dot"></span>
+          <span>SOVEREIGN</span>
+        </div>
+      </div>
+
+      <!-- Navigation Menu -->
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="desk">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>The Desk</span>
+        </button>
+        <button class="nav-item" data-view="focus">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Focus Engine</span>
+        </button>
+        <button class="nav-item" data-view="tasks">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          <span>Active Tasks</span>
+        </button>
+        <button class="nav-item" data-view="completed">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Completed</span>
+        </button>
+        <button class="nav-item" data-view="topics">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M4.93 4.93l4.24 4.24"></path><path d="M14.83 9.17l4.24-4.24"></path><path d="M14.83 14.83l4.24 4.24"></path><path d="M9.17 14.83l-4.24 4.24"></path></svg>
+          <span>Topics & Time</span>
+        </button>
+        <button class="nav-item" data-view="parking">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></polyline><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>Curiosity Parking</span>
+        </button>
+        <button class="nav-item" data-view="mirror">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span>Life Mirror</span>
+        </button>
+        <button class="nav-item" data-view="backlog">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          <span>Dynamic Backlog</span>
+        </button>
+        <button class="nav-item" data-view="guard">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>Guard Governors</span>
+        </button>
+        <button class="nav-item" data-view="stats">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span>Honest Stats</span>
+        </button>
+        <button class="nav-item" data-view="ledger">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <span>Audit Ledger</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Foot Controls -->
+      <div class="sidebar-footer">
+        <button class="lockdown-btn" id="btn-lockdown" title="Strengthen guards immediately (Asymmetric consent L-6)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Daily Lockdown</span>
+        </button>
+        <button class="sidebar-return-btn" id="btn-return-art">
+          <span>Art & Poem Mode ↗</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main View Content Area -->
+    <main class="shell-content" id="shell-content">
+
+      <!-- View 1: The Desk -->
+      <section class="shell-view active" id="view-desk">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">The Desk</h1>
+            <p class="view-subtitle">Executive overview: contract state, topic distribution, return anchor, and stage ratio.</p>
+          </div>
+          <div class="view-actions">
+            <span class="session-pill active">Session Active: 42m</span>
+          </div>
+        </div>
+
+        <!-- 4 Top Executive Stat Cards -->
+        <div class="desk-stats-grid">
+          <div class="stat-card">
+            <div class="stat-meta">Active Daily Contract</div>
+            <div class="stat-figure" id="desk-contract-target">3 Targets</div>
+            <div class="stat-note">2 verified with machine proof</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-meta">Stage Output Ratio</div>
+            <div class="stat-figure" id="desk-stage-figure">88%</div>
+            <div class="stat-note">Reference band: 70–80% (Endorsed)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-meta">Consecutive Run Days</div>
+            <div class="stat-figure" id="desk-streak-figure">14</div>
+            <div class="stat-note">Neutral completion record (L-2)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-meta">Decompression Zone</div>
+            <div class="stat-figure" id="desk-decomp-figure">Ready</div>
+            <div class="stat-note">90m bounded release upon finish</div>
+          </div>
+        </div>
+
+        <!-- Bento Grid for The Desk (Cards sized naturally without internal scrolling) -->
+        <div class="desk-layout-grid">
+
+          <!-- Return Anchor Capsule (Wide) -->
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Return Anchor (D-090 Resume Capsule)</span>
+              <span class="card-badge success">Sovereign State</span>
+            </div>
+            <div class="card-body">
+              <div class="capsule-box" style="margin-bottom: 12px;">
+                <div class="capsule-key">Next Concrete Step</div>
+                <div class="capsule-value" id="desk-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
+              </div>
+              <div class="capsule-box">
+                <div class="capsule-key">Active Blocker</div>
+                <div class="capsule-value" id="desk-anchor-blocker">None detected. Sovereign execution path unobstructed.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage Ratio Donut & Wall Card -->
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">Stage Ratio Donut</span>
+              <span class="card-badge info">Output / Input</span>
+            </div>
+            <div class="card-body centered-body">
+              <canvas id="donut-stage-canvas" width="160" height="160"></canvas>
+              <div class="donut-legend">
+                <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
+                <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Topic-Time Distribution Stacked Bar (D-091 / L-11 Honest Metrics) -->
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Topic-Time Distribution (Hours per Domain)</span>
+              <span class="card-badge info">Honest Metrics</span>
+            </div>
+            <div class="card-body">
+              <p class="chart-desc">Decomposes activity by domain segment (Stage vs Audience / drift) rather than guilt-inducing generic screen time.</p>
+              <div class="topic-bars-container" id="desk-topic-bars">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Decompression Zone Status Card (D-018 & D-091) -->
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">Decompression Status</span>
+              <span class="card-badge warning">Transition Lock</span>
+            </div>
+            <div class="card-body">
+              <div class="metric-row">
+                <span class="metric-label">Status</span>
+                <span class="metric-val" id="decomp-status-val">Armed on Target Finish</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Remaining Duration</span>
+                <span class="metric-val" id="decomp-duration-val">90 min max</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Springboard Strikes</span>
+                <span class="metric-val" id="decomp-strikes-val">0 / 4</span>
+              </div>
+              <div class="capsule-box" style="margin-top: 10px;">
+                <div class="capsule-key">Decompression Rules</div>
+                <div class="capsule-value">Google Search & images allowed. Video and entertainment blocked. Leaps trigger auto-revert.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Park Input Card -->
+          <div class="desk-card card-span-3">
+            <div class="card-head">
+              <span class="card-title">Curiosity Parking Lot — Quick Capture</span>
+              <span class="card-badge info">Cold Review Mail Slot</span>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <input type="text" class="form-input" id="quick-park-input" placeholder="Park mid-session curiosity, rabbit-hole URL, or spark to review cold...">
+                <button class="btn-primary" id="btn-quick-park">Park Thought</button>
+              </div>
+              <div class="park-feedback" id="quick-park-feedback"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- View 2: Focus Engine -->
+      <section class="shell-view" id="view-focus">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Pomodoro Focus Engine</h1>
+            <p class="view-subtitle">Ultradian rhythm timer with pure procedural alarms and ambient noise generator.</p>
+          </div>
+        </div>
+
+        <div class="focus-layout-grid">
+          <!-- Main Timer Display -->
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Focus Interval</span>
+              <span class="card-badge info" id="focus-phase-badge">Focus Zone</span>
+            </div>
+            <div class="card-body timer-body">
+              <div class="big-timer-display" id="focus-big-timer">25:00</div>
+              <div class="focus-preset-row">
+                <button class="pomo-preset-btn active" data-preset="standard">Standard 25/5</button>
+                <button class="pomo-preset-btn" data-preset="extended">Extended 50/15</button>
+                <button class="pomo-preset-btn" data-preset="deep">Deep Work 100/30</button>
+              </div>
+              <div class="focus-actions-row">
+                <button class="pomo-btn primary" id="btn-focus-start">Start Focus</button>
+                <button class="pomo-btn secondary" id="btn-focus-reset">Reset</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Procedural Sound Catalog (D-095) -->
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">Procedural Alarm Tone</span>
+              <span class="card-badge success">Zero Audio Samples</span>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Sound Profile</label>
+                <select class="form-select" id="alarm-sound-select">
+                  <option value="singing_bowl">Tibetan Singing Bowl</option>
+                  <option value="wind_chimes">Wind Chimes (Pythagorean)</option>
+                  <option value="bicycle_bell">Bicycle Bell</option>
+                  <option value="temple_bell">Temple Bell</option>
+                  <option value="digital_beep">Digital Beep</option>
+                  <option value="toy_honk">Toy Honk</option>
+                  <option value="clown_horn">Clown Horn</option>
+                  <option value="drum_crash">Drum Crash</option>
+                  <option value="klaxon">Subtle Klaxon</option>
+                </select>
+              </div>
+              <button class="btn-sec" id="btn-test-alarm" style="width: 100%; margin-top: 8px;">Test Selected Tone</button>
+
+              <div style="margin-top: 24px;">
+                <label class="form-label">Ambient Noise Generator</label>
+                <div class="noise-type-row">
+                  <label><input type="radio" name="noise-type" value="brown" checked> Brown</label>
+                  <label><input type="radio" name="noise-type" value="pink"> Pink</label>
+                  <label><input type="radio" name="noise-type" value="white"> White</label>
+                </div>
+                <div class="slider-control-group" style="margin-top: 10px;">
+                  <div class="slider-header">
+                    <span class="slider-title">Noise Volume</span>
+                    <span class="slider-value-pill" id="val-noise-vol">30%</span>
+                  </div>
+                  <input type="range" class="styled-range-slider" id="slider-noise-vol" min="0" max="100" value="30">
+                </div>
+                <button class="btn-primary" id="btn-toggle-noise" style="width: 100%; margin-top: 10px;">Start Ambient Noise</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 3: Active Tasks & Balancer -->
+      <section class="shell-view" id="view-tasks">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Active Contract Tasks</h1>
+            <p class="view-subtitle">Today's committed evidence-bearing deliverables.</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn-primary" id="btn-open-poison-modal">Pick Your Poison Menu</button>
+          </div>
+        </div>
+
+        <div class="desk-card">
+          <div class="card-head">
+            <span class="card-title">Committed Tasks</span>
+            <span class="card-badge info">Proof Enforced</span>
+          </div>
+          <div class="card-body">
+            <div class="task-list-table" id="contract-task-list">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 4: Completed Tasks -->
+      <section class="shell-view" id="view-completed">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Completed Work</h1>
+            <p class="view-subtitle">Tamper-evident record of verified deliverables.</p>
+          </div>
+        </div>
+
+        <div class="desk-card">
+          <div class="card-head">
+            <span class="card-title">Completed Items</span>
+            <span class="card-badge success">Verified</span>
+          </div>
+          <div class="card-body">
+            <div class="task-list-table" id="completed-task-list">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 5: Topics & Observation -->
+      <section class="shell-view" id="view-topics">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Topics & Observation</h1>
+            <p class="view-subtitle">Local content-aware tokenization, query springboard detection, and domain breakdowns.</p>
+          </div>
+        </div>
+
+        <div class="desk-layout-grid">
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Real-Time Topic Segments</span>
+              <span class="card-badge info">Local Tokenizer</span>
+            </div>
+            <div class="card-body" id="topics-breakdown-container">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">Co-Occurrence Chips</span>
+              <span class="card-badge success">Topical Clusters</span>
+            </div>
+            <div class="card-body" id="co-occurrence-chips-container">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 6: Parking Lot -->
+      <section class="shell-view" id="view-parking">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Curiosity Parking Lot</h1>
+            <p class="view-subtitle">Mid-session captures awaiting cold-state review (L-1 Wall Principle).</p>
+          </div>
+        </div>
+
+        <div class="desk-card">
+          <div class="card-head">
+            <span class="card-title">Parked Items</span>
+            <span class="card-badge info" id="parking-count-badge">0 Items</span>
+          </div>
+          <div class="card-body">
+            <div class="parking-timeline" id="parking-timeline-container">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 7: Life Mirror -->
+      <section class="shell-view" id="view-mirror">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Life Mirror & Thought Bubbles</h1>
+            <p class="view-subtitle">Cold-declared life alternative goals resurfaced via unobtrusive floating bubbles (D-092).</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn-primary" id="btn-add-life-alt">Declare New Alternative</button>
+          </div>
+        </div>
+
+        <div class="desk-layout-grid">
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Cold-Declared Life Alternatives</span>
+              <span class="card-badge info">Active Pool</span>
+            </div>
+            <div class="card-body">
+              <div class="life-alt-list" id="life-alt-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">Bubble Scheduling Rules</span>
+              <span class="card-badge info">D-092 Spec</span>
+            </div>
+            <div class="card-body">
+              <p class="chart-desc">Floating frosted thought bubbles surface in Art Mode with uniform random selection. Silent expiry after 60s without moralizing shame.</p>
+              <div class="metric-row" style="margin-top: 12px;">
+                <span class="metric-label">Daily Bubble Cap</span>
+                <span class="metric-val">10 / day</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Min Floor Gap</span>
+                <span class="metric-val">10 seconds</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Cooldown per Alt</span>
+                <span class="metric-val">30 minutes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 8: Dynamic Backlog -->
+      <section class="shell-view" id="view-backlog">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Dynamic Backlog & Unit Balancer</h1>
+            <p class="view-subtitle">Standardized effort units: light (0.5u), medium (1u), hard (2u), challenging (3u).</p>
+          </div>
+          <div class="view-actions">
+            <button class="btn-primary" id="btn-eval-autofill">Auto-Fill Light Day</button>
+          </div>
+        </div>
+
+        <div class="desk-card">
+          <div class="card-head">
+            <span class="card-title">Backlog Repository</span>
+            <span class="card-badge info" id="backlog-count-badge">8 Items</span>
+          </div>
+          <div class="card-body">
+            <div class="backlog-table" id="backlog-table-container">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 9: Guard Governors -->
+      <section class="shell-view" id="view-guard">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Guard Governors & Prompt Inspection</h1>
+            <p class="view-subtitle">ChatGuard 15m budget and semantic topic-divergence testing.</p>
+          </div>
+        </div>
+
+        <div class="desk-layout-grid">
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Prompt Divergence Sandbox</span>
+              <span class="card-badge info">Local Semantic Test</span>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Active Session Topic</label>
+                <input type="text" class="form-input" id="guard-active-topic" value="Dhriti v0.7.0 Tactile Dashboard and Architecture" readonly>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Test Candidate Prompt</label>
+                <textarea class="form-textarea" id="guard-test-prompt" rows="3" placeholder="Enter prompt to evaluate topic alignment..."></textarea>
+              </div>
+              <button class="btn-primary" id="btn-eval-prompt">Evaluate Prompt Alignment</button>
+              <div class="guard-verdict-box" id="guard-verdict-box" style="margin-top: 14px; display: none;"></div>
+            </div>
+          </div>
+
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">ChatGuard Budget</span>
+              <span class="card-badge success">15m / 15m</span>
+            </div>
+            <div class="card-body">
+              <div class="metric-row">
+                <span class="metric-label">Window Remaining</span>
+                <span class="metric-val">15m 00s</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Burst Cooldown</span>
+                <span class="metric-val">0s (Ready)</span>
+              </div>
+              <div class="capsule-box" style="margin-top: 12px;">
+                <div class="capsule-key">Enforcement Law L-9</div>
+                <div class="capsule-value">Local computation only. Divergence creates a held turn, never an argument.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 10: Honest Stats -->
+      <section class="shell-view" id="view-stats">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Honest Metrics & Statistics</h1>
+            <p class="view-subtitle">Facts, streaks, run days, and distributions without shame or gamification (L-2).</p>
+          </div>
+        </div>
+
+        <div class="desk-layout-grid">
+          <div class="desk-card card-span-3">
+            <div class="card-head">
+              <span class="card-title">14-Day Completion Fact Ribbon</span>
+              <span class="card-badge success">14 Runs Met</span>
+            </div>
+            <div class="card-body">
+              <div class="streak-ribbon" id="stats-streak-ribbon">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 11: Audit Ledger -->
+      <section class="shell-view" id="view-ledger">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Tamper-Evident Audit Ledger</h1>
+            <p class="view-subtitle">Cryptographic SHA-256 event log with timestamp verification.</p>
+          </div>
+        </div>
+
+        <div class="desk-card">
+          <div class="card-head">
+            <span class="card-title">Ledger Events</span>
+            <span class="card-badge info">SHA-256 Chain</span>
+          </div>
+          <div class="card-body">
+            <div class="ledger-table" id="ledger-events-container">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 12: Settings -->
+      <section class="shell-view" id="view-settings">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Settings & Customization</h1>
+            <p class="view-subtitle">Theme, background painting dials, quote rotation, and bridge configuration.</p>
+          </div>
+        </div>
+
+        <div class="desk-layout-grid">
+          <div class="desk-card card-span-2">
+            <div class="card-head">
+              <span class="card-title">Underlay Dials & Transparency</span>
+              <span class="card-badge info">Live Canvas</span>
+            </div>
+            <div class="card-body">
+              <div class="slider-control-group">
+                <div class="slider-header">
+                  <span class="slider-title">Background Brightness</span>
+                  <span class="slider-value-pill" id="shell-val-brightness">88%</span>
+                </div>
+                <input type="range" class="styled-range-slider" id="shell-slider-brightness" min="40" max="120" value="88">
+              </div>
+              <div class="slider-control-group" style="margin-top: 14px;">
+                <div class="slider-header">
+                  <span class="slider-title">Background Blur Filter</span>
+                  <span class="slider-value-pill" id="shell-val-blur">5 px</span>
+                </div>
+                <input type="range" class="styled-range-slider" id="shell-slider-blur" min="0" max="25" value="5">
+              </div>
+              <div class="slider-control-group" style="margin-top: 14px;">
+                <div class="slider-header">
+                  <span class="slider-title">Background Opacity</span>
+                  <span class="slider-value-pill" id="shell-val-opacity">88%</span>
+                </div>
+                <input type="range" class="styled-range-slider" id="shell-slider-opacity" min="20" max="100" value="88">
+              </div>
+            </div>
+          </div>
+
+          <div class="desk-card card-span-1">
+            <div class="card-head">
+              <span class="card-title">Theme Palette</span>
+              <span class="card-badge success">Executive Scale</span>
+            </div>
+            <div class="card-body">
+              <div class="theme-choice-grid">
+                <div class="theme-choice-card active" id="shell-theme-card-dark" data-theme="dark">
+                  <div class="theme-card-info">
+                    <div class="theme-name">Executive Dark</div>
+                    <div class="theme-desc">Midnight Navy (#141726, #20253b) with Purple accents (#8b78f6).</div>
+                  </div>
+                </div>
+                <div class="theme-choice-card" id="shell-theme-card-light" data-theme="light">
+                  <div class="theme-card-info">
+                    <div class="theme-name">Minimal Light</div>
+                    <div class="theme-desc">Pure White (#ffffff) with Cyan accents (#00b894).</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+
+  <!-- =========================================================================
+       Modals: Pick-Your-Poison, Life Alt, Lockdown, Settings
+       ========================================================================= -->
+
+  <!-- Pick-Your-Poison Task Equivalence Modal (D-093) -->
+  <div class="modal-overlay" id="poison-modal-overlay">
+    <div class="styled-modal">
+      <div class="modal-header">
+        <div class="modal-title">Pick Your Poison — Task Equivalence Menu</div>
+        <button class="icon-btn modal-close-btn" id="btn-close-poison">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Balanced equivalence baskets automatically calculated from standard units (light = 0.5u, medium = 1u, hard = 2u, challenging = 3u). Choose one option without negotiation.</p>
+        <div class="poison-options-grid" id="poison-options-grid">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Declare Life Alternative Modal -->
+  <div class="modal-overlay" id="life-modal-overlay">
+    <div class="styled-modal">
+      <div class="modal-header">
+        <div class="modal-title">Declare Life Alternative Goal</div>
+        <button class="icon-btn modal-close-btn" id="btn-close-life">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Activity Label (e.g. "Back exercises — min 10m")</label>
+          <input type="text" class="form-input" id="new-life-label" placeholder="Enter offline healthy alternative...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="new-life-category">
+            <option value="physical">Physical Exercise / Stretch</option>
+            <option value="offline_craft">Offline Craft / Instrument</option>
+            <option value="nature">Nature / Walk</option>
+            <option value="reading">Offline Book Reading</option>
+            <option value="rest">Mindful Rest / Meditation</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Minimum Duration (minutes)</label>
+          <input type="number" class="form-input" id="new-life-duration" value="15" min="5" max="180">
+        </div>
+        <button class="btn-primary" id="btn-save-life-alt" style="width: 100%; margin-top: 10px;">Save to Life Mirror</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Lockdown Confirmation Modal (L-6 Asymmetric Consent) -->
+  <div class="modal-overlay" id="lockdown-modal-overlay">
+    <div class="styled-modal">
+      <div class="modal-header">
+        <div class="modal-title">Confirm Daily Lockdown Engagement</div>
+        <button class="icon-btn modal-close-btn" id="btn-close-lockdown">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Per Design Law L-6 (Asymmetric Consent): strengthening protection is permitted immediately in hot state. Weakening will require cold-state consent at next day start.</p>
+        <div class="capsule-box" style="margin-bottom: 16px;">
+          <div class="capsule-key">Engaged Protection</div>
+          <div class="capsule-value">All entertainment, social springboards, and non-work domains immediately sealed until tomorrow's window open.</div>
+        </div>
+        <div class="form-row">
+          <button class="btn-primary" id="btn-confirm-lockdown" style="flex: 1;">Engage Lockdown</button>
+          <button class="btn-sec" id="btn-cancel-lockdown">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legacy Frosted Glass Settings Modal (Kept for quick access) -->
   <div class="settings-overlay" id="settings-overlay">
     <div class="settings-modal">
       <div class="settings-header">
         <div class="settings-title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span>Dashboard & Gallery Configuration</span>
+          <span>Gallery & Appearance Configuration</span>
         </div>
-        <button class="icon-btn" id="btn-close-settings" style="width: 34px; height: 34px; font-size: 14px;">✕</button>
+        <button class="icon-btn" id="btn-close-settings">✕</button>
       </div>
       <div class="settings-body">
-        
-        <!-- Tab Navigation -->
         <nav class="settings-tabs-nav">
           <button class="tab-btn active" data-tab="tab-appearance">Appearance & Theme</button>
           <button class="tab-btn" data-tab="tab-art">Art & Gallery</button>
           <button class="tab-btn" data-tab="tab-quotes">Hourly Quotes</button>
-          <button class="tab-btn" data-tab="tab-poems">Poetry & PoetryDB</button>
-          <button class="tab-btn" data-tab="tab-pomodoro">Pomodoro Timer</button>
-          <button class="tab-btn" data-tab="tab-bridge">Dhriti Bridge</button>
+          <button class="tab-btn" data-tab="tab-poems">PoetryDB</button>
         </nav>
-
-        <!-- Tab Contents -->
         <div class="settings-tab-content">
-
-          <!-- Tab 0: Appearance & Theme -->
+          <!-- Tab: Appearance -->
           <div class="tab-pane active" id="tab-appearance">
-            <h3 style="margin-bottom: 8px;">Theme & Canvas Appearance</h3>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-              Toggle between executive Dark Mode (deep purple/navy) and Light Mode (pure white/cyan), and fine-tune your background painting's brightness, blur, and opacity during focus sessions.
-            </p>
-
-            <div class="form-group">
-              <label class="form-label">Theme Mode</label>
-              <div class="theme-choice-grid">
-                <div class="theme-choice-card active" id="theme-card-dark" data-theme="dark">
-                  <div class="theme-card-preview dark-preview">
-                    <span class="preview-badge">Purple & Navy</span>
-                  </div>
-                  <div class="theme-card-info">
-                    <div class="theme-name">Executive Dark</div>
-                    <div class="theme-desc">Solid deep navy cards (#20253b) with vibrant purple values (#8b78f6) and lavender accents.</div>
-                  </div>
+            <label class="form-label">Theme Mode</label>
+            <div class="theme-choice-grid">
+              <div class="theme-choice-card active" id="theme-card-dark" data-theme="dark">
+                <div class="theme-card-info">
+                  <div class="theme-name">Executive Dark</div>
+                  <div class="theme-desc">Purple & Midnight Navy</div>
                 </div>
-                <div class="theme-choice-card" id="theme-card-light" data-theme="light">
-                  <div class="theme-card-preview light-preview">
-                    <span class="preview-badge">White & Cyan</span>
-                  </div>
-                  <div class="theme-card-info">
-                    <div class="theme-name">Minimal Light</div>
-                    <div class="theme-desc">Pure white cards (#ffffff) with crisp cyan/emerald accents and airy readability.</div>
-                  </div>
+              </div>
+              <div class="theme-choice-card" id="theme-card-light" data-theme="light">
+                <div class="theme-card-info">
+                  <div class="theme-name">Minimal Light</div>
+                  <div class="theme-desc">White & Cyan</div>
                 </div>
               </div>
             </div>
-
-            <h4 style="margin: 22px 0 10px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main);">
-              Dashboard Underlay Background Controls
-            </h4>
-
-            <div class="slider-control-group">
+            <div class="slider-control-group" style="margin-top: 16px;">
               <div class="slider-header">
-                <span class="slider-title">Background Brightness</span>
+                <span class="slider-title">Brightness</span>
                 <span class="slider-value-pill" id="val-bg-brightness">88%</span>
               </div>
-              <input type="range" class="styled-range-slider" id="slider-bg-brightness" min="40" max="120" value="88" step="1">
-              <div class="slider-hint">Controls the brightness of the artwork underlay when in Dashboard Mode.</div>
+              <input type="range" class="styled-range-slider" id="slider-bg-brightness" min="40" max="120" value="88">
             </div>
-
-            <div class="slider-control-group">
+            <div class="slider-control-group" style="margin-top: 12px;">
               <div class="slider-header">
-                <span class="slider-title">Background Blur Filter</span>
+                <span class="slider-title">Blur</span>
                 <span class="slider-value-pill" id="val-bg-blur">5 px</span>
               </div>
-              <input type="range" class="styled-range-slider" id="slider-bg-blur" min="0" max="25" value="5" step="1">
-              <div class="slider-hint">Softens the background painting behind widgets to ensure clean, razor-sharp contrast.</div>
+              <input type="range" class="styled-range-slider" id="slider-bg-blur" min="0" max="25" value="5">
             </div>
-
-            <div class="slider-control-group">
+            <div class="slider-control-group" style="margin-top: 12px;">
               <div class="slider-header">
-                <span class="slider-title">Background Opacity</span>
+                <span class="slider-title">Opacity</span>
                 <span class="slider-value-pill" id="val-bg-opacity">88%</span>
               </div>
-              <input type="range" class="styled-range-slider" id="slider-bg-opacity" min="20" max="100" value="88" step="1">
-              <div class="slider-hint">Sets the transparency of the background underlay against the canvas floor.</div>
-            </div>
-
-            <div style="margin-top: 18px;">
-              <button class="btn-primary" id="btn-reset-underlay" style="background: var(--btn-sec-bg); color: var(--btn-sec-text); border: 1px solid var(--card-border-back); padding: 8px 16px; font-size: 12px; border-radius: 8px; cursor: pointer;">
-                Reset Underlay to Defaults
-              </button>
+              <input type="range" class="styled-range-slider" id="slider-bg-opacity" min="20" max="100" value="88">
             </div>
           </div>
-          
-          <!-- Tab 1: Art & Gallery -->
+          <!-- Tab: Art -->
           <div class="tab-pane" id="tab-art">
-            <h3 style="margin-bottom: 8px;">Background Painting Sets</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-              Select a preset artwork or paste an image URL to set the underlying painting.
-            </p>
             <div class="form-group">
               <label class="form-label">Add Custom Painting URL</label>
               <div class="form-row">
-                <input type="text" class="form-input" id="custom-art-url" placeholder="https://images.unsplash.com/photo-...">
-                <button class="btn-primary" id="btn-add-art">Add to Set</button>
+                <input type="text" class="form-input" id="custom-art-url" placeholder="https://images.unsplash.com/...">
+                <button class="btn-primary" id="btn-add-art">Add Art</button>
               </div>
             </div>
-            <label class="form-label">Curated Gallery</label>
-            <div class="art-preset-grid" id="art-preset-grid">
-              <!-- Rendered via app.js -->
-            </div>
+            <div class="art-preset-grid" id="art-preset-grid"></div>
           </div>
-
-          <!-- Tab 2: Hourly Quotes -->
+          <!-- Tab: Quotes -->
           <div class="tab-pane" id="tab-quotes">
-            <h3 style="margin-bottom: 8px;">Quote Rotation Collection</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-              Dhriti rotates through your quotes every 1 hour on the floating card.
-            </p>
             <div class="form-group">
-              <label class="form-label">Add New Motivational Quote</label>
-              <textarea class="form-textarea" id="new-quote-text" rows="2" placeholder="Enter inspiring or stoic quote..."></textarea>
+              <label class="form-label">Add Motivational Quote</label>
+              <textarea class="form-textarea" id="new-quote-text" rows="2" placeholder="Quote text..."></textarea>
               <div class="form-row" style="margin-top: 8px;">
-                <input type="text" class="form-input" id="new-quote-author" placeholder="Author / Source">
+                <input type="text" class="form-input" id="new-quote-author" placeholder="Author">
                 <button class="btn-primary" id="btn-add-quote">Add Quote</button>
               </div>
             </div>
-            <label class="form-label">Active Rotation List</label>
-            <div class="item-manager-list" id="quotes-manager-list">
-              <!-- Rendered via app.js -->
-            </div>
+            <div class="item-manager-list" id="quotes-manager-list"></div>
           </div>
-
-          <!-- Tab 3: Poetry & PoetryDB -->
+          <!-- Tab: PoetryDB -->
           <div class="tab-pane" id="tab-poems">
-            <h3 style="margin-bottom: 8px;">Public Domain Poetry (PoetryDB API)</h3>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-              Live integration with PoetryDB (free, keyless, open-source). Fetches classic public-domain poetry and automatically mounts it into the suspended chimes installation.
-            </p>
-            <div style="margin-bottom: 16px;">
-              <button class="btn-primary" id="btn-fetch-poetrydb-modal" style="padding: 10px 18px; font-size: 14px;">Fetch Random Poem from PoetryDB</button>
-              <div class="poetrydb-status-pill arvo-regular-italic" id="poetrydb-status-modal" style="margin-top: 8px;">Ready to query PoetryDB</div>
-            </div>
-            
-            <label class="form-label">Featured Authors (Instant Load)</label>
-            <div class="author-chip-grid" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn-primary" id="btn-fetch-poetrydb-modal" style="width: 100%;">Fetch Random Poem from PoetryDB</button>
+            <div class="poetrydb-status-pill arvo-regular-italic" id="poetrydb-status-modal" style="margin-top: 8px;">Ready to query PoetryDB</div>
+            <div class="author-chip-grid" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;">
               <button class="author-chip" data-author="Emily Dickinson">Emily Dickinson</button>
-              <button class="author-chip" data-author="Percy Bysshe Shelley">Percy Bysshe Shelley</button>
+              <button class="author-chip" data-author="Rabindranath Tagore">Rabindranath Tagore</button>
               <button class="author-chip" data-author="John Keats">John Keats</button>
-              <button class="author-chip" data-author="William Wordsworth">William Wordsworth</button>
-              <button class="author-chip" data-author="Edgar Allan Poe">Edgar Allan Poe</button>
-              <button class="author-chip" data-author="William Blake">William Blake</button>
-              <button class="author-chip" data-author="Lord Byron">Lord Byron</button>
-              <button class="author-chip" data-author="Walt Whitman">Walt Whitman</button>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Search by Poet Name</label>
-              <div class="form-row">
-                <input type="text" class="form-input" id="custom-author-input" placeholder="e.g. Shakespeare, Milton, Tennyson...">
-                <button class="btn-primary" id="btn-search-author">Search</button>
-              </div>
+              <button class="author-chip" data-author="Robert Frost">Robert Frost</button>
             </div>
           </div>
-
-          <!-- Tab 3: Pomodoro Settings -->
-          <div class="tab-pane" id="tab-pomodoro">
-            <h3 style="margin-bottom: 8px;">Pomodoro Focus Engine Configuration</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-              Interval schedules aligned with Dhriti ultradian rhythm guidelines.
-            </p>
-            <div class="form-group">
-              <label class="form-label">Standard Focus Interval</label>
-              <input type="text" class="form-input" value="25 min focus / 5 min break" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Extended Focus Interval</label>
-              <input type="text" class="form-input" value="50 min focus / 15 min break" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Deep Work Interval</label>
-              <input type="text" class="form-input" value="100 min focus / 30 min break" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Completion Acoustic Signal</label>
-              <input type="text" class="form-input" value="Synthesized Tibetan Singing Bowl (Modal Resonator)" readonly>
-            </div>
-          </div>
-
-          <!-- Tab 4: Dhriti Bridge -->
-          <div class="tab-pane" id="tab-bridge">
-            <h3 style="margin-bottom: 8px;">Dhriti Sovereign Local Bridge</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-              Connects the dashboard directly to the local Python daemon over HTTP localhost.
-            </p>
-            <div class="form-group">
-              <label class="form-label">Bridge Endpoint</label>
-              <input type="text" class="form-input" id="bridge-host-input" value="http://127.0.0.1:7311">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Cold-State Protection</label>
-              <input type="text" class="form-input" value="Strict Localhost Binding — Zero Cloud Telemetry" readonly>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
   </div>
 
   <!-- Scripts -->
-  <script src="audio_synth.js?v=3"></script>
-  <script src="physics_chimes.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="audio_synth.js?v=4"></script>
+  <script src="physics_chimes.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

@@ -242,6 +242,120 @@ def guard_sidecar_armed(ctx, body):
 
 
 # --------------------------------------------------------------------------
+# Dashboard v2 Extended Bridge Routes (D-091 - D-096)
+# --------------------------------------------------------------------------
+
+_TOPIC_TICKS: list = []
+_DECOMPRESSION_MGR = None
+
+
+@GuardRoutes.route("GET", "/history")
+def history(ctx, body):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+        try:
+            days = ctx.daemon.db.query(
+                "SELECT date, state, targets_met FROM day ORDER BY date DESC LIMIT 31")
+            sessions = ctx.daemon.db.query(
+                "SELECT s.task, s.state, s.ended_at, d.date AS day FROM session s "
+                "JOIN day d ON s.day_id=d.id ORDER BY s.started_at DESC LIMIT 200")
+            return 200, {"days": days, "sessions": sessions}
+        except Exception as e:
+            return 200, {"days": [], "sessions": [], "error": str(e)}
+    return 200, {"days": [], "sessions": []}
+
+
+@GuardRoutes.route("GET", "/topic/day")
+def topic_day(ctx, body):
+    from .topic_time import day_histogram
+    return 200, day_histogram(_TOPIC_TICKS)
+
+
+@GuardRoutes.route("POST", "/topic/tick")
+def topic_tick(ctx, body):
+    from .topic_time import day_histogram
+    if body and isinstance(body, dict):
+        _TOPIC_TICKS.append(body)
+    return 200, day_histogram(_TOPIC_TICKS)
+
+
+@GuardRoutes.route("GET", "/parking/timeline")
+def parking_timeline(ctx, body):
+    items = []
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+        try:
+            items = ctx.daemon.db.query(
+                "SELECT id, text, kind, sparked_by, created_at, disposition, note FROM parking_lot "
+                "ORDER BY created_at DESC LIMIT 200")
+        except Exception:
+            pass
+    return 200, {"items": items, "open_count": sum(1 for it in items if not it.get("disposition"))}
+
+
+@GuardRoutes.route("GET", "/life/list")
+def life_list(ctx, body):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+        try:
+            from .life_mirror import LifeMirrorService
+            svc = LifeMirrorService(ctx.daemon.db, getattr(ctx, "config", {}), ctx.daemon.clock, ctx.daemon.ledger)
+            return 200, {"items": svc.list()}
+        except Exception as e:
+            return 200, {"items": [], "error": str(e)}
+    return 200, {"items": []}
+
+
+@GuardRoutes.route("POST", "/life/declare")
+def life_declare(ctx, body):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+        try:
+            from .life_mirror import LifeMirrorService
+            svc = LifeMirrorService(ctx.daemon.db, getattr(ctx, "config", {}), ctx.daemon.clock, ctx.daemon.ledger)
+            res = svc.declare(body.get("label", ""), body.get("kind", "other"), body.get("minimum_version", ""))
+            return 200, res
+        except Exception as e:
+            return 400, {"error": str(e)}
+    return 200, {"id": "local", "label": body.get("label", ""), "kind": body.get("kind", "other")}
+
+
+@GuardRoutes.route("POST", "/life/log")
+def life_log(ctx, body):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+        try:
+            from .life_mirror import LifeMirrorService
+            svc = LifeMirrorService(ctx.daemon.db, getattr(ctx, "config", {}), ctx.daemon.clock, ctx.daemon.ledger)
+            res = svc.log(body.get("id", ""))
+            return 200, res
+        except Exception as e:
+            return 400, {"error": str(e)}
+    return 200, {"logged": True}
+
+
+@GuardRoutes.route("GET", "/decompression/status")
+def decompression_status(ctx, body):
+    global _DECOMPRESSION_MGR
+    if _DECOMPRESSION_MGR is None:
+        from .decompression import DecompressionManager
+        cfg = getattr(ctx, "config", {}).get("decompression", {})
+        _DECOMPRESSION_MGR = DecompressionManager(config=cfg)
+    return 200, _DECOMPRESSION_MGR.status()
+
+
+@GuardRoutes.route("POST", "/decompression/action")
+def decompression_action(ctx, body):
+    global _DECOMPRESSION_MGR
+    if _DECOMPRESSION_MGR is None:
+        from .decompression import DecompressionManager
+        cfg = getattr(ctx, "config", {}).get("decompression", {})
+        _DECOMPRESSION_MGR = DecompressionManager(config=cfg)
+    act = body.get("action")
+    if act == "start":
+        return 200, _DECOMPRESSION_MGR.start()
+    elif act == "eval":
+        res = _DECOMPRESSION_MGR.evaluate_navigation(body.get("url", ""), body.get("category"))
+        return 200, res
+    return 200, _DECOMPRESSION_MGR.status()
+
+
+# --------------------------------------------------------------------------
 # Event adapter: guard events -> the repo's real Ledger.record signature
 # --------------------------------------------------------------------------
 

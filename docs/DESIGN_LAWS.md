@@ -25,22 +25,24 @@ surface may end an interaction by proposing the next one.**
 *Tests:* `tests/test_design_laws.py` — the wall page carries no links,
 no buttons, no forms; no surface text contains engagement phrases.
 
-## L-2. Shame-safety (D-052)
+## L-2. Honest metrics (was Shame-safety, D-052)
 
 Pattern P-10 is the affective engine the build exists to disarm: "the
 compiler exposes you as a beginner; the audience seat is safe." A tool
 that shames repels the user back to the audience; a tool that praises
 feeds the validation loop (P-05). Therefore, in every surface:
 
-1. **No generated praise** — no "great job", no congratulations, no
-   pride. Achievement facts (accepted evidence, targets met) are
-   stated as facts or not at all.
-2. **No shame** — no "lazy", no "you failed", no disappointment
-   language. Gaps are shown as observed facts with timestamps.
-3. **No comparative framing** — no streaks, percentiles, ranks,
-   "better/worse than". The only reference band in the system is the
-   user's own endorsed band (D-046), and the software computes the
-   distance for no one — the reader does.
+1. **No generated praise or validation** — no "great job", no
+   congratulations, no pride, no confetti or cheering animations.
+   Achievement facts (accepted evidence, targets met) are stated as
+   facts or not at all.
+2. **No moralizing shame** — no "lazy", no "you failed", no
+   disappointment language. Gaps are shown as neutral observed facts
+   with timestamps.
+3. **No competitive framing or gamification** — no streaks as badges of
+   moral worth, no percentiles, no ranks, no levels, no virtual currency,
+   no tomato icons (zero Pomodoro gamification). Streak is presented
+   solely as a neutral completion fact: run days count and past run record.
 4. **Errors are first-class proof** — a documented failed attempt with
    a non-zero exit is accepted evidence when the contract says so
    (`accept_nonzero_exit`). "Let it error, fix one line, compile
@@ -65,14 +67,19 @@ the record is the countermeasure.
 
 *Tests:* `tests/test_design_laws.py::TestConfigImmutability`.
 
-## L-4. Structure-aware, content-blind (D-014, absolute)
+## L-4. Structure-aware, content-blind & privacy-local (D-014, absolute)
 
-Nothing in the enforcement or observation path reads page content,
-chat text, or window titles as semantic input. All signals are
-deterministic structural counts (domains, categories, event types).
-The behavioral pattern taxonomy (P-01..P-10) is reference vocabulary
-for cold-state coding — naming a pattern hot is itself P-02, and the
-software never does it. No classifier, no model, no prediction.
+Nothing in the ambient enforcement or background observation path reads
+page content, chat text, or window titles as semantic input. All ambient
+signals are deterministic structural counts (domains, categories, event
+types). The behavioral pattern taxonomy (P-01..P-10) is reference
+vocabulary for cold-state coding — naming a pattern hot is itself P-02,
+and the software never does it. No classifier, no model, no prediction.
+
+Where explicit content analysis is enabled by narrow exception (L-9
+semantic topic-lock or search query springboard inspection), processing
+is **100% local**: no remote telemetry of prompts, search queries, or
+reading history.
 
 *Tests:* the policy engine and all adapters are deterministic by
 construction; `analysis/labels/BEHAVIORAL_PATTERNS.md` carries the
@@ -82,20 +89,25 @@ cold-only rule.
 
 Every lock has a ceiling: the day releases unconditionally at
 window_end; the earned evening (D-049) ends at day_end; break-glass
-cooldowns expire; research passes expire. Nothing in this system may
-block indefinitely — an unbounded lock is a bug, not a feature.
+cooldowns expire; research passes expire; decompression zones expire
+at 90 minutes. Nothing in this system may block indefinitely — an
+unbounded lock is a bug, not a feature.
 
 *Tests:* day-window transitions; `tests/test_earned_evening.py`
 (expires_at == day_end, policy goes dormant past it).
 
-## L-6. Cold-state consent for scope changes
+## L-6. Asymmetric consent for scope changes
 
-Anything that changes what the system **measures, locks, or watches**
-defaults OFF and is enabled only by a cold-state act (config edit,
-next daemon start): the builder clause (D-035), evening observation
-(D-048 — a `surveillance_comfort` consent), the earned evening
-(D-049). A session, a document, or an agent may propose; only the
-builder, cold, confirms.
+1. **Weakening requires cold-state consent:** Anything that weakens
+   restrictions, disables guards, widens allowlists, or lowers friction
+   defaults OFF and is enabled ONLY by a cold-state act (config edit,
+   next daemon start, post-day review): the builder clause (D-035),
+   evening observation (D-048), earned evening (D-049).
+2. **Strengthening is allowed hot:** The user may voluntarily strengthen
+   protection in the heat of the moment (e.g. engaging Lockdown, deep
+   guard, or tightening allowlists). This is framed calmly and
+   authoritatively as an ordinary daily operational act — never as a
+   panicky, shameful, or crisis-driven "SOS" button.
 
 **Interaction with the allowlist (Phase 0, Bug 7):** the builder
 clause never overrides the profile allowlist. If a domain is an
@@ -133,33 +145,47 @@ mirror surfaces carry no affordances.
 
 ---
 
-## L-9. The explicit-content exception, topic-lock only (v0.7.0)
+## L-9. The explicit-content exception: Topic-Lock & Search Springboard (v0.7.0+)
 
-L-4 (structure-aware, content-blind) governs enforcement and ambient
-observation, absolutely. The topic-lock is a **distinct mechanism**:
-the operator explicitly consents, in cold state, to the system reading
-ONLY the prompts they submit to AI chat surfaces during an ACTIVE
-session, and comparing them semantically to the session's declared
-topic. L-9 is that narrow exception — nothing else may invoke it.
+L-4 (structure-aware, content-blind) governs ambient observation
+absolutely. The topic-lock and search springboard checks are **narrow,
+explicit exceptions**: the operator consents to the system reading ONLY
+the prompts they submit to AI chat surfaces and URL search parameters
+(`?q=`, titles) during an ACTIVE session or decompression zone,
+comparing them semantically to the active topic.
 
 The exception's own bounds (each is tested):
 
 1. **Off by default.** `topic_lock.semantic_mode_enabled = False`;
    enabling it is a cold-state act recorded as `topic_lock_enabled`
    (L-6 applies to the exception itself).
-2. **Session-bound.** The lock binds to the declared session topic;
-   outside an ACTIVE session nothing is read.
-3. **Prompts only.** The submitted prompt text — never the page, the
-   history, or the response content beyond the divergence verdict.
-4. **Bounded, not optimized** (L-8 inherits): the lock bounds the
-   conversation; it never ranks, paces, or "improves" it.
-5. **The hash, not the vector.** The topic embedding is stored as a
+2. **Session- or Zone-bound.** The lock binds to the declared session
+   topic; outside an ACTIVE session or decompression zone nothing is read.
+3. **Local processing only.** Stems, embeddings, and token counts are
+   computed strictly locally on-device. Prompts and queries are never
+   transmitted.
+4. **Prompts and query strings only.** The submitted query text — never
+   the page body, user credentials, private document contents, or history.
+5. **Bounded, not optimized** (L-8 inherits): the lock bounds the
+   investigation; it never ranks, paces, or "improves" it.
+6. **The hash, not the vector.** The topic embedding is stored as a
    hash — reproducibility, not surveillance.
 
-*Tests:* `tests/test_v070_part3b.py::TestTopicLockLedger` (off by
-default, the enabling event, divergence and pivot events),
-`TestSemanticTopicLock` (bind/threshold/verdict semantics, the
-embedding backend disclosed, never silently swapped).
+*Tests:* `tests/test_v070_part3b.py::TestTopicLockLedger`,
+`TestSemanticTopicLock`.
+
+---
+
+## L-11. Topic observation over generic screen time (v0.7.0+)
+
+Tracking generic "screen time" is an anti-pattern: it conflates
+demanding compilation, active coding, and research with passive
+entertainment scrolling, producing meaningless guilt. Dhriti decomposes
+time into domain and topic segments (Stage vs Audience, core topic vs
+drift). Time is displayed as honest, neutral topic-segment distributions
+(hours per domain, topic clusters), never moralized totals.
+
+*Tests:* `tests/test_dashboard_bridge.py` (topic time histogram facts).
 
 ---
 
