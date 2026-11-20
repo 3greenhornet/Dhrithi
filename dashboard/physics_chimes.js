@@ -73,9 +73,9 @@
   // --- Ideal Standard Configuration (Spacious, Roomy Draped Installation) ---
   const CONFIG = {
     width: 1080,
-    height: 760,
+    height: 700,
     gridW: 32,
-    gridH: 38,
+    gridH: 34,
     gravity: 0.20,
     damping: 0.990,
     iterationsPerFrame: 5,
@@ -447,12 +447,12 @@
     // Staggered Stanza Column Mapping:
     // Stanzas are distributed across 3 distinct columns with ample spacing
     const stanzaConfigs = [
-      { col: 4,  startRow: 4,  stanzaIdx: 0 },
-      { col: 4,  startRow: 18, stanzaIdx: 1 },
-      { col: 15, startRow: 6,  stanzaIdx: 2 },
-      { col: 15, startRow: 20, stanzaIdx: 3 },
-      { col: 26, startRow: 5,  stanzaIdx: 4 },
-      { col: 26, startRow: 19, stanzaIdx: 5 }
+      { col: 4,  startRow: 3,  stanzaIdx: 0 },
+      { col: 4,  startRow: 16, stanzaIdx: 1 },
+      { col: 15, startRow: 5,  stanzaIdx: 2 },
+      { col: 15, startRow: 18, stanzaIdx: 3 },
+      { col: 26, startRow: 4,  stanzaIdx: 4 },
+      { col: 26, startRow: 17, stanzaIdx: 5 }
     ];
 
     // 1. Create Particles
@@ -757,7 +757,7 @@
     if (!container) return;
 
     canvasW = container.clientWidth || window.innerWidth || 1400;
-    canvasH = container.clientHeight || Math.max(window.innerHeight * 0.90, 820);
+    canvasH = Math.max(container.clientHeight || 0, Math.ceil(window.innerHeight * 1.05), 1000);
     dpr = window.devicePixelRatio || 1;
 
     canvas.width = Math.ceil(canvasW * dpr);
