@@ -1030,8 +1030,126 @@
       }
     });
 
+    // Wire Play Configuration Panel (Niyam Vora Chimes Standards)
+    wireChimesPlayPanel();
+
     // Hourly quote rotation
     setInterval(cycleQuote, 3600000);
+  }
+
+  // --- Wire Chimes Play Configuration Panel ---
+  function wireChimesPlayPanel() {
+    const panel = document.getElementById('chimes-play-panel');
+    const collapseBtn = document.getElementById('tp-collapse-toggle');
+    const togglePanelBtn = document.getElementById('btn-toggle-play-panel');
+    const titleBar = document.querySelector('.tp-title-bar');
+
+    const togglePanel = () => {
+      if (!panel) return;
+      panel.classList.toggle('is-collapsed');
+    };
+
+    if (collapseBtn) collapseBtn.addEventListener('click', e => { e.stopPropagation(); togglePanel(); });
+    if (titleBar) titleBar.addEventListener('click', togglePanel);
+    if (togglePanelBtn) {
+      togglePanelBtn.addEventListener('click', () => {
+        if (!panel) return;
+        if (panel.style.display === 'none') {
+          panel.style.display = 'block';
+          panel.classList.remove('is-collapsed');
+        } else if (panel.classList.contains('is-collapsed')) {
+          panel.classList.remove('is-collapsed');
+        } else {
+          panel.classList.add('is-collapsed');
+        }
+      });
+    }
+
+    // Two-way slider <-> number input binder
+    function bindSliderNumPair(sliderId, numId, onUpdate) {
+      const slider = document.getElementById(sliderId);
+      const num = document.getElementById(numId);
+      if (!slider || !num) return;
+
+      slider.addEventListener('input', e => {
+        num.value = e.target.value;
+        onUpdate(e.target.value);
+      });
+      num.addEventListener('input', e => {
+        slider.value = e.target.value;
+        onUpdate(e.target.value);
+      });
+    }
+
+    // Destination Country
+    const countrySelect = document.getElementById('tp-country-select');
+    if (countrySelect) {
+      countrySelect.addEventListener('change', e => {
+        if (window.DhritiChimes) window.DhritiChimes.setCountry(e.target.value);
+      });
+    }
+
+    // Cloth Properties
+    bindSliderNumPair('tp-slider-width', 'tp-num-width', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ width: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-height', 'tp-num-height', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ height: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-gridW', 'tp-num-gridW', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ gridW: parseInt(val, 10) });
+    });
+    bindSliderNumPair('tp-slider-gridH', 'tp-num-gridH', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ gridH: parseInt(val, 10) });
+    });
+
+    const btnRebuild = document.getElementById('tp-btn-rebuild');
+    if (btnRebuild) {
+      btnRebuild.addEventListener('click', () => {
+        if (window.DhritiChimes) window.DhritiChimes.rebuild();
+      });
+    }
+
+    // Motion & Sound Properties
+    bindSliderNumPair('tp-slider-gravity', 'tp-num-gravity', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ gravity: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-damping', 'tp-num-damping', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ damping: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-iterations', 'tp-num-iterations', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ iterationsPerFrame: parseInt(val, 10) });
+    });
+    bindSliderNumPair('tp-slider-stretch', 'tp-num-stretch', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ stretchFactor: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-compress', 'tp-num-compress', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ compressFactor: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-mouseSize', 'tp-num-mouseSize', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ mouseSize: parseFloat(val) });
+    });
+    bindSliderNumPair('tp-slider-mouseStrength', 'tp-num-mouseStrength', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ mouseStrength: parseFloat(val) });
+    });
+
+    const checkChimes = document.getElementById('tp-check-chimes');
+    if (checkChimes) {
+      checkChimes.addEventListener('change', e => {
+        if (window.DhritiChimes) window.DhritiChimes.updateConfig({ chimes: e.target.checked });
+      });
+    }
+
+    bindSliderNumPair('tp-slider-volume', 'tp-num-volume', val => {
+      if (window.DhritiChimes) window.DhritiChimes.updateConfig({ chimeVolume: parseFloat(val) });
+    });
+
+    const checkContain = document.getElementById('tp-check-contain');
+    if (checkContain) {
+      checkContain.addEventListener('change', e => {
+        if (window.DhritiChimes) window.DhritiChimes.updateConfig({ contain: e.target.checked });
+      });
+    }
   }
 
   // --- Initialization ---

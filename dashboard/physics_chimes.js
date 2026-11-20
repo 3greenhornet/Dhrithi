@@ -1,1015 +1,833 @@
 /**
- * Dhriti Chimes Physics & Interactive Poem Installation
- * Inspired by Niyam Vora's Chimes (niyamvora.github.io/chimes).
+ * Dhriti Suspended Poem Chimes & Cloth Engine (v0.7.0+)
+ * Fully modeled on Niyam Vora's Chimes (niyamvora.github.io/chimes)
  *
  * Implements:
- * 1. Cultural doorway curtain with multi-color, multi-shape beaded strings
- *    (Sphere, Star, Triangle, Hexagon, Octagon, Rhombus with specular shine or matte)
- * 2. Silky, smooth cursor hover interaction that parts doorway curtain strings
- *    with authentic Verlet physics and synthesized Akebono chimes
- * 3. Asymmetric, organically staggered Stanza Chains where adjacent poem blocks
- *    sit at different, non-uniform heights
- * 4. Dedicated drag-and-drop physics exclusively for Stanza Chains and cards
+ * 1. High-performance Verlet cloth physics with offscreen canvas character caching (solid 60-120 FPS).
+ * 2. Country-tuned acoustic bell chime strikes with speed/proximity modulation.
+ * 3. Ideal standard parameters matching Niyam Vora's Play configuration pane:
+ *    - Width: 492, Height: 468, Columns: 36, Rows: 40
+ *    - Gravity: 0.20, Damping: 0.990, Precision: 5
+ *    - Stretch: 1.10, Compress: 0.02, Touch radius: 5000, Touch force: 4
+ * 4. Silky smooth cursor brushing with Hermite smoothstep radial deflection.
+ * 5. Asymmetrically staggered poem stanza cards attached to chains with grab & drag physics.
+ * 6. Live Rebuild & Configuration Controls.
  */
+
 (() => {
   "use strict";
 
-  const BEAD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789✦◊◈⚓⏣§¶";
+  // --- Math Utilities ---
+  function smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  }
 
-  const BEAD_SHAPES = ["sphere", "star", "triangle", "hexagon", "octagon", "rhombus"];
+  function getPointID(row, col, gridH) {
+    return col * gridH + row;
+  }
 
-  const BEAD_PALETTES = [
-    { name: "cyan",     main: "#06b6d4", dark: "#0e7490", light: "#a5f3fc" },
-    { name: "emerald",  main: "#10b981", dark: "#047857", light: "#a7f3d0" },
-    { name: "amber",    main: "#f59e0b", dark: "#b45309", light: "#fde68a" },
-    { name: "rose",     main: "#f43f5e", dark: "#be123c", light: "#fecdd3" },
-    { name: "amethyst", main: "#8b5cf6", dark: "#6d28d9", light: "#ddd6fe" },
-    { name: "sapphire", main: "#3b82f6", dark: "#1d4ed8", light: "#bfdbfe" },
-    { name: "gold",     main: "#eab308", dark: "#a16207", light: "#fef08a" },
-    { name: "coral",    main: "#fb7185", dark: "#9f1239", light: "#ffe4e6" },
-    { name: "pearl",    main: "#e2e8f0", dark: "#64748b", light: "#ffffff" },
-    { name: "bronze",   main: "#78716c", dark: "#44403c", light: "#d6d3d1" }
-  ];
-
-  const DEFAULT_POEM = [
-    {
-      title: "Where the Mind is Without Fear",
-      author: "Rabindranath Tagore",
-      stanzas: [
-        [
-          "Where the mind is without fear",
-          "and the head is held high;",
-          "Where knowledge is free;"
-        ],
-        [
-          "Where the world has not been",
-          "broken up into fragments",
-          "By narrow domestic walls;"
-        ],
-        [
-          "Where words come out from",
-          "the depth of truth;",
-          "Where tireless striving",
-          "stretches its arms towards perfection;"
-        ],
-        [
-          "Where the clear stream of reason",
-          "has not lost its way",
-          "Into the dreary desert sand of dead habit;"
-        ],
-        [
-          "Where the mind is led forward",
-          "by thee into ever-widening",
-          "thought and action;"
-        ],
-        [
-          "Into that heaven of freedom,",
-          "my Father, let my country awake."
-        ]
-      ]
-    },
-    {
-      title: "The Road Not Taken",
-      author: "Robert Frost",
-      stanzas: [
-        [
-          "Two roads diverged in a yellow wood,",
-          "And sorry I could not travel both",
-          "And be one traveler, long I stood."
-        ],
-        [
-          "And looked down one as far as I could",
-          "To where it bent in the undergrowth;",
-          "Then took the other, as just as fair."
-        ],
-        [
-          "And having perhaps the better claim,",
-          "Because it was grassy and wanted wear;",
-          "Though as for that the passing there."
-        ],
-        [
-          "Had worn them really about the same,",
-          "And both that morning equally lay",
-          "In leaves no step had trodden black."
-        ],
-        [
-          "Oh, I kept the first for another day!",
-          "Yet knowing how way leads on to way,",
-          "I doubted if I should ever come back."
-        ],
-        [
-          "I shall be telling this with a sigh",
-          "Somewhere ages and ages hence:",
-          "Two roads diverged in a wood, and I—",
-          "I took the one less traveled by,",
-          "And that has made all the difference."
-        ]
-      ]
+  class Vec2 {
+    constructor(x = 0, y = 0) {
+      this.reset(x, y);
     }
-  ];
+    zero() {
+      this.reset(0, 0);
+    }
+    reset(x = 0, y = 0) {
+      this.x = x;
+      this.y = y;
+    }
+    clone() {
+      return new Vec2(this.x, this.y);
+    }
+    add(v) {
+      this.x += v.x;
+      this.y += v.y;
+      return this;
+    }
+    subtract(v) {
+      this.x -= v.x;
+      this.y -= v.y;
+      return this;
+    }
+    subtractNew(v) {
+      return this.clone().subtract(v);
+    }
+    scale(scalar) {
+      this.x *= scalar;
+      this.y *= scalar;
+      return this;
+    }
+    get lengthSquared() {
+      return this.x ** 2 + this.y ** 2;
+    }
+    get length() {
+      return Math.hypot(this.x, this.y);
+    }
+    get angle() {
+      return Math.atan2(this.y, this.x);
+    }
+  }
 
-  // =========================================================================
-  // Physics Primitives (Verlet Particles & Constraints)
-  // =========================================================================
+  // --- Ideal Standard Configuration (Niyam Vora Standards) ---
+  const CONFIG = {
+    width: 492,
+    height: 468,
+    gridW: 36,
+    gridH: 40,
+    gravity: 0.20,
+    damping: 0.990,
+    iterationsPerFrame: 5,
+    stretchFactor: 1.10,
+    compressFactor: 0.02,
+    mouseSize: 5000,
+    mouseStrength: 4,
+    chimes: true,
+    chimeVolume: 0.28,
+    contain: false,
+    country: "china"
+  };
 
+  // --- Physical Particle ---
   class Particle {
-    constructor(x, y, char = "•", pinned = false) {
-      this.x = x;
-      this.y = y;
-      this.ox = x;
-      this.oy = y;
+    constructor({ x, y, pinned = false, id = 0, char = "", stanzaIdx = -1, isStanzaAnchor = false } = {}) {
+      this.pos = new Vec2(x, y);
+      this.oldPos = new Vec2(x, y);
+      this.velocity = new Vec2();
+      this.acceleration = new Vec2();
       this.pinned = pinned;
+      this.originalPinnedState = pinned;
+      this.id = id;
       this.char = char;
-      this.radius = 5.2;
-      this.isBlock = false;
-      this.blockData = null; // { lines: [], width, height }
-      this.lastSoundTime = 0;
-    }
-  }
-
-  class CurtainBead {
-    constructor(x, y, shape, palette, shine, radius = 5.0, pinned = false) {
-      this.x = x;
-      this.y = y;
-      this.ox = x;
-      this.oy = y;
-      this.pinned = pinned;
-      this.shape = shape;       // 'sphere' | 'star' | 'triangle' | 'hexagon' | 'octagon' | 'rhombus'
-      this.palette = palette;   // { main, dark, light }
-      this.shine = shine;       // boolean
-      this.radius = radius;
-      this.lastSoundTime = 0;
-    }
-  }
-
-  class Constraint {
-    constructor(p1, p2, length) {
-      this.p1 = p1;
-      this.p2 = p2;
-      this.length = length !== undefined ? length : Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      this.stanzaIdx = stanzaIdx;
+      this.isStanzaAnchor = isStanzaAnchor;
+      this.gravityVec = new Vec2();
+      this.downConstraint = null;
     }
 
-    resolve() {
-      const dx = this.p2.x - this.p1.x;
-      const dy = this.p2.y - this.p1.y;
-      const dist = Math.hypot(dx, dy) || 0.001;
-      const diff = (dist - this.length) / dist;
-
-      if (!this.p1.pinned && !this.p2.pinned) {
-        this.p1.x += dx * 0.5 * diff;
-        this.p1.y += dy * 0.5 * diff;
-        this.p2.x -= dx * 0.5 * diff;
-        this.p2.y -= dy * 0.5 * diff;
-      } else if (!this.p1.pinned) {
-        this.p1.x += dx * diff;
-        this.p1.y += dy * diff;
-      } else if (!this.p2.pinned) {
-        this.p2.x -= dx * diff;
-        this.p2.y -= dy * diff;
+    contain(w, h) {
+      if (this.pinned) return;
+      const radius = 4;
+      if (this.pos.x < radius) {
+        this.pos.x = radius;
+        this.oldPos.x = this.pos.x + Math.abs(this.oldPos.x - this.pos.x) * 0.8;
+      } else if (this.pos.x > w - radius) {
+        this.pos.x = w - radius;
+        this.oldPos.x = this.pos.x - Math.abs(this.oldPos.x - this.pos.x) * 0.8;
       }
-    }
-  }
-
-  // =========================================================================
-  // Curtain String (Doorway Beaded Curtain Component)
-  // =========================================================================
-
-  class CurtainString {
-    constructor(baseX, startY, count, linkLen = 17) {
-      this.baseX = baseX;
-      this.startY = startY;
-      this.particles = [];
-      this.constraints = [];
-      this.buildString(count, linkLen);
-    }
-
-    buildString(count, linkLen) {
-      let curY = this.startY;
-      // Top anchor bead attached to doorway beam
-      const anchor = new CurtainBead(this.baseX, curY, "sphere", BEAD_PALETTES[8], false, 3.5, true);
-      this.particles.push(anchor);
-
-      // Harmonious per-string palette pairing
-      const palIdx = Math.floor(Math.random() * BEAD_PALETTES.length);
-      const primaryPal = BEAD_PALETTES[palIdx];
-      const accentPal = BEAD_PALETTES[(palIdx + 4) % BEAD_PALETTES.length];
-
-      for (let i = 0; i < count; i++) {
-        curY += linkLen;
-        // Diverse geometric bead shape alternating down the string
-        const shape = BEAD_SHAPES[(i + Math.floor(this.baseX / 42)) % BEAD_SHAPES.length];
-        const pal = (i % 4 === 0) ? accentPal : primaryPal;
-        const shine = (i % 2 === 0);
-        let rad = 5.0;
-        if (shape === "star") rad = 6.2;
-        else if (shape === "rhombus") rad = 5.6;
-        else if (shape === "octagon") rad = 5.2;
-
-        const bead = new CurtainBead(this.baseX, curY, shape, pal, shine, rad);
-        this.particles.push(bead);
-        this.constraints.push(new Constraint(this.particles[this.particles.length - 2], bead, linkLen));
-      }
-    }
-  }
-
-  // =========================================================================
-  // Stanza Chain Assembly (Non-Uniform, Organically Staggered)
-  // =========================================================================
-
-  class StanzaChainAssembly {
-    constructor(baseX, startY, stanza1, stanza2, chainIndex, config) {
-      this.baseX = baseX;
-      this.startY = startY;
-      this.chainIndex = chainIndex;
-      this.particles = [];
-      this.constraints = [];
-      this.config = config;
-
-      this.buildChain(stanza1, stanza2);
-    }
-
-    buildChain(stanza1, stanza2) {
-      const linkLen = 15;
-      const clearance = 24; // Generous clearance so beads never touch stanza cards
-      let curY = this.startY;
-
-      // 1. Pinned Top Anchor
-      const anchor = new Particle(this.baseX, curY, "⚓", true);
-      this.particles.push(anchor);
-
-      // 2. Organically Staggered Top Drop:
-      // Tasteful, organic vertical variation (adjacent blocks differ by 20-35px)
-      // Chain 0: 4 beads (~56px) -> Stanza 1 sits at Y ~ 125px
-      // Chain 1: 6 beads (~84px) -> Stanza 1 sits at Y ~ 155px
-      // Chain 2: 5 beads (~70px) -> Stanza 1 sits at Y ~ 140px
-      // Keeps both stanzas comfortably visible in the upper viewport without excessive downward scrolling!
-      const topDropSequence = [4, 6, 5, 7, 4, 6];
-      const topCount = topDropSequence[this.chainIndex % topDropSequence.length];
-
-      for (let i = 0; i < topCount; i++) {
-        curY += linkLen;
-        const char = BEAD_CHARS[Math.floor(Math.random() * BEAD_CHARS.length)];
-        const p = new Particle(this.baseX, curY, char);
-        this.particles.push(p);
-        this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
-      }
-
-      // 3. Stanza 1 Block
-      const s1Data = this.measureStanza(stanza1 || ["(Stanza Line 1)", "(Stanza Line 2)"]);
-      const s1HalfHeight = s1Data.height / 2;
-      curY += clearance + s1HalfHeight;
-      const s1 = new Particle(this.baseX, curY);
-      s1.isBlock = true;
-      s1.blockData = s1Data;
-      this.particles.push(s1);
-      this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s1, clearance + s1HalfHeight));
-
-      // 4. Organically Staggered Bridge Chain between Stanza 1 and Stanza 2
-      // Different vertical link count for each chain
-      curY += s1HalfHeight + clearance;
-      // Moderate Staggered Bridge Chain between Stanza 1 and Stanza 2:
-      // Chain 0: 5 beads (~70px) -> Stanza 2 sits at Y ~ 290px
-      // Chain 1: 6 beads (~84px) -> Stanza 2 sits at Y ~ 330px
-      // Chain 2: 5 beads (~70px) -> Stanza 2 sits at Y ~ 305px
-      const midDropSequence = [5, 6, 5, 7, 6, 5];
-      const midCount = midDropSequence[this.chainIndex % midDropSequence.length];
-
-      for (let i = 0; i < midCount; i++) {
-        const char = BEAD_CHARS[Math.floor(Math.random() * BEAD_CHARS.length)];
-        const p = new Particle(this.baseX, curY, char);
-        this.particles.push(p);
-        if (i === 0) {
-          this.constraints.push(new Constraint(s1, p, s1HalfHeight + clearance));
-        } else {
-          this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
-        }
-        curY += linkLen;
-      }
-
-      // 5. Stanza 2 Block
-      const s2Data = this.measureStanza(stanza2 || ["(Stanza Line 3)", "(Stanza Line 4)"]);
-      const s2HalfHeight = s2Data.height / 2;
-      curY += clearance + s2HalfHeight;
-      const s2 = new Particle(this.baseX, curY);
-      s2.isBlock = true;
-      s2.blockData = s2Data;
-      this.particles.push(s2);
-      this.constraints.push(new Constraint(this.particles[this.particles.length - 2], s2, clearance + s2HalfHeight));
-
-      // 6. Trailing tail beads (modest fringe)
-      curY += s2HalfHeight + clearance;
-      const tailDropSequence = [4, 5, 4, 6, 5, 4];
-      const tailCount = tailDropSequence[this.chainIndex % tailDropSequence.length];
-
-      for (let i = 0; i < tailCount; i++) {
-        const char = BEAD_CHARS[Math.floor(Math.random() * BEAD_CHARS.length)];
-        const p = new Particle(this.baseX, curY, char);
-        this.particles.push(p);
-        if (i === 0) {
-          this.constraints.push(new Constraint(s2, p, s2HalfHeight + clearance));
-        } else {
-          this.constraints.push(new Constraint(this.particles[this.particles.length - 2], p, linkLen));
-        }
-        curY += linkLen;
+      if (this.pos.y < radius) {
+        this.pos.y = radius;
+        this.oldPos.y = this.pos.y + Math.abs(this.oldPos.y - this.pos.y) * 0.8;
+      } else if (this.pos.y > h - radius) {
+        this.pos.y = h - radius;
+        this.oldPos.y = this.pos.y - Math.abs(this.oldPos.y - this.pos.y) * 0.8;
       }
     }
 
-    measureStanza(lines) {
-      const lineList = Array.isArray(lines) ? lines : [String(lines)];
-      let maxLen = 0;
-      lineList.forEach(l => { if (l.length > maxLen) maxLen = l.length; });
-      // Arvo slab serif is slightly wider and taller with generous breathing room
-      const width = Math.max(200, Math.min(380, maxLen * 9.2 + 48));
-      const height = lineList.length * 26 + 34;
-      return { lines: lineList, width, height };
-    }
-  }
-
-  // =========================================================================
-  // Main Physics Engine (Curtain & Stanza Assemblies)
-  // =========================================================================
-
-  class PoemChimesEngine {
-    constructor(canvas) {
-      this.canvas = canvas;
-      this.ctx = canvas.getContext("2d");
-      this.curtainStrings = [];
-      this.stanzaChains = [];
-      this.draggedParticle = null;
-      this.mouse = { x: 0, y: 0, down: false, px: 0, py: 0 };
-      this.time = 0;
-
-      this.config = {
-        gravity: 0.24,
-        damping: 0.984, // High silky damping, matching original Chimes
-        swaySpeed: 0.02,
-        swayIntensity: 0.012,
-        curtainSpacing: 28, // Spacing between curtain strings
-        stanzaSpacing: 380, // Spacing between poem stanza chains
-        chainSpacingY: 42
-      };
-
-      this.activePoemIndex = 0;
-      this.activePoem = DEFAULT_POEM[0];
-      this.initEvents();
-      this.resize();
-      this.loop = this.loop.bind(this);
-      requestAnimationFrame(this.loop);
-    }
-
-    cyclePoemPreset() {
-      this.activePoemIndex = (this.activePoemIndex + 1) % DEFAULT_POEM.length;
-      this.activePoem = DEFAULT_POEM[this.activePoemIndex];
-      this.buildAssemblies();
-    }
-
-    loadCustomPoem(stanzas) {
-      if (Array.isArray(stanzas) && stanzas.length > 0) {
-        this.activePoem = {
-          title: "Custom Reflection",
-          author: "User",
-          stanzas: stanzas
-        };
-        this.buildAssemblies();
-      }
-    }
-
-    setPoem(poemData) {
-      if (poemData && Array.isArray(poemData.stanzas)) {
-        this.activePoem = poemData;
-        this.buildAssemblies();
-      }
-    }
-
-    resize() {
-      const rect = this.canvas.parentElement.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      this.width = rect.width;
-      this.height = Math.max(880, window.innerHeight * 0.96);
-      this.canvas.width = this.width * dpr;
-      this.canvas.height = this.height * dpr;
-      this.canvas.style.width = `${this.width}px`;
-      this.canvas.style.height = `${this.height}px`;
-      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.buildAssemblies();
-    }
-
-    buildAssemblies() {
-      this.curtainStrings = [];
-      this.stanzaChains = [];
-
-      const startY = this.config.chainSpacingY;
-
-      // 1. Build Stanza Chains (Centered horizontally)
-      const stanzas = this.activePoem.stanzas || [];
-      const numStanzaChains = Math.max(1, Math.ceil(stanzas.length / 2));
-      const totalStanzaWidth = (numStanzaChains - 1) * this.config.stanzaSpacing;
-      const stanzaStartX = (this.width - totalStanzaWidth) / 2;
-
-      const stanzaXs = [];
-      for (let i = 0; i < numStanzaChains; i++) {
-        const x = stanzaStartX + i * this.config.stanzaSpacing;
-        stanzaXs.push(x);
-        const s1 = stanzas[i * 2] || null;
-        const s2 = stanzas[i * 2 + 1] || null;
-        const chain = new StanzaChainAssembly(x, startY, s1, s2, i, this.config);
-        this.stanzaChains.push(chain);
-      }
-
-      // 2. Build Beaded Doorway Curtain Strings (spanning across entire width)
-      const spacing = this.config.curtainSpacing;
-      const margin = 36;
-      const numStrings = Math.floor((this.width - margin * 2) / spacing);
-
-      for (let i = 0; i <= numStrings; i++) {
-        const x = margin + i * spacing;
-
-        // Skip string if it overlaps directly on the exact central drop of a stanza chain anchor
-        const isNearStanzaAnchor = stanzaXs.some(sx => Math.abs(x - sx) < 14);
-        if (isNearStanzaAnchor) continue;
-
-        // Organic arched curtain fringe length (24 to 34 beads per string)
-        const archWave = Math.sin((i / numStrings) * Math.PI) * 4;
-        const count = Math.max(22, Math.min(34, Math.floor(25 + archWave + (Math.sin(i * 1.5) * 2))));
-
-        const cs = new CurtainString(x, startY, count, 17);
-        this.curtainStrings.push(cs);
-      }
-    }
-
-    initEvents() {
-      window.addEventListener("resize", () => this.resize());
-
-      const getPos = (e) => {
-        const r = this.canvas.getBoundingClientRect();
-        return {
-          x: (e.clientX || (e.touches && e.touches[0].clientX)) - r.left,
-          y: (e.clientY || (e.touches && e.touches[0].clientY)) - r.top
-        };
-      };
-
-      const onDown = (e) => {
-        const pos = getPos(e);
-        this.mouse.x = pos.x;
-        this.mouse.y = pos.y;
-        this.mouse.px = pos.x;
-        this.mouse.py = pos.y;
-        this.mouse.down = true;
-
-        // "dragging is for only for chains with stanzas"
-        // Search strictly among stanzaChains for the closest particle or block
-        let closest = null;
-        let minDist = 48;
-
-        this.stanzaChains.forEach(chain => {
-          chain.particles.forEach(p => {
-            if (p.pinned) return;
-            const hitRadius = p.isBlock
-              ? Math.max(p.blockData.width, p.blockData.height) / 2 + 12
-              : p.radius * 2.8;
-            const dist = Math.hypot(p.x - pos.x, p.y - pos.y);
-            if (dist < hitRadius && dist < minDist) {
-              minDist = dist;
-              closest = p;
-            }
-          });
-        });
-
-        if (closest) {
-          this.draggedParticle = closest;
-          if (window.DhritiAudio) {
-            window.DhritiAudio.playChime(Math.floor((pos.x / this.width) * 16), 0.65);
-          }
-        }
-      };
-
-      const onMove = (e) => {
-        const pos = getPos(e);
-        const dx = pos.x - this.mouse.x;
-        const dy = pos.y - this.mouse.y;
-
-        this.mouse.px = this.mouse.x;
-        this.mouse.py = this.mouse.y;
-        this.mouse.x = pos.x;
-        this.mouse.y = pos.y;
-
-        if (this.draggedParticle) {
-          // Direct drag manipulation for stanza cards/beads
-          this.draggedParticle.x = pos.x;
-          this.draggedParticle.y = pos.y;
-        } else {
-          // Hovering across doorway curtain strings:
-          // Moves like the authentic doorway beaded curtain as cursor passes across them
-          const mouseSpeed = Math.hypot(dx, dy);
-          if (mouseSpeed > 0.4) {
-            const sweepRadius = 32;
-            const now = performance.now();
-
-            // 1. Hover through curtain strings
-            this.curtainStrings.forEach((cs) => {
-              if (Math.abs(cs.baseX - pos.x) > sweepRadius + 18) return;
-
-              cs.particles.forEach((p) => {
-                if (p.pinned) return;
-                const dist = Math.hypot(p.x - pos.x, p.y - pos.y);
-                if (dist < sweepRadius) {
-                  const proximity = 1 - dist / sweepRadius;
-                  const pushDir = Math.abs(dx) > 0.3 ? Math.sign(dx) : (p.x >= pos.x ? 1 : -1);
-                  // Smooth, bounded impulse (avoids erratic jerkiness)
-                  const impulse = pushDir * Math.min(4.8, (Math.abs(dx) * 0.22 + 1.2) * proximity);
-
-                  // Smooth Verlet impulse: adjust ox so velocity increases naturally
-                  p.ox -= impulse * 0.55;
-                  p.x += impulse * 0.45;
-
-                  // Play chime if moving noticeably, throttled
-                  if (Math.abs(impulse) > 0.8 && (!p.lastSoundTime || now - p.lastSoundTime > 160)) {
-                    p.lastSoundTime = now;
-                    if (window.DhritiAudio) {
-                      const noteIdx = Math.floor((p.x / this.width) * 17);
-                      window.DhritiAudio.playChime(noteIdx, Math.min(0.6, Math.abs(impulse) / 4.8));
-                    }
-                  }
-                }
-              });
-            });
-
-            // 2. Also gently sway stanza letter beads on hover if cursor brushes past
-            this.stanzaChains.forEach((chain) => {
-              if (Math.abs(chain.baseX - pos.x) > sweepRadius + 50) return;
-
-              chain.particles.forEach((p) => {
-                if (p.pinned || p.isBlock) return;
-                const dist = Math.hypot(p.x - pos.x, p.y - pos.y);
-                if (dist < sweepRadius) {
-                  const proximity = 1 - dist / sweepRadius;
-                  const pushDir = Math.abs(dx) > 0.3 ? Math.sign(dx) : (p.x >= pos.x ? 1 : -1);
-                  const impulse = pushDir * Math.min(3.8, (Math.abs(dx) * 0.18 + 0.8) * proximity);
-                  p.ox -= impulse * 0.5;
-                  p.x += impulse * 0.5;
-                }
-              });
-            });
-          }
-        }
-      };
-
-      const onUp = () => {
-        this.mouse.down = false;
-        this.draggedParticle = null;
-      };
-
-      this.canvas.addEventListener("mousedown", onDown);
-      this.canvas.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-
-      this.canvas.addEventListener("touchstart", onDown, { passive: true });
-      this.canvas.addEventListener("touchmove", onMove, { passive: true });
-      window.addEventListener("touchend", onUp);
-    }
-
-    step() {
-      this.time += 1;
-      const swayTime = this.time * this.config.swaySpeed;
-
-      // 1. Update Curtain Strings
-      this.curtainStrings.forEach((cs, csIdx) => {
-        const stringPhase = csIdx * 0.26;
-        const breeze = Math.sin(swayTime + stringPhase) * (this.config.swayIntensity * 0.85);
-
-        cs.particles.forEach((p) => {
-          if (p.pinned) return;
-
-          const vx = (p.x - p.ox) * this.config.damping;
-          const vy = (p.y - p.oy) * this.config.damping;
-
-          p.ox = p.x;
-          p.oy = p.y;
-
-          // Plumb-line restoring force centered exactly on string's baseX
-          const plumb = (cs.baseX - p.x) * 0.0038;
-
-          p.x += vx + breeze + plumb;
-          p.y += vy + this.config.gravity * 0.88;
-        });
-
-        // Constraint relaxation iterations
-        for (let iter = 0; iter < 3; iter++) {
-          cs.constraints.forEach(c => c.resolve());
-        }
-      });
-
-      // 2. Update Stanza Chains
-      this.stanzaChains.forEach((chain, cIdx) => {
-        const chainPhase = cIdx * 1.2;
-        const ambientWind = Math.sin(swayTime + chainPhase) * this.config.swayIntensity;
-
-        chain.particles.forEach((p, pIdx) => {
-          if (p.pinned) return;
-          if (p === this.draggedParticle) return;
-
-          const vx = (p.x - p.ox) * this.config.damping;
-          const vy = (p.y - p.oy) * this.config.damping;
-
-          p.ox = p.x;
-          p.oy = p.y;
-
-          const wind = ambientWind * (1 + (pIdx / chain.particles.length) * 0.35);
-          const plumbRestoring = (chain.baseX - p.x) * 0.0035;
-
-          p.x += vx + wind + plumbRestoring;
-          p.y += vy + (p.isBlock ? this.config.gravity * 1.15 : this.config.gravity);
-        });
-
-        for (let iter = 0; iter < 4; iter++) {
-          chain.constraints.forEach(c => c.resolve());
-        }
-      });
-    }
-
-    draw() {
-      const ctx = this.ctx;
-      ctx.clearRect(0, 0, this.width, this.height);
-
-      const startY = this.config.chainSpacingY;
-
-      // 1. Draw Architectural Doorway Header Beam
-      this.drawDoorwayBeam(ctx, startY);
-
-      // 2. Draw Curtain Strings (Background Layer)
-      this.curtainStrings.forEach((cs) => {
-        // String thread
-        ctx.strokeStyle = "rgba(203, 213, 225, 0.22)";
-        ctx.lineWidth = 1.0;
-
-        ctx.beginPath();
-        ctx.moveTo(cs.particles[0].x, cs.particles[0].y);
-        for (let i = 1; i < cs.particles.length; i++) {
-          ctx.lineTo(cs.particles[i].x, cs.particles[i].y);
-        }
-        ctx.stroke();
-
-        // Geometric beads
-        for (let i = 1; i < cs.particles.length; i++) {
-          this.drawGeometricBead(ctx, cs.particles[i]);
-        }
-      });
-
-      // 3. Draw Stanza Chains (Foreground Layer)
-      this.stanzaChains.forEach((chain) => {
-        // Draw string segments between adjacent particles (terminating at block eyelets)
-        ctx.strokeStyle = "rgba(226, 232, 240, 0.42)";
-        ctx.lineWidth = 1.8;
-
-        for (let i = 0; i < chain.particles.length - 1; i++) {
-          const p1 = chain.particles[i];
-          const p2 = chain.particles[i + 1];
-
-          let startX = p1.x;
-          let startYPos = p1.y;
-          let endX = p2.x;
-          let endYPos = p2.y;
-
-          if (p1.isBlock && p1.blockData) {
-            startYPos += p1.blockData.height / 2;
-          }
-          if (p2.isBlock && p2.blockData) {
-            endYPos -= p2.blockData.height / 2;
-          }
-
-          ctx.beginPath();
-          ctx.moveTo(startX, startYPos);
-          ctx.lineTo(endX, endYPos);
-          ctx.stroke();
-        }
-
-        // Draw stanzas with frosted parchment background
-        chain.particles.forEach((p) => {
-          if (p.isBlock) {
-            this.drawStanzaBlock(ctx, p, chain);
-          }
-        });
-
-        // Draw letter beads
-        chain.particles.forEach((p, i) => {
-          if (!p.isBlock) {
-            this.drawLetterBead(ctx, p, i === 0);
-          }
-        });
-      });
-    }
-
-    drawDoorwayBeam(ctx, startY) {
-      const beamY = startY - 14;
-      const margin = 24;
-      const beamWidth = this.width - margin * 2;
-
-      ctx.save();
-      // Beam shadow
-      ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetY = 4;
-
-      // Wooden / bronze beveled beam
-      const beamGrad = ctx.createLinearGradient(0, beamY, 0, beamY + 12);
-      beamGrad.addColorStop(0, "#475569");
-      beamGrad.addColorStop(0.3, "#334155");
-      beamGrad.addColorStop(0.7, "#1e293b");
-      beamGrad.addColorStop(1, "#0f172a");
-
-      ctx.fillStyle = beamGrad;
-      ctx.beginPath();
-      ctx.roundRect(margin, beamY, beamWidth, 10, 4);
-      ctx.fill();
-
-      // Top specular highlight line
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(margin + 4, beamY + 1);
-      ctx.lineTo(margin + beamWidth - 4, beamY + 1);
-      ctx.stroke();
-
-      // Brass mounting finials on ends
-      ctx.fillStyle = "#f59e0b";
-      ctx.beginPath();
-      ctx.arc(margin, beamY + 5, 6, 0, Math.PI * 2);
-      ctx.arc(margin + beamWidth, beamY + 5, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    drawGeometricBead(ctx, bead) {
-      const x = bead.x;
-      const y = bead.y;
-      const r = bead.radius;
-      const shape = bead.shape;
-      const pal = bead.palette;
-      const shine = bead.shine;
-
-      ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-      ctx.shadowBlur = 3;
-      ctx.shadowOffsetY = 1.5;
-
-      switch (shape) {
-        case "sphere":
-          this.drawSphere(ctx, x, y, r, pal, shine);
-          break;
-        case "star":
-          this.drawStar(ctx, x, y, 5, r, r * 0.48, pal, shine);
-          break;
-        case "triangle":
-          this.drawTriangle(ctx, x, y, r, true, pal, shine);
-          break;
-        case "hexagon":
-          this.drawPolygon(ctx, x, y, r, 6, pal, shine);
-          break;
-        case "octagon":
-          this.drawPolygon(ctx, x, y, r, 8, pal, shine);
-          break;
-        case "rhombus":
-        default:
-          this.drawRhombus(ctx, x, y, r * 0.85, r * 1.3, pal, shine);
-          break;
-      }
-      ctx.restore();
-    }
-
-    drawSphere(ctx, x, y, r, pal, shine) {
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      if (shine) {
-        const grad = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.12, x, y, r);
-        grad.addColorStop(0, "#ffffff");
-        grad.addColorStop(0.35, pal.light);
-        grad.addColorStop(0.75, pal.main);
-        grad.addColorStop(1, pal.dark);
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = pal.main;
-      }
-      ctx.fill();
-    }
-
-    drawStar(ctx, x, y, spikes, outerRadius, innerRadius, pal, shine) {
-      let rot = (Math.PI / 2) * 3;
-      const step = Math.PI / spikes;
-      ctx.beginPath();
-      ctx.moveTo(x, y - outerRadius);
-      for (let i = 0; i < spikes; i++) {
-        ctx.lineTo(x + Math.cos(rot) * outerRadius, y + Math.sin(rot) * outerRadius);
-        rot += step;
-        ctx.lineTo(x + Math.cos(rot) * innerRadius, y + Math.sin(rot) * innerRadius);
-        rot += step;
-      }
-      ctx.closePath();
-      if (shine) {
-        const grad = ctx.createRadialGradient(x, y - outerRadius * 0.3, outerRadius * 0.1, x, y, outerRadius);
-        grad.addColorStop(0, "#ffffff");
-        grad.addColorStop(0.4, pal.light);
-        grad.addColorStop(1, pal.dark);
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = pal.main;
-      }
-      ctx.fill();
-    }
-
-    drawTriangle(ctx, x, y, r, pointingUp, pal, shine) {
-      const h = (r * Math.sqrt(3)) / 2;
-      ctx.beginPath();
-      if (pointingUp) {
-        ctx.moveTo(x, y - r);
-        ctx.lineTo(x + r, y + h);
-        ctx.lineTo(x - r, y + h);
-      } else {
-        ctx.moveTo(x, y + r);
-        ctx.lineTo(x + r, y - h);
-        ctx.lineTo(x - r, y - h);
-      }
-      ctx.closePath();
-      if (shine) {
-        const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-        grad.addColorStop(0, pal.light);
-        grad.addColorStop(0.6, pal.main);
-        grad.addColorStop(1, pal.dark);
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = pal.main;
-      }
-      ctx.fill();
-    }
-
-    drawPolygon(ctx, x, y, r, sides, pal, shine) {
-      ctx.beginPath();
-      for (let i = 0; i < sides; i++) {
-        const a = (i * 2 * Math.PI) / sides - Math.PI / 2;
-        const px = x + r * Math.cos(a);
-        const py = y + r * Math.sin(a);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      if (shine) {
-        const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-        grad.addColorStop(0, "#ffffff");
-        grad.addColorStop(0.3, pal.light);
-        grad.addColorStop(0.7, pal.main);
-        grad.addColorStop(1, pal.dark);
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = pal.main;
-      }
-      ctx.fill();
-    }
-
-    drawRhombus(ctx, x, y, rw, rh, pal, shine) {
-      ctx.beginPath();
-      ctx.moveTo(x, y - rh);
-      ctx.lineTo(x + rw, y);
-      ctx.lineTo(x, y + rh);
-      ctx.lineTo(x - rw, y);
-      ctx.closePath();
-      if (shine) {
-        const grad = ctx.createLinearGradient(x - rw, y - rh, x + rw, y + rh);
-        grad.addColorStop(0, pal.light);
-        grad.addColorStop(0.5, pal.main);
-        grad.addColorStop(1, pal.dark);
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = pal.main;
-      }
-      ctx.fill();
-    }
-
-    drawLetterBead(ctx, p, isAnchor) {
-      if (isAnchor) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
-        ctx.fill();
+    update(delta) {
+      if (this.pinned) {
+        this.acceleration.zero();
         return;
       }
+      this.velocity.reset(
+        (this.pos.x - this.oldPos.x) * CONFIG.damping,
+        (this.pos.y - this.oldPos.y) * CONFIG.damping
+      );
+      this.oldPos.reset(this.pos.x, this.pos.y);
 
-      const r = p.radius || 5.2;
+      const dd = delta ** 2;
+      this.gravityVec.reset(0, CONFIG.gravity / dd);
+      this.applyForce(this.gravityVec);
 
-      // Metallic bead sphere with stamped letter
-      const grad = ctx.createRadialGradient(p.x - 1.5, p.y - 1.5, 0.8, p.x, p.y, r);
-      grad.addColorStop(0, "rgba(255, 255, 255, 0.96)");
-      grad.addColorStop(0.55, "rgba(203, 213, 225, 0.90)");
-      grad.addColorStop(1, "rgba(71, 85, 105, 0.82)");
+      this.pos.x += this.velocity.x + this.acceleration.x * dd;
+      this.pos.y += this.velocity.y + this.acceleration.y * dd;
+      this.acceleration.reset();
 
-      ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.38)";
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetY = 2;
-
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      ctx.fillStyle = "#0f172a";
-      ctx.font = "bold 6.5px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(p.char, p.x, p.y + 0.3);
-    }
-
-    drawStanzaBlock(ctx, p, chain) {
-      const data = p.blockData;
-      if (!data) return;
-
-      // Estimate local tilt angle from neighboring chain particles
-      const pIdx = chain.particles.indexOf(p);
-      const prev = chain.particles[pIdx - 1];
-      const next = chain.particles[pIdx + 1];
-
-      let angle = 0;
-      if (prev && next) {
-        angle = Math.atan2(next.x - prev.x, next.y - prev.y) * 0.38;
+      if (CONFIG.contain) {
+        this.contain(CONFIG.width, CONFIG.height);
       }
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-angle);
-
-      const hw = data.width / 2;
-      const hh = data.height / 2;
-
-      // Stanza Card Body: Frosted translucent parchment card
-      ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
-      ctx.shadowBlur = 18;
-      ctx.shadowOffsetY = 8;
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-      ctx.lineWidth = 1.4;
-
-      ctx.beginPath();
-      ctx.roundRect(-hw, -hh, data.width, data.height, 14);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.restore(); // remove card shadow for crisp text rendering
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-angle);
-
-      // Render Stanza Lines using Arvo slab serif
-      ctx.fillStyle = "#0f172a";
-      ctx.font = "italic 15px 'Arvo', 'Georgia', serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const startY = -hh + 25;
-      data.lines.forEach((line, idx) => {
-        ctx.fillText(line, 0, startY + idx * 26);
-      });
-
-      // Subtle suspension loop rings at top and bottom
-      ctx.fillStyle = "#475569";
-      ctx.beginPath();
-      ctx.arc(0, -hh + 4, 3, 0, Math.PI * 2);
-      ctx.arc(0, hh - 4, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
     }
 
-    loop() {
-      this.step();
-      this.draw();
-      requestAnimationFrame(this.loop);
+    applyForce(v) {
+      this.acceleration.add(v);
     }
   }
 
-  let activeEngineInstance = null;
+  // --- Elastic Constraint with Asymmetric Limits ---
+  class Constraint {
+    constructor({ p1, p2, length, id, compressFactor, stretchFactor, isSpacer = false }) {
+      this.p1 = p1;
+      this.p2 = p2;
+      this.length = length;
+      this.id = id;
+      this.isSpacer = isSpacer;
+      this.compressFactor = compressFactor;
+      this.stretchFactor = stretchFactor;
+      this.minLength = length * compressFactor;
+      this.maxLength = length * stretchFactor;
+    }
 
-  window.DhritiPoemChimes = window.DhritiChimes = {
-    init: (canvasOrId) => {
-      const canvas = typeof canvasOrId === "string" ? document.getElementById(canvasOrId) : canvasOrId;
-      if (canvas) {
-        activeEngineInstance = new PoemChimesEngine(canvas);
-        return activeEngineInstance;
+    solve() {
+      const dx = this.p2.pos.x - this.p1.pos.x;
+      const dy = this.p2.pos.y - this.p1.pos.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance === 0) return;
+
+      let targetLength = this.length;
+      if (distance < this.minLength) targetLength = this.minLength;
+      else if (distance > this.maxLength) targetLength = this.maxLength;
+      else return;
+
+      const percent = (targetLength - distance) / distance / 2;
+      const offsetX = dx * percent;
+      const offsetY = dy * percent;
+
+      if (!this.p1.pinned) {
+        this.p1.pos.x -= offsetX;
+        this.p1.pos.y -= offsetY;
       }
-      return null;
-    },
-    nextPoemPreset: () => {
-      if (activeEngineInstance) {
-        activeEngineInstance.cyclePoemPreset();
+      if (!this.p2.pinned) {
+        this.p2.pos.x += offsetX;
+        this.p2.pos.y += offsetY;
       }
-    },
-    loadCustomPoem: (stanzas) => {
-      if (activeEngineInstance) {
-        activeEngineInstance.loadCustomPoem(stanzas);
-      }
-    },
-    getInstance: () => activeEngineInstance,
-    DEFAULT_POEM
+    }
+  }
+
+  // --- Default Cultural Doorway Poems & Stanzas ---
+  const DEFAULT_POEM = {
+    title: "Where the Mind is Without Fear",
+    author: "Rabindranath Tagore",
+    stanzas: [
+      [
+        "Where the mind is without fear",
+        "and the head is held high;",
+        "Where knowledge is free;"
+      ],
+      [
+        "Where the world has not been",
+        "broken up into fragments",
+        "By narrow domestic walls;"
+      ],
+      [
+        "Where words come out from",
+        "the depth of truth;",
+        "Where tireless striving",
+        "stretches its arms towards perfection;"
+      ],
+      [
+        "Where the clear stream of reason",
+        "has not lost its way",
+        "Into the dreary desert sand of dead habit;"
+      ],
+      [
+        "Where the mind is led forward",
+        "by thee into ever-widening",
+        "thought and action;"
+      ],
+      [
+        "Into that heaven of freedom,",
+        "my Father, let my country awake."
+      ]
+    ]
   };
+
+  // Cultural beaded string glyphs
+  const GLYPH_CHARS = "✦◊◈⚓⏣§¶ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  // Multi-shape geometric bead styles & cultural jewel palettes
+  const BEAD_SHAPES = ["circle", "rhombus", "star", "hexagon", "triangle", "octagon"];
+  const BEAD_PALETTES = [
+    { fill: "#1e2238", stroke: "#8b78f6", text: "#e0dbfc" }, // Royal Amethyst
+    { fill: "#2b2318", stroke: "#e0a96d", text: "#fdf0d5" }, // Golden Amber
+    { fill: "#132a26", stroke: "#00b894", text: "#e6fffa" }, // Emerald Jade
+    { fill: "#19223c", stroke: "#4361ee", text: "#dbe4ff" }, // Lapis Lazuli
+    { fill: "#2e1a1a", stroke: "#e76f51", text: "#ffe8e1" }, // Carnelian Ruby
+    { fill: "#202530", stroke: "#a0aec0", text: "#ffffff" }  // Silver Opal
+  ];
+
+  // --- Engine State & Cloth System ---
+  let canvas = null;
+  let ctx = null;
+  let particles = [];
+  let constraints = [];
+  let charCanvases = {};
+  let stanzaCanvases = [];
+  let currentPoem = DEFAULT_POEM;
+  let grabbedParticle = null;
+  let isSimulating = false;
+  let lastSim = performance.now();
+  let simRaf = null;
+  let dpr = 1;
+
+  // Staggered stanza anchor definitions (organic non-uniform heights)
+  let activeStanzaAnchors = [];
+
+  // Coordinate transforms
+  let canvasW = 1200;
+  let canvasH = 650;
+  let originX = 0;
+  let originY = 30;
+
+  const mousePos = new Vec2();
+  const chimeRadiusSq = 55 * 55;
+  const grabRadius = 36;
+
+  // Helper: Draw geometric polygon on offscreen canvas
+  function drawPolygon(octx, x, y, radius, sides, startAngle = -Math.PI / 2) {
+    octx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      const a = startAngle + (i * 2 * Math.PI) / sides;
+      const px = x + radius * Math.cos(a);
+      const py = y + radius * Math.sin(a);
+      if (i === 0) octx.moveTo(px, py);
+      else octx.lineTo(px, py);
+    }
+    octx.closePath();
+  }
+
+  // Helper: Draw star shape
+  function drawStar(octx, cx, cy, spikes, outerRadius, innerRadius) {
+    let rot = (Math.PI / 2) * 3;
+    let x = cx;
+    let y = cy;
+    const step = Math.PI / spikes;
+
+    octx.beginPath();
+    octx.moveTo(cx, cy - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+      x = cx + Math.cos(rot) * outerRadius;
+      y = cy + Math.sin(rot) * outerRadius;
+      octx.lineTo(x, y);
+      rot += step;
+
+      x = cx + Math.cos(rot) * innerRadius;
+      y = cy + Math.sin(rot) * innerRadius;
+      octx.lineTo(x, y);
+      rot += step;
+    }
+    octx.lineTo(cx, cy - outerRadius);
+    octx.closePath();
+  }
+
+  // --- Offscreen Pre-rendering Cache (Key to 60-120 FPS!) ---
+  function preRenderAssets() {
+    dpr = window.devicePixelRatio || 1;
+    charCanvases = {};
+
+    // 1. Pre-render multi-shape bead glyphs once with DPR scaling
+    const fontSize = 13;
+    const size = Math.ceil(fontSize * 1.6);
+    const charsToCache = new Set(GLYPH_CHARS.split(""));
+
+    let beadIdx = 0;
+    charsToCache.forEach(ch => {
+      const shape = BEAD_SHAPES[beadIdx % BEAD_SHAPES.length];
+      const pal = BEAD_PALETTES[beadIdx % BEAD_PALETTES.length];
+      beadIdx++;
+
+      const off = document.createElement("canvas");
+      off.width = Math.ceil(size * dpr);
+      off.height = Math.ceil(size * dpr);
+      off._size = size;
+      const octx = off.getContext("2d");
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const center = size / 2;
+      const radius = size * 0.44;
+
+      // Draw distinctive bead geometry
+      if (shape === "circle") {
+        octx.beginPath();
+        octx.arc(center, center, radius, 0, Math.PI * 2);
+      } else if (shape === "rhombus") {
+        octx.beginPath();
+        octx.moveTo(center, center - radius);
+        octx.lineTo(center + radius * 0.85, center);
+        octx.lineTo(center, center + radius);
+        octx.lineTo(center - radius * 0.85, center);
+        octx.closePath();
+      } else if (shape === "star") {
+        drawStar(octx, center, center, 4, radius, radius * 0.45);
+      } else if (shape === "hexagon") {
+        drawPolygon(octx, center, center, radius, 6);
+      } else if (shape === "triangle") {
+        drawPolygon(octx, center, center, radius, 3);
+      } else if (shape === "octagon") {
+        drawPolygon(octx, center, center, radius, 8);
+      }
+
+      octx.fillStyle = pal.fill;
+      octx.fill();
+      octx.lineWidth = 1.2;
+      octx.strokeStyle = pal.stroke;
+      octx.stroke();
+
+      // Render center glyph
+      octx.font = `600 ${fontSize * 0.72}px ui-monospace, SFMono-Regular, monospace`;
+      octx.textAlign = "center";
+      octx.textBaseline = "middle";
+      octx.fillStyle = pal.text;
+      octx.fillText(ch, center, center + 0.5);
+
+      charCanvases[ch] = off;
+    });
+
+    // 2. Pre-render poem stanza cards once with Arvo and Poiret One fonts
+    stanzaCanvases = currentPoem.stanzas.map((lines, sIdx) => {
+      const cardW = 280;
+      const cardH = 80 + lines.length * 24;
+      const off = document.createElement("canvas");
+      off.width = Math.ceil(cardW * dpr);
+      off.height = Math.ceil(cardH * dpr);
+      off._cardW = cardW;
+      off._cardH = cardH;
+
+      const octx = off.getContext("2d");
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Card Background (Frosted Executive Styling with subtle drop shadow)
+      const r = 14;
+      octx.beginPath();
+      octx.moveTo(r, 0);
+      octx.lineTo(cardW - r, 0);
+      octx.quadraticCurveTo(cardW, 0, cardW, r);
+      octx.lineTo(cardW, cardH - r);
+      octx.quadraticCurveTo(cardW, cardH, cardW - r, cardH);
+      octx.lineTo(r, cardH);
+      octx.quadraticCurveTo(0, cardH, 0, cardH - r);
+      octx.lineTo(0, r);
+      octx.quadraticCurveTo(0, 0, r, 0);
+      octx.closePath();
+
+      octx.fillStyle = "rgba(26, 31, 51, 0.96)";
+      octx.fill();
+      octx.lineWidth = 1.5;
+      octx.strokeStyle = "rgba(139, 120, 246, 0.55)";
+      octx.stroke();
+
+      // Top Header Line in Poiret One
+      octx.font = '600 12px "Poiret One", sans-serif';
+      octx.fillStyle = '#b4a8fb';
+      octx.textAlign = 'left';
+      octx.fillText(`STANZA ${sIdx + 1} • ${currentPoem.author.toUpperCase()}`, 18, 26);
+
+      // Stanza Lines in Arvo
+      octx.font = '400 14px "Arvo", Georgia, serif';
+      octx.fillStyle = '#f8fafc';
+      lines.forEach((line, lIdx) => {
+        octx.fillText(line, 18, 54 + lIdx * 24);
+      });
+
+      return off;
+    });
+  }
+
+  // --- Cloth & Stanza Network Builder ---
+  function buildCloth() {
+    if (!canvas) return;
+
+    // Center cloth horizontally on canvas
+    originX = Math.max(20, (canvasW - CONFIG.width) / 2);
+    originY = 25;
+
+    particles = [];
+    constraints = [];
+    activeStanzaAnchors = [];
+
+    const gridW = CONFIG.gridW;
+    const gridH = CONFIG.gridH;
+    const cellWidth = CONFIG.width / (gridW - 1);
+    const cellHeight = CONFIG.height / (gridH - 1);
+
+    // Staggered Stanza Column Mapping:
+    // Distribute the 6 stanzas across distinct columns with ORGANIC NON-UNIFORM heights
+    const stanzaConfigs = [
+      { col: Math.max(2, Math.floor(gridW * 0.16)), startRow: 5,  stanzaIdx: 0 },
+      { col: Math.max(2, Math.floor(gridW * 0.16)), startRow: 17, stanzaIdx: 1 },
+      { col: Math.floor(gridW * 0.50),               startRow: 7,  stanzaIdx: 2 },
+      { col: Math.floor(gridW * 0.50),               startRow: 19, stanzaIdx: 3 },
+      { col: Math.min(gridW - 3, Math.floor(gridW * 0.84)), startRow: 4,  stanzaIdx: 4 },
+      { col: Math.min(gridW - 3, Math.floor(gridW * 0.84)), startRow: 16, stanzaIdx: 5 }
+    ];
+
+    // 1. Create Particles
+    for (let i = 0; i < gridW; i++) {
+      for (let j = 0; j < gridH; j++) {
+        const x = i * cellWidth;
+        const y = j * cellHeight;
+        const id = getPointID(j, i, gridH);
+        const pinned = j === 0;
+
+        // Bead glyph
+        const char = GLYPH_CHARS[(i * 7 + j * 3) % GLYPH_CHARS.length];
+
+        // Check if particle is a stanza anchor
+        let stanzaIdx = -1;
+        let isAnchor = false;
+        const matched = stanzaConfigs.find(s => s.col === i && s.startRow === j);
+        if (matched) {
+          stanzaIdx = matched.stanzaIdx;
+          isAnchor = true;
+        }
+
+        const p = new Particle({
+          x,
+          y,
+          pinned,
+          id,
+          char,
+          stanzaIdx,
+          isStanzaAnchor: isAnchor
+        });
+        particles.push(p);
+        if (isAnchor) activeStanzaAnchors.push(p);
+      }
+    }
+
+    // 2. Create Constraints (Vertical Strings & Horizontal Spacers)
+    for (let i = 0; i < gridW; i++) {
+      for (let j = 0; j < gridH; j++) {
+        const id = getPointID(j, i, gridH);
+        const p = particles[id];
+
+        // Vertical constraint along string
+        if (j < gridH - 1) {
+          const bottomP = particles[getPointID(j + 1, i, gridH)];
+          const constraint = new Constraint({
+            p1: p,
+            p2: bottomP,
+            length: cellHeight,
+            id: id + gridW * gridH,
+            compressFactor: CONFIG.compressFactor,
+            stretchFactor: CONFIG.stretchFactor
+          });
+          constraints.push(constraint);
+          p.downConstraint = constraint;
+        }
+
+        // Horizontal spacer constraint between adjacent strings
+        if (i < gridW - 1) {
+          const rightP = particles[getPointID(j, i + 1, gridH)];
+          constraints.push(
+            new Constraint({
+              p1: p,
+              p2: rightP,
+              length: cellWidth,
+              id: id + gridW * gridH * 2,
+              compressFactor: 0.60,
+              stretchFactor: 4.0,
+              isSpacer: true
+            })
+          );
+        }
+      }
+    }
+
+    // 3. Pre-settle warm up relaxation (70 frames) so strings start at resting hang
+    for (let f = 0; f < 70; f++) {
+      particles.forEach(p => p.update(16));
+      for (let k = 0; k < CONFIG.iterationsPerFrame; k++) {
+        for (let m = 0; m < constraints.length; m++) constraints[m].solve();
+      }
+    }
+  }
+
+  // Occlusion Helper: Prevent beads from obscuring stanza text
+  function isCoveredByStanza(p) {
+    if (p.isStanzaAnchor) return false;
+    for (let i = 0; i < activeStanzaAnchors.length; i++) {
+      const anchor = activeStanzaAnchors[i];
+      const card = stanzaCanvases[anchor.stanzaIdx];
+      if (!card) continue;
+      const cardW = card._cardW;
+      const cardH = card._cardH;
+      const minX = anchor.pos.x - cardW / 2 - 4;
+      const maxX = anchor.pos.x + cardW / 2 + 4;
+      const minY = anchor.pos.y - 4;
+      const maxY = anchor.pos.y + cardH + 4;
+      if (p.pos.x >= minX && p.pos.x <= maxX && p.pos.y >= minY && p.pos.y <= maxY) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // --- Rendering Loop (Zero allocation, high-DPI blit) ---
+  function draw() {
+    if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    // 1. Draw Bead Strings (Skip beads occluded behind stanza cards)
+    particles.forEach(p => {
+      if (isCoveredByStanza(p)) return;
+
+      const img = charCanvases[p.char];
+      if (!img) return;
+
+      let cos = 1;
+      let sin = 0;
+      const constraint = p.downConstraint;
+      if (constraint) {
+        const dx = constraint.p2.pos.x - constraint.p1.pos.x;
+        const dy = constraint.p2.pos.y - constraint.p1.pos.y;
+        const angle = Math.atan2(dy, dx) - Math.PI / 2;
+        cos = Math.cos(angle);
+        sin = Math.sin(angle);
+      }
+
+      const size = img._size;
+      const half = size / 2;
+      const x = p.pos.x + originX;
+      const y = p.pos.y + originY;
+
+      ctx.setTransform(
+        cos * dpr,
+        sin * dpr,
+        -sin * dpr,
+        cos * dpr,
+        x * dpr,
+        y * dpr
+      );
+      ctx.drawImage(img, -half, -half, size, size);
+    });
+
+    // 2. Draw Suspended Stanza Cards (Anchored to Stanza Particles)
+    activeStanzaAnchors.forEach(p => {
+      if (!p.isStanzaAnchor || p.stanzaIdx < 0) return;
+      const cardCanvas = stanzaCanvases[p.stanzaIdx];
+      if (!cardCanvas) return;
+
+      let cos = 1;
+      let sin = 0;
+      const constraint = p.downConstraint;
+      if (constraint) {
+        const dx = constraint.p2.pos.x - constraint.p1.pos.x;
+        const dy = constraint.p2.pos.y - constraint.p1.pos.y;
+        const angle = (Math.atan2(dy, dx) - Math.PI / 2) * 0.40; // Gentle tilt
+        cos = Math.cos(angle);
+        sin = Math.sin(angle);
+      }
+
+      const cardW = cardCanvas._cardW;
+      const cardH = cardCanvas._cardH;
+      const x = p.pos.x + originX;
+      const y = p.pos.y + originY;
+
+      ctx.setTransform(
+        cos * dpr,
+        sin * dpr,
+        -sin * dpr,
+        cos * dpr,
+        x * dpr,
+        y * dpr
+      );
+      ctx.drawImage(cardCanvas, -cardW / 2, 0, cardW, cardH);
+    });
+  }
+
+  // --- Physics Step ---
+  function tick(dt) {
+    particles.forEach(p => p.update(dt));
+    for (let k = 0; k < CONFIG.iterationsPerFrame; k++) {
+      for (let m = 0; m < constraints.length; m++) constraints[m].solve();
+    }
+    draw();
+  }
+
+  function simLoop(now) {
+    if (!isSimulating) return;
+    const dt = Math.min(32, Math.max(1, now - lastSim));
+    lastSim = now;
+    tick(dt);
+    simRaf = requestAnimationFrame(simLoop);
+  }
+
+  // --- Coordinate Mapping & Mouse/Touch Interaction ---
+  function localPoint(clientX, clientY) {
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return null;
+    return {
+      x: ((clientX - rect.left) / rect.width) * canvasW - originX,
+      y: ((clientY - rect.top) / rect.height) * canvasH - originY
+    };
+  }
+
+  function brush(clientX, clientY, { chime = true } = {}) {
+    const pt = localPoint(clientX, clientY);
+    if (!pt) return;
+    mousePos.reset(pt.x, pt.y);
+
+    let nearest = null;
+    let nearestLs = Infinity;
+
+    for (const p of particles) {
+      const diff = mousePos.subtractNew(p.pos);
+      const ls = diff.lengthSquared;
+      if (ls < CONFIG.mouseSize) {
+        const a = diff.angle - Math.PI;
+        const strength =
+          (smoothstep(CONFIG.mouseSize, -2000, ls) * CONFIG.mouseStrength) / 300;
+        p.applyForce(new Vec2(Math.cos(a) * strength, Math.sin(a) * strength));
+      }
+      if (chime && ls < chimeRadiusSq && ls < nearestLs) {
+        nearest = p;
+        nearestLs = ls;
+      }
+    }
+
+    if (chime && nearest && CONFIG.chimes && window.DhritiAudio?.chimes) {
+      const closeness = 1 - nearestLs / chimeRadiusSq;
+      window.DhritiAudio.chimes.setCountry(CONFIG.country);
+      window.DhritiAudio.chimes.strike({
+        x: pt.x,
+        y: pt.y,
+        particle: nearest,
+        gridW: CONFIG.gridW,
+        intensity: 0.2 + closeness * 0.7
+      });
+    }
+  }
+
+  // --- Pointer Event Handlers (Brushing + Dragging) ---
+  function onPointerDown(e) {
+    const pt = localPoint(e.clientX, e.clientY);
+    if (!pt) return;
+
+    mousePos.reset(pt.x, pt.y);
+
+    // Check if clicked near any particle or stanza card
+    for (const p of particles) {
+      const dist = mousePos.subtractNew(p.pos).length;
+      if (dist < grabRadius) {
+        // Dragging is permitted ONLY for chains with stanzas (loose beaded chains move via smooth hover brushing)
+        const isStanzaChain = p.isStanzaAnchor || p.stanzaIdx >= 0 || activeStanzaAnchors.some(a => Math.abs(a.pos.x - p.pos.x) < 14);
+        if (isStanzaChain) {
+          grabbedParticle = p;
+          grabbedParticle.originalPinnedState = p.pinned;
+          grabbedParticle.pinned = true;
+        }
+
+        if (CONFIG.chimes && window.DhritiAudio?.chimes) {
+          window.DhritiAudio.chimes.setCountry(CONFIG.country);
+          window.DhritiAudio.chimes.strike({
+            x: pt.x,
+            y: pt.y,
+            particle: p,
+            gridW: CONFIG.gridW,
+            intensity: 0.85,
+            force: true
+          });
+        }
+        break;
+      }
+    }
+  }
+
+  function onPointerMove(e) {
+    const pt = localPoint(e.clientX, e.clientY);
+    if (!pt) return;
+
+    if (grabbedParticle) {
+      grabbedParticle.pos.reset(pt.x, pt.y);
+      grabbedParticle.oldPos.reset(pt.x, pt.y);
+    }
+
+    brush(e.clientX, e.clientY, { chime: true });
+  }
+
+  function onPointerUp() {
+    if (grabbedParticle) {
+      grabbedParticle.pinned = grabbedParticle.originalPinnedState;
+      grabbedParticle = null;
+    }
+  }
+
+  // --- Canvas Resizing ---
+  function resizeCanvas() {
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    canvasW = container.clientWidth || 1200;
+    canvasH = container.clientHeight || 650;
+    dpr = window.devicePixelRatio || 1;
+
+    canvas.width = Math.ceil(canvasW * dpr);
+    canvas.height = Math.ceil(canvasH * dpr);
+    canvas.style.width = `${canvasW}px`;
+    canvas.style.height = `${canvasH}px`;
+
+    originX = Math.max(20, (canvasW - CONFIG.width) / 2);
+    originY = 25;
+
+    preRenderAssets();
+    buildCloth();
+  }
+
+  // --- Public Engine Controller ---
+  function initEngine() {
+    canvas = document.getElementById("chimes-canvas");
+    if (!canvas) return;
+    ctx = canvas.getContext("2d");
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    canvas.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+
+    isSimulating = true;
+    lastSim = performance.now();
+    if (simRaf) cancelAnimationFrame(simRaf);
+    simRaf = requestAnimationFrame(simLoop);
+  }
+
+  function updateConfig(newOpts = {}) {
+    Object.assign(CONFIG, newOpts);
+    if (CONFIG.chimeVolume != null && window.DhritiAudio?.chimes) {
+      window.DhritiAudio.chimes.setVolume(CONFIG.chimeVolume);
+    }
+  }
+
+  function rebuild() {
+    preRenderAssets();
+    buildCloth();
+  }
+
+  function setPoem(poemData) {
+    if (poemData && poemData.stanzas) {
+      currentPoem = poemData;
+      rebuild();
+    }
+  }
+
+  function setCountry(countryId) {
+    CONFIG.country = countryId;
+    if (window.DhritiAudio?.chimes) {
+      window.DhritiAudio.chimes.setCountry(countryId);
+    }
+  }
+
+  // Auto-init on load
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initEngine);
+  } else {
+    initEngine();
+  }
+
+  // Expose to window.DhritiChimes
+  window.DhritiChimes = {
+    CONFIG,
+    updateConfig,
+    rebuild,
+    setPoem,
+    setCountry,
+    brush
+  };
+
 })();
