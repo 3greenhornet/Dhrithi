@@ -165,9 +165,12 @@
     DOM.floatingQuote = document.getElementById('floating-quote');
     DOM.quoteText = document.getElementById('quote-text');
     DOM.quoteAuthor = document.getElementById('quote-author');
+    DOM.modeBadge = document.getElementById('mode-badge');
     DOM.modeBadgeText = document.getElementById('mode-badge-text');
     DOM.btnToggleMode = document.getElementById('btn-toggle-dashboard-mode');
     DOM.btnToggleText = document.getElementById('btn-toggle-text');
+    DOM.btnNavArtMode = document.getElementById('btn-nav-art-mode');
+    DOM.sidebarBrand = document.querySelector('.sidebar-brand');
     DOM.btnThemeToggle = document.getElementById('btn-theme-toggle');
     DOM.themeIconDark = document.getElementById('theme-icon-dark');
     DOM.themeIconLight = document.getElementById('theme-icon-light');
@@ -282,7 +285,7 @@
       DOM.body.classList.add('mode-dashboard');
       DOM.appShell.style.display = 'flex';
       DOM.modeBadgeText.textContent = 'Dashboard Shell';
-      DOM.btnToggleText.textContent = 'Art & Poem Mode';
+      if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Art & Poem Mode';
       if (window.DhritiBubbles && typeof window.DhritiBubbles.clear === 'function') {
         window.DhritiBubbles.clear();
       }
@@ -294,7 +297,7 @@
       DOM.body.classList.add('mode-picture');
       DOM.appShell.style.display = 'none';
       DOM.modeBadgeText.textContent = 'Art & Poem Mode';
-      DOM.btnToggleText.textContent = 'Enter Dashboard Shell';
+      if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Enter Dashboard Shell';
       if (window.DhritiBubbles && typeof window.DhritiBubbles.updateLoopState === 'function') {
         window.DhritiBubbles.updateLoopState();
       }
@@ -1188,13 +1191,30 @@
   // --- Wire Event Listeners ---
   function wireEvents() {
     // Mode toggles
-    DOM.btnToggleMode.addEventListener('click', () => {
-      if (state.mode === 'picture') flipToDashboard();
-      else returnToArt();
-    });
+    if (DOM.btnToggleMode) {
+      DOM.btnToggleMode.addEventListener('click', () => {
+        if (state.mode === 'picture') flipToDashboard();
+        else returnToArt();
+      });
+    }
 
     if (DOM.btnReturnArt) {
       DOM.btnReturnArt.addEventListener('click', returnToArt);
+    }
+
+    if (DOM.btnNavArtMode) {
+      DOM.btnNavArtMode.addEventListener('click', returnToArt);
+    }
+
+    if (DOM.sidebarBrand) {
+      DOM.sidebarBrand.addEventListener('click', returnToArt);
+    }
+
+    if (DOM.modeBadge) {
+      DOM.modeBadge.addEventListener('click', () => {
+        if (state.mode === 'picture') flipToDashboard();
+        else returnToArt();
+      });
     }
 
     // Persistent header Pomodoro controls

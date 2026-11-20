@@ -70,12 +70,12 @@
     }
   }
 
-  // --- Ideal Standard Configuration (Harmonious Roomy Draped Installation) ---
+  // --- Ideal Standard Configuration (Harmonious Roomy Draped Installation matching Play panel) ---
   const CONFIG = {
-    width: 1040,
-    height: 720,
-    gridW: 32,
-    gridH: 38,
+    width: 492,
+    height: 468,
+    gridW: 36,
+    gridH: 40,
     gravity: 0.20,
     damping: 0.990,
     iterationsPerFrame: 5,
