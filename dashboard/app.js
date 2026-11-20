@@ -174,6 +174,13 @@
     DOM.bubbleLayer = document.getElementById('bubble-layer');
     DOM.miniTimerPill = document.getElementById('mini-timer-pill');
     DOM.miniTimerDisplay = document.getElementById('mini-timer-display');
+    DOM.headerPomoPill = document.getElementById('header-pomo-pill');
+    DOM.headerPomoDot = document.getElementById('header-pomo-dot');
+    DOM.headerPomoPhase = document.getElementById('header-pomo-phase');
+    DOM.headerPomoTime = document.getElementById('header-pomo-time');
+    DOM.headerPomoToggle = document.getElementById('header-pomo-toggle');
+    DOM.headerPomoPlayIcon = document.getElementById('header-pomo-play-icon');
+    DOM.headerPomoPauseIcon = document.getElementById('header-pomo-pause-icon');
     DOM.btnReturnArt = document.getElementById('btn-return-art');
     DOM.navItems = Array.from(document.querySelectorAll('.nav-item'));
     DOM.shellViews = Array.from(document.querySelectorAll('.shell-view'));
@@ -558,6 +565,21 @@
     if (DOM.miniTimerDisplay) DOM.miniTimerDisplay.textContent = str;
     const tilePomo = document.getElementById('tile-pomo-time');
     if (tilePomo) tilePomo.textContent = str;
+
+    // Persistent Header Pomodoro Timer Pill update
+    if (DOM.headerPomoTime) DOM.headerPomoTime.textContent = str;
+    if (DOM.headerPomoPhase) DOM.headerPomoPhase.textContent = state.pomodoro.mode === 'break' ? 'REST' : 'FOCUS';
+    if (DOM.headerPomoPill) {
+      if (state.pomodoro.isRunning) {
+        DOM.headerPomoPill.classList.add('running');
+        if (DOM.headerPomoPlayIcon) DOM.headerPomoPlayIcon.style.display = 'none';
+        if (DOM.headerPomoPauseIcon) DOM.headerPomoPauseIcon.style.display = 'block';
+      } else {
+        DOM.headerPomoPill.classList.remove('running');
+        if (DOM.headerPomoPlayIcon) DOM.headerPomoPlayIcon.style.display = 'block';
+        if (DOM.headerPomoPauseIcon) DOM.headerPomoPauseIcon.style.display = 'none';
+      }
+    }
   }
 
   function togglePomodoro() {
@@ -600,79 +622,9 @@
     updateTimerDisplay();
   }
 
-  // --- Life Mirror Floating Thought Bubbles (D-092) ---
-  function spawnLifeBubble() {
-    if (state.mode !== 'picture' || !DOM.bubbleLayer) return;
-
-    // Pick uniform random from declared alternatives
-    const alt = state.lifeAlts[Math.floor(Math.random() * state.lifeAlts.length)];
-    if (!alt) return;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'life-bubble';
-
-    // Random non-colliding coordinates
-    const top = 15 + Math.random() * 55;
-    const left = 8 + Math.random() * 65;
-    bubble.style.top = `${top}vh`;
-    bubble.style.left = `${left}vw`;
-
-    bubble.innerHTML = `
-      <div class="bubble-icon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-        </svg>
-      </div>
-      <div class="bubble-content">
-        <span class="bubble-tag">Life Alternative (${alt.category})</span>
-        <span class="bubble-text">${alt.label}</span>
-      </div>
-      <div class="bubble-actions">
-        <button class="bubble-btn bubble-btn-did" title="Mark Done">done</button>
-        <button class="bubble-btn bubble-btn-dismiss" title="Dismiss">dismiss</button>
-      </div>
-    `;
-
-    // Silent expiry after 45s without moralizing shame
-    const expiryTimer = setTimeout(() => {
-      dismissBubble(bubble);
-    }, 45000);
-
-    bubble.querySelector('.bubble-btn-did').addEventListener('click', (e) => {
-      e.stopPropagation();
-      clearTimeout(expiryTimer);
-      if (window.DhritiAudio) window.DhritiAudio.playBell();
-      dismissBubble(bubble);
-    });
-
-    bubble.querySelector('.bubble-btn-dismiss').addEventListener('click', (e) => {
-      e.stopPropagation();
-      clearTimeout(expiryTimer);
-      dismissBubble(bubble);
-    });
-
-    DOM.bubbleLayer.appendChild(bubble);
-  }
-
-  function dismissBubble(bubbleEl) {
-    bubbleEl.style.opacity = '0';
-    bubbleEl.style.transform = 'scale(0.8)';
-    setTimeout(() => {
-      if (bubbleEl.parentNode) bubbleEl.parentNode.removeChild(bubbleEl);
-    }, 500);
-  }
-
-  function startBubbleScheduler() {
-    if (state.bubbleTimerId) clearInterval(state.bubbleTimerId);
-    // Schedule bubble check every 35s
-    state.bubbleTimerId = setInterval(() => {
-      if (state.mode === 'picture' && DOM.bubbleLayer.children.length === 0) {
-        spawnLifeBubble();
-      }
-    }, 35000);
-    // Initial spawn after 4s
-    setTimeout(spawnLifeBubble, 4000);
+  // --- Life Alternatives Data Synchronization ---
+  function getLifeAlternatives() {
+    return state.lifeAlts || [];
   }
 
   // --- Parking Timeline View ---
@@ -1231,10 +1183,31 @@
       DOM.btnReturnArt.addEventListener('click', returnToArt);
     }
 
-    // Tactile tile click in Mode 1 flips to dashboard
+    // Persistent header Pomodoro controls
+    if (DOM.headerPomoToggle) {
+      DOM.headerPomoToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePomodoro();
+      });
+    }
+    if (DOM.headerPomoPill) {
+      DOM.headerPomoPill.addEventListener('click', () => {
+        if (state.mode === 'picture') {
+          // Flip the Pomodoro tile so user can see it right in Mode 1
+          const pomoTile = document.querySelector('.tactile-tile[data-tile-id="1"]');
+          if (pomoTile) pomoTile.classList.toggle('is-flipped');
+        } else {
+          showView('focus');
+        }
+      });
+    }
+
+    // Tactile tile click in Mode 1 flips THAT individual tile locally (preserves artwork view!)
     DOM.tiles.forEach(tile => {
-      tile.addEventListener('click', () => {
-        if (state.mode === 'picture') flipToDashboard();
+      tile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tile.classList.toggle('is-flipped');
+        if (window.DhritiAudio) window.DhritiAudio.playFlipClick(0.6);
       });
     });
 
@@ -1532,7 +1505,6 @@
     wireEvents();
     updateTimerDisplay();
     updateUnderlayStyles();
-    startBubbleScheduler();
     loadGallery();
   }
 

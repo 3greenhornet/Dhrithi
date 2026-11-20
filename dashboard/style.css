@@ -67,8 +67,8 @@
 
 body.theme-light {
   --bg-canvas: #f1f5f9;
-  --sidebar-bg: #1e293b;
-  --sidebar-border: #334155;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
 
   /* Light Theme: Pure White Cards & Cyan/Teal (Image 2 reference) */
   --card-bg-front: rgba(255, 255, 255, 0.20);
@@ -393,6 +393,80 @@ body.mode-dashboard .painting-canvas-underlay {
   opacity: 0.85;
 }
 
+/* Persistent Header Pomodoro Timer Pill */
+.header-pomo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--capsule-bg);
+  border: 1px solid var(--accent-primary);
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  box-shadow: 0 2px 10px var(--accent-glow);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.header-pomo-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.pomo-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  transition: background-color 0.3s ease;
+}
+
+.header-pomo-pill.running .pomo-dot {
+  animation: pomo-pulse 1.8s infinite;
+}
+
+@keyframes pomo-pulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.pomo-phase {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: var(--font-serif);
+  letter-spacing: 0.8px;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+}
+
+.pomo-time {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.5px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.pomo-quick-btn {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.pomo-quick-btn:hover {
+  color: var(--accent-secondary);
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
@@ -492,35 +566,47 @@ body.mode-dashboard .return-note-fixed {
   overflow: hidden;
 }
 
-/* Front: Elegant Frosted Glass (Artwork and Quote fully visible through tiles without popping images) */
+/* Front: Pure Translucent Glass (Artwork fully visible without blur) */
 .tile-face-front {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.tactile-tile:hover .tile-face-front {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 body.theme-light .tile-face-front {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+body.theme-light .tactile-tile:hover .tile-face-front {
   background: rgba(255, 255, 255, 0.35);
-  border-color: rgba(255, 255, 255, 0.7);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.8), 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-color: rgba(255, 255, 255, 0.85);
 }
 
 .tile-front-badge {
   position: absolute;
   bottom: 12px;
   left: 14px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(8px);
-  padding: 4px 10px;
+  background: rgba(14, 17, 28, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 5px 12px;
   border-radius: 12px;
   font-family: var(--font-display);
   font-size: 12px;
-  letter-spacing: 1px;
-  color: var(--text-main);
-  opacity: 0.85;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.8px;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.6);
 }
 
 /* Back: Widget Card */
@@ -694,22 +780,62 @@ body.theme-light .floating-quote-card {
 
 .poem-section-header {
   text-align: center;
-  max-width: 800px;
+  max-width: 840px;
   margin-bottom: 24px;
   z-index: 20;
+  background: rgba(14, 18, 30, 0.76);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 18px;
+  padding: 22px 34px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
 }
 
 .poem-section-title {
+  font-family: var(--font-display);
   font-size: 34px;
-  letter-spacing: 3px;
-  color: var(--text-main);
-  margin-bottom: 10px;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 2.5px;
+  color: #ffffff;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85), 0 0 20px rgba(139, 120, 246, 0.5);
 }
 
 .poem-section-subtitle {
-  font-size: 14px;
-  color: var(--text-muted);
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  color: #e2e8f0;
   line-height: 1.6;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.poem-section-subtitle strong {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-style: italic;
+  color: #b4a8fb;
+}
+
+body.theme-light .poem-section-header {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(226, 232, 240, 0.95);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .poem-section-title {
+  color: #0f172a;
+  text-shadow: none;
+}
+
+body.theme-light .poem-section-subtitle {
+  color: #475569;
+  text-shadow: none;
+}
+
+body.theme-light .poem-section-subtitle strong {
+  color: #00b894;
 }
 
 .poem-canvas-container {
@@ -2219,4 +2345,132 @@ body.theme-light .upload-dropzone.drag-active {
   font-size: 13px;
   font-weight: 600;
   color: var(--accent-primary);
+}
+
+/* =========================================================================
+   Thought Bubbles (D-092 / L-2 / L-8 Screensaver Floating Thoughts)
+   Translucent cloud/oval/dialogue shapes with organic trailing tails
+   ========================================================================= */
+
+#thought-bubble-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 85;
+  overflow: hidden;
+}
+
+.thought-bubble {
+  position: absolute;
+  max-width: 320px;
+  padding: 16px 22px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+  background: rgba(22, 27, 46, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+body.theme-light .thought-bubble {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 184, 148, 0.45);
+  color: #0f172a;
+  text-shadow: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Shape 1: Fluffy Thought Cloud with trailing circle thought dots */
+.thought-bubble.shape-cloud {
+  border-radius: 48% 52% 46% 54% / 58% 44% 56% 42%;
+}
+
+.thought-bubble.shape-cloud::after {
+  content: '';
+  position: absolute;
+  bottom: -16px;
+  left: 22%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(22, 27, 46, 0.65);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 14px 10px 0 -3px rgba(22, 27, 46, 0.65);
+}
+
+body.theme-light .thought-bubble.shape-cloud::after {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 184, 148, 0.45);
+  box-shadow: 14px 10px 0 -3px rgba(255, 255, 255, 0.85);
+}
+
+/* Shape 2: Speech Oval with pointer tail */
+.thought-bubble.shape-oval {
+  border-radius: 28px;
+}
+
+.thought-bubble.shape-oval::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 28px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 2px solid transparent;
+  border-top: 10px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Shape 3: Dialogue Card with angled pointer */
+.thought-bubble.shape-rect {
+  border-radius: 14px;
+}
+
+.thought-bubble.shape-rect::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 32px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(255, 255, 255, 0.35);
+}
+
+.thought-bubble.size-1 { font-size: 13.5px; max-width: 260px; }
+.thought-bubble.size-2 { font-size: 15px; max-width: 310px; }
+.thought-bubble.size-3 { font-size: 17px; max-width: 360px; }
+
+.thought-bubble.rising {
+  animation: bubble-float var(--rise-dur, 18s) ease-in forwards;
+}
+
+@keyframes bubble-float {
+  0% {
+    transform: translate(0, 0) scale(0.92);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(var(--drift-x, 2vw), -35vh) scale(1);
+    opacity: 0.92;
+  }
+  80% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(calc(var(--drift-x, 2vw) * -1), -68vh) scale(1.02);
+    opacity: 0;
+  }
 }

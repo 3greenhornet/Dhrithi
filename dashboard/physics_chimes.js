@@ -70,12 +70,12 @@
     }
   }
 
-  // --- Ideal Standard Configuration (Niyam Vora Standards) ---
+  // --- Ideal Standard Configuration (Harmonious Roomy Draped Installation) ---
   const CONFIG = {
-    width: 492,
-    height: 468,
-    gridW: 36,
-    gridH: 40,
+    width: 1040,
+    height: 720,
+    gridW: 32,
+    gridH: 38,
     gravity: 0.20,
     damping: 0.990,
     iterationsPerFrame: 5,
@@ -232,18 +232,17 @@
     ]
   };
 
-  // Cultural beaded string glyphs
-  const GLYPH_CHARS = "✦◊◈⚓⏣§¶ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  // Cultural poetic chimes glyphs (clean, elegant, no noisy arcade digits)
+  const GLYPH_CHARS = "✦◊◈◇•⚓WMFHKTRDPSAELN";
 
-  // Multi-shape geometric bead styles & cultural jewel palettes
+  // Harmonious painting-matched bead styles & palettes (muted gold, rose, verdigris, slate, parchment)
   const BEAD_SHAPES = ["circle", "rhombus", "star", "hexagon", "triangle", "octagon"];
   const BEAD_PALETTES = [
-    { fill: "#1e2238", stroke: "#8b78f6", text: "#e0dbfc" }, // Royal Amethyst
-    { fill: "#2b2318", stroke: "#e0a96d", text: "#fdf0d5" }, // Golden Amber
-    { fill: "#132a26", stroke: "#00b894", text: "#e6fffa" }, // Emerald Jade
-    { fill: "#19223c", stroke: "#4361ee", text: "#dbe4ff" }, // Lapis Lazuli
-    { fill: "#2e1a1a", stroke: "#e76f51", text: "#ffe8e1" }, // Carnelian Ruby
-    { fill: "#202530", stroke: "#a0aec0", text: "#ffffff" }  // Silver Opal
+    { fill: "#241f1a", stroke: "#d8b46a", text: "#f6eccb" }, // Muted Antique Gold
+    { fill: "#271c21", stroke: "#c76b7a", text: "#fce9ed" }, // Dusty Rose
+    { fill: "#1a2520", stroke: "#7fa08a", text: "#e8f2ec" }, // Sage Verdigris
+    { fill: "#1a1f2e", stroke: "#8fa3d1", text: "#e4ebf8" }, // Slate Periwinkle
+    { fill: "#292621", stroke: "#e0d3b8", text: "#ffffff" }  // Warm Parchment
   ];
 
   // --- Engine State & Cloth System ---
@@ -264,8 +263,8 @@
   let activeStanzaAnchors = [];
 
   // Coordinate transforms
-  let canvasW = 1200;
-  let canvasH = 650;
+  let canvasW = 1280;
+  let canvasH = 780;
   let originX = 0;
   let originY = 30;
 
@@ -373,10 +372,10 @@
       charCanvases[ch] = off;
     });
 
-    // 2. Pre-render poem stanza cards once with Arvo and Poiret One fonts
+    // 2. Pre-render poem stanza cards once with Arvo bold-italic and Poiret One fonts
     stanzaCanvases = currentPoem.stanzas.map((lines, sIdx) => {
-      const cardW = 280;
-      const cardH = 80 + lines.length * 24;
+      const cardW = 310;
+      const cardH = 82 + lines.length * 26;
       const off = document.createElement("canvas");
       off.width = Math.ceil(cardW * dpr);
       off.height = Math.ceil(cardH * dpr);
@@ -386,7 +385,7 @@
       const octx = off.getContext("2d");
       octx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Card Background (Frosted Executive Styling with subtle drop shadow)
+      // Card Background (Translucent Deep Slate with Muted Gold Border)
       const r = 14;
       octx.beginPath();
       octx.moveTo(r, 0);
@@ -400,23 +399,23 @@
       octx.quadraticCurveTo(0, 0, r, 0);
       octx.closePath();
 
-      octx.fillStyle = "rgba(26, 31, 51, 0.96)";
+      octx.fillStyle = "rgba(16, 20, 34, 0.94)";
       octx.fill();
       octx.lineWidth = 1.5;
-      octx.strokeStyle = "rgba(139, 120, 246, 0.55)";
+      octx.strokeStyle = "rgba(216, 180, 106, 0.50)";
       octx.stroke();
 
-      // Top Header Line in Poiret One
-      octx.font = '600 12px "Poiret One", sans-serif';
-      octx.fillStyle = '#b4a8fb';
+      // Top Header Line in Poiret One bold-italic
+      octx.font = '700 italic 13px "Poiret One", sans-serif';
+      octx.fillStyle = '#e0d3b8';
       octx.textAlign = 'left';
-      octx.fillText(`STANZA ${sIdx + 1} • ${currentPoem.author.toUpperCase()}`, 18, 26);
+      octx.fillText(`STANZA ${sIdx + 1} • ${currentPoem.author.toUpperCase()}`, 18, 28);
 
-      // Stanza Lines in Arvo
-      octx.font = '400 14px "Arvo", Georgia, serif';
-      octx.fillStyle = '#f8fafc';
+      // Stanza Lines in Arvo bold-italic (User's preferred combination!)
+      octx.font = '700 italic 14px "Arvo", Georgia, serif';
+      octx.fillStyle = '#fdfcf8';
       lines.forEach((line, lIdx) => {
-        octx.fillText(line, 18, 54 + lIdx * 24);
+        octx.fillText(line, 18, 56 + lIdx * 26);
       });
 
       return off;
@@ -441,14 +440,14 @@
     const cellHeight = CONFIG.height / (gridH - 1);
 
     // Staggered Stanza Column Mapping:
-    // Distribute the 6 stanzas across distinct columns with ORGANIC NON-UNIFORM heights
+    // Stanzas are distributed across 3 distinct columns with ample spacing
     const stanzaConfigs = [
-      { col: Math.max(2, Math.floor(gridW * 0.16)), startRow: 5,  stanzaIdx: 0 },
-      { col: Math.max(2, Math.floor(gridW * 0.16)), startRow: 17, stanzaIdx: 1 },
-      { col: Math.floor(gridW * 0.50),               startRow: 7,  stanzaIdx: 2 },
-      { col: Math.floor(gridW * 0.50),               startRow: 19, stanzaIdx: 3 },
-      { col: Math.min(gridW - 3, Math.floor(gridW * 0.84)), startRow: 4,  stanzaIdx: 4 },
-      { col: Math.min(gridW - 3, Math.floor(gridW * 0.84)), startRow: 16, stanzaIdx: 5 }
+      { col: 4,  startRow: 4,  stanzaIdx: 0 },
+      { col: 4,  startRow: 18, stanzaIdx: 1 },
+      { col: 15, startRow: 6,  stanzaIdx: 2 },
+      { col: 15, startRow: 20, stanzaIdx: 3 },
+      { col: 26, startRow: 5,  stanzaIdx: 4 },
+      { col: 26, startRow: 19, stanzaIdx: 5 }
     ];
 
     // 1. Create Particles
