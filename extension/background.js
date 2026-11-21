@@ -250,8 +250,70 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ ok: true });
     return false;
   }
+  if (msg && msg.type === "vidura_search") {
+    (async () => {
+      const cfg = self.DHRITI_CONFIG || {};
+      const token = await getEffectiveToken();
+      const q = encodeURIComponent(msg.query || "");
+      try {
+        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:8080'}/api/vidura/search?q=${q}&limit=5`, {
+          headers: { "X-Dhriti-Token": token }
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          sendResponse({ items: data.items || [] });
+        } else {
+          sendResponse({ items: [] });
+        }
+      } catch (err) {
+        sendResponse({ items: [] });
+      }
+    })();
+    return true; // async response
+  }
   return false;
 });
+
+// --- Omnibox Keyword 'v' (Vidura Personal Search D-100) ---
+if (chrome.omnibox) {
+  chrome.omnibox.onInputChanged.addListener(async (text, suggest) => {
+    const query = (text || "").trim();
+    if (!query) return;
+    const cfg = self.DHRITI_CONFIG || {};
+    const token = await getEffectiveToken();
+    try {
+      const res = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:8080'}/api/vidura/search?q=${encodeURIComponent(query)}&limit=6`, {
+        headers: { "X-Dhriti-Token": token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const suggestions = (data.items || []).map(item => {
+          const cleanTitle = (item.title || "").replace(/[<>&]/g, "");
+          const domain = item.facet_domain || "general";
+          const form = item.facet_form || item.kind || "video";
+          return {
+            content: item.url,
+            description: `<match>${cleanTitle}</match> <dim>(${form} | ${domain})</dim>`
+          };
+        });
+        suggest(suggestions);
+      }
+    } catch (e) {}
+  });
+
+  chrome.omnibox.onInputEntered.addListener((text, disposition) => {
+    let targetUrl = (text || "").trim();
+    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+      const cfg = self.DHRITI_CONFIG || {};
+      targetUrl = `${cfg.bridgeUrl || 'http://127.0.0.1:8080'}/dashboard/?q=${encodeURIComponent(targetUrl)}`;
+    }
+    if (disposition === "currentTab") {
+      chrome.tabs.update({ url: targetUrl });
+    } else {
+      chrome.tabs.create({ url: targetUrl });
+    }
+  });
+}
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.url || changeInfo.title) {

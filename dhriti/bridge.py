@@ -233,6 +233,59 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == "/policy":
             self._send(200, snap["policy"] or {
                 "enforce": False, "reason": "no active policy (dormant)"})
+        elif path == "/api/vidura/search":
+            qs = parse_qs(urlparse(self.path).query)
+            q = qs.get("q", [""])[0]
+            limit = int(qs.get("limit", [20])[0])
+            try:
+                from .constants import DB_VIDURA_PATH
+                from .vidura_corpus import ViduraCorpus
+                corpus = ViduraCorpus(DB_VIDURA_PATH)
+                results = corpus.search(q, limit=limit)
+                self._send(200, {"ok": True, "query": q, "items": results, "count": len(results)})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/api/vidura/surface":
+            try:
+                from .constants import DB_VIDURA_PATH
+                from .vidura_corpus import ViduraCorpus
+                from .vidura_surface import ViduraSurfaceService
+                corpus = ViduraCorpus(DB_VIDURA_PATH)
+                svc = ViduraSurfaceService(corpus)
+                item = svc.suggest_daily_item()
+                if not item:
+                    self._send(200, {"ok": True, "card": None, "message": "no items to surface"})
+                else:
+                    card = svc.prepare_recall_card(item)
+                    self._send(200, {"ok": True, "card": card})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/api/vidura/facets":
+            try:
+                from .constants import DB_VIDURA_PATH
+                from .vidura_corpus import ViduraCorpus
+                from .vidura_facets import FacetEngine
+                corpus = ViduraCorpus(DB_VIDURA_PATH)
+                engine = FacetEngine(corpus)
+                breakdown = engine.get_facet_breakdown()
+                self._send(200, {"ok": True, "facets": breakdown})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/api/vidura/instruments":
+            try:
+                from .constants import DB_VIDURA_PATH
+                from .vidura_corpus import ViduraCorpus
+                from .vidura_facets import FacetEngine
+                corpus = ViduraCorpus(DB_VIDURA_PATH)
+                engine = FacetEngine(corpus)
+                instruments = engine.get_instruments()
+                self._send(200, {"ok": True, "instruments": instruments, "count": len(instruments)})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
         elif GuardRoutes.dispatch(self, "GET", path, None):
             return
         else:
@@ -302,6 +355,24 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     self._send(500, {"error": f"failed to delete: {e}"})
                     return
             self._send(404, {"error": "file not found"})
+            return
+
+        elif path == "/api/vidura/recall":
+            item_id = payload.get("item_id")
+            answer = payload.get("answer", "")
+            if not item_id:
+                self._send(400, {"error": "item_id is required"})
+                return
+            try:
+                from .constants import DB_VIDURA_PATH
+                from .vidura_corpus import ViduraCorpus
+                from .vidura_surface import ViduraSurfaceService
+                corpus = ViduraCorpus(DB_VIDURA_PATH)
+                svc = ViduraSurfaceService(corpus)
+                res = svc.submit_recall_response(item_id, answer)
+                self._send(200, {"ok": True, "result": res})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
             return
 
         elif path == "/events" and self.on_event is not None:

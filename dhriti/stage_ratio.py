@@ -201,3 +201,68 @@ def drift_split(consumption_events: list, declarations: list) -> dict:
             drift.append((when, category))
     return {"declared_rest": declared, "drift": len(drift),
             "drift_events": drift[:50]}
+
+
+# -- behavioral artifact test (D-099) ---------------------------------------
+
+def compute_artifact_stage_ratio(db, start_utc: Optional[_dt.datetime] = None,
+                                 end_utc: Optional[_dt.datetime] = None,
+                                 window_minutes: int = 30) -> dict:
+    """Behavioral stage classification: an opened content item is Stage if and only if
+    it is followed by an accepted evidence event within window_minutes. Otherwise it is Audience."""
+    opens_sql = "SELECT occurred_at_utc, observed_payload FROM event WHERE event_type = 'content_item_opened'"
+    params = []
+    if start_utc:
+        opens_sql += " AND occurred_at_utc >= ?"
+        params.append(to_iso(start_utc))
+    if end_utc:
+        opens_sql += " AND occurred_at_utc < ?"
+        params.append(to_iso(end_utc))
+    opens_sql += " ORDER BY occurred_at_utc ASC"
+
+    open_rows = db.query(opens_sql, params)
+    total_opens = len(open_rows)
+    if total_opens == 0:
+        return {
+            "total_content_opened": 0,
+            "stage_with_evidence": 0,
+            "audience_unaccompanied": 0,
+            "artifact_stage_ratio": None,
+            "window_minutes": window_minutes
+        }
+
+    evidence_rows = db.query(
+        "SELECT occurred_at_utc, observed_payload FROM event WHERE event_type = 'evidence_submitted' ORDER BY occurred_at_utc ASC"
+    )
+    evidence_times = []
+    for ev_row in evidence_rows:
+        try:
+            evidence_times.append(parse_iso(ev_row["occurred_at_utc"]))
+        except Exception:
+            pass
+
+    stage_count = 0
+    audience_count = 0
+
+    for op in open_rows:
+        try:
+            op_time = parse_iso(op["occurred_at_utc"])
+        except Exception:
+            audience_count += 1
+            continue
+
+        deadline = op_time + _dt.timedelta(minutes=window_minutes)
+        has_evidence = any(op_time <= ev_t <= deadline for ev_t in evidence_times)
+        if has_evidence:
+            stage_count += 1
+        else:
+            audience_count += 1
+
+    ratio = stage_count / total_opens if total_opens > 0 else 0.0
+    return {
+        "total_content_opened": total_opens,
+        "stage_with_evidence": stage_count,
+        "audience_unaccompanied": audience_count,
+        "artifact_stage_ratio": round(ratio, 3),
+        "window_minutes": window_minutes
+    }

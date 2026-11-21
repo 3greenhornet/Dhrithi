@@ -30,7 +30,20 @@
     "default_popup": "popup.html",
     "default_title": "Dhriti Dashboard"
   },
+  "omnibox": {
+    "keyword": "v"
+  },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.google.com/search*",
+        "*://*.google.co.in/search*",
+        "*://*.youtube.com/results*"
+      ],
+      "js": ["search_escape.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
     {
       "matches": [
         "*://*.youtube.com/*",

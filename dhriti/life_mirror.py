@@ -142,3 +142,20 @@ class LifeMirrorService:
         facts = self.week_facts(week_start_iso)
         return [f["label"] for f in facts["alternatives"]
                 if f["occurrences"] == 0]
+
+    def sync_instruments_from_vidura(self, vidura_corpus) -> list:
+        """Route interactive practice instruments from Vidura into Life Mirror (D-097)."""
+        from .vidura_facets import FacetEngine
+        engine = FacetEngine(vidura_corpus)
+        instruments = engine.get_instruments()
+        added = []
+        for inst in instruments:
+            label = (inst.get("title") or "Practice Instrument").strip()[:100]
+            existing = self.db.query_one("SELECT id FROM life_alternative WHERE label=?", (label,))
+            if not existing:
+                try:
+                    alt = self.declare(label=label, kind="hobby", minimum_version=inst.get("url", "")[:200])
+                    added.append(alt)
+                except Exception:
+                    pass
+        return added
