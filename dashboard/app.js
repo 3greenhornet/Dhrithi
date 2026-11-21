@@ -285,7 +285,7 @@
       DOM.body.classList.add('mode-dashboard');
       DOM.appShell.style.display = 'flex';
       DOM.modeBadgeText.textContent = 'Dashboard Shell';
-      if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Art & Poem Mode';
+      if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Still Mode';
       if (window.DhritiBubbles && typeof window.DhritiBubbles.clear === 'function') {
         window.DhritiBubbles.clear();
       }
@@ -296,7 +296,7 @@
       DOM.body.classList.remove('mode-dashboard');
       DOM.body.classList.add('mode-picture');
       DOM.appShell.style.display = 'none';
-      DOM.modeBadgeText.textContent = 'Art & Poem Mode';
+      DOM.modeBadgeText.textContent = 'Still Mode';
       if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Enter Dashboard Shell';
       if (window.DhritiBubbles && typeof window.DhritiBubbles.updateLoopState === 'function') {
         window.DhritiBubbles.updateLoopState();
@@ -449,13 +449,27 @@
       row.innerHTML = `
         <div class="topic-bar-meta">
           <span><strong>${item.domain}</strong> — ${item.category}</span>
-          <span>${hours}h (${item.duration_min}m)</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>${hours}h (${item.duration_min}m)</span>
+            <button type="button" class="btn-remove-item" data-remove-topic="${item.id}" title="Remove topic">✕</button>
+          </div>
         </div>
         <div class="topic-bar-track">
           <div class="topic-bar-seg ${item.is_stage ? 'stage' : 'audience'}" style="width: ${widthPct}%;"></div>
         </div>
       `;
       DOM.deskTopicBars.appendChild(row);
+    });
+
+    // Wire topic removal
+    DOM.deskTopicBars.querySelectorAll('[data-remove-topic]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-remove-topic');
+        state.topicTime = state.topicTime.filter(t => t.id !== tid);
+        renderTopicBars();
+        drawDonutChart();
+      });
     });
   }
 
@@ -475,6 +489,7 @@
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="task-units-badge">${task.units}u</span>
           <span class="card-badge ${task.done ? 'success' : 'info'}">${task.proof}</span>
+          <button type="button" class="btn-remove-item" data-remove-task="${task.id}" title="Remove target">✕</button>
         </div>
       `;
       DOM.contractTaskList.appendChild(row);
@@ -488,6 +503,16 @@
         if (e.target.checked && window.DhritiAudio) {
           window.DhritiAudio.playBell();
         }
+        renderContractTasks();
+      });
+    });
+
+    // Wire task removal
+    DOM.contractTaskList.querySelectorAll('[data-remove-task]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-remove-task');
+        state.activeTasks = state.activeTasks.filter(t => t.id !== tid);
         renderContractTasks();
       });
     });
@@ -688,16 +713,32 @@
       const shape = shapes[idx % shapes.length];
       chip.className = `bubble-alt-chip ${shape}`;
       chip.innerHTML = `
+        <button type="button" class="chip-remove-btn" data-remove-life="${alt.id}" title="Remove alternative">✕</button>
         <div class="chip-quote">“${alt.label}”</div>
         <div class="chip-meta">${alt.duration ? alt.duration + 'm' : 'Offline'} • ${alt.category || 'Rest'}</div>
       `;
       chip.title = "Click to release this thought bubble across the screen";
-      chip.addEventListener('click', () => {
+      chip.addEventListener('click', (e) => {
+        if (e.target.closest('.chip-remove-btn')) return;
         if (window.DhritiBubbles && typeof window.DhritiBubbles.spawnNow === 'function') {
           window.DhritiBubbles.spawnNow(alt.label);
         }
       });
       DOM.lifeAltList.appendChild(chip);
+    });
+
+    // Wire life alternative removal
+    DOM.lifeAltList.querySelectorAll('[data-remove-life]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const lid = btn.getAttribute('data-remove-life');
+        state.lifeAlts = state.lifeAlts.filter(a => a.id !== lid);
+        try { localStorage.setItem('dhriti_life_alts', JSON.stringify(state.lifeAlts)); } catch (err) {}
+        if (window.DhritiBubbles && typeof window.DhritiBubbles.refreshFeed === 'function') {
+          window.DhritiBubbles.refreshFeed();
+        }
+        renderLifeAlts();
+      });
     });
   }
 
@@ -1376,6 +1417,71 @@
         if (window.DhritiBubbles && typeof window.DhritiBubbles.spawnNow === 'function') {
           window.DhritiBubbles.spawnNow();
         }
+      });
+    }
+
+    // Inline Add Topic Handler
+    const btnAddTopic = document.getElementById('btn-add-topic');
+    const inputTopicDom = document.getElementById('new-topic-domain');
+    const inputTopicMin = document.getElementById('new-topic-minutes');
+    if (btnAddTopic && inputTopicDom) {
+      btnAddTopic.addEventListener('click', () => {
+        const dom = (inputTopicDom.value || '').trim();
+        if (!dom) return;
+        const mins = parseInt(inputTopicMin ? inputTopicMin.value : '30', 10) || 30;
+        state.topicTime.push({
+          id: `top-${Date.now()}`,
+          domain: dom,
+          category: 'Stage (Active Focus)',
+          duration_min: mins,
+          is_stage: true
+        });
+        inputTopicDom.value = '';
+        if (inputTopicMin) inputTopicMin.value = '';
+        renderTopicBars();
+        drawDonutChart();
+      });
+    }
+
+    // Inline Add Contract Target Handler
+    const btnAddTask = document.getElementById('btn-add-task');
+    const inputTaskTitle = document.getElementById('new-task-title');
+    if (btnAddTask && inputTaskTitle) {
+      btnAddTask.addEventListener('click', () => {
+        const t = (inputTaskTitle.value || '').trim();
+        if (!t) return;
+        state.activeTasks.push({
+          id: `task-${Date.now()}`,
+          title: t,
+          units: 1.0,
+          proof: 'machine_check',
+          done: false
+        });
+        inputTaskTitle.value = '';
+        renderContractTasks();
+        if (window.DhritiAudio) window.DhritiAudio.playBell();
+      });
+    }
+
+    // Inline Add Life Alternative Handler
+    const btnQuickLife = document.getElementById('btn-quick-add-life');
+    const inputQuickLife = document.getElementById('quick-life-label');
+    if (btnQuickLife && inputQuickLife) {
+      btnQuickLife.addEventListener('click', () => {
+        const lbl = (inputQuickLife.value || '').trim();
+        if (!lbl) return;
+        state.lifeAlts.push({
+          id: `life-${Date.now()}`,
+          label: lbl,
+          category: 'rest',
+          duration: 15
+        });
+        try { localStorage.setItem('dhriti_life_alts', JSON.stringify(state.lifeAlts)); } catch (e) {}
+        if (window.DhritiBubbles && typeof window.DhritiBubbles.refreshFeed === 'function') {
+          window.DhritiBubbles.refreshFeed();
+        }
+        inputQuickLife.value = '';
+        renderLifeAlts();
       });
     }
 

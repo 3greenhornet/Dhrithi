@@ -223,20 +223,12 @@
   function updateAllToggleUIs() {
     const textLabel = getModeLabel(mode);
 
-    // 1. Poem Mode Toggle UI
+    // Single dedicated toggle button near Poem Installation
     const poemLabel = document.getElementById("bubbles-mode-label");
     const poemDot = document.getElementById("bubble-dot-poem");
     if (poemLabel) poemLabel.textContent = textLabel;
     if (poemDot) {
       poemDot.className = `bubble-toggle-dot state-${mode}`;
-    }
-
-    // 2. Image Mode Toggle UI
-    const imageLabel = document.getElementById("bubbles-mode-label-image");
-    const imageDot = document.getElementById("bubble-dot-image");
-    if (imageLabel) imageLabel.textContent = textLabel;
-    if (imageDot) {
-      imageDot.className = `bubble-toggle-dot state-${mode}`;
     }
   }
 
@@ -256,21 +248,11 @@
   }
 
   function wireToggles() {
-    // Poem mode button
+    // Single poem installation thought bubbles button
     const btnPoem = document.getElementById("btn-toggle-thought-bubbles");
     if (btnPoem && !btnPoem.dataset.wired) {
       btnPoem.dataset.wired = "true";
       btnPoem.addEventListener("click", (e) => {
-        e.stopPropagation();
-        cycleMode();
-      });
-    }
-
-    // Image mode button
-    const btnImage = document.getElementById("btn-toggle-bubbles-image");
-    if (btnImage && !btnImage.dataset.wired) {
-      btnImage.dataset.wired = "true";
-      btnImage.addEventListener("click", (e) => {
         e.stopPropagation();
         cycleMode();
       });
