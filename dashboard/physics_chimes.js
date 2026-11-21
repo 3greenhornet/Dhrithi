@@ -380,18 +380,21 @@
     // 2. Pre-render poem stanza cards with dynamic width sized to text, Arvo bold-italic, and corner numeral
     const measureCanvas = document.createElement("canvas");
     const measureCtx = measureCanvas.getContext("2d");
-    measureCtx.font = '700 italic 14px "Arvo", Georgia, serif';
+    measureCtx.font = '700 italic 15px "Arvo", Georgia, serif';
 
     stanzaCanvases = currentPoem.stanzas.map((lines, sIdx) => {
       let maxLineWidth = 0;
       lines.forEach(line => {
-        const textWidth = measureCtx.measureText(line).width;
+        const measured = measureCtx.measureText(line).width;
+        // Conservative character fallback (average 9.8px per character for Arvo bold-italic)
+        const charFallback = line.length * 9.8;
+        const textWidth = Math.max(measured, charFallback);
         if (textWidth > maxLineWidth) maxLineWidth = textWidth;
       });
 
       // Card width sized according to text length + comfortable horizontal margins (no text cut off)
-      const cardW = Math.max(280, Math.ceil(maxLineWidth + 46));
-      const cardH = 46 + lines.length * 26;
+      const cardW = Math.max(300, Math.ceil(maxLineWidth + 56));
+      const cardH = 46 + lines.length * 28;
       const off = document.createElement("canvas");
       off.width = Math.ceil(cardW * dpr);
       off.height = Math.ceil(cardH * dpr);
@@ -426,7 +429,7 @@
       octx.fillStyle = '#fdfcf8';
       octx.textAlign = 'left';
       lines.forEach((line, lIdx) => {
-        octx.fillText(line, 20, 28 + lIdx * 26);
+        octx.fillText(line, 22, 28 + lIdx * 28);
       });
 
       // Single number at bottom-right end corner (1, 2, 3...)
@@ -793,6 +796,13 @@
 
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
+
+    // Re-render stanza text cards once web fonts (Arvo / Poiret One) finish loading
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        preRenderAssets();
+      }).catch(() => {});
+    }
 
     canvas.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointermove", onPointerMove);

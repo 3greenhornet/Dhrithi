@@ -375,14 +375,23 @@
     if (newTheme === 'light') {
       DOM.body.classList.remove('theme-dark');
       DOM.body.classList.add('theme-light');
-      DOM.themeIconDark.style.display = 'none';
-      DOM.themeIconLight.style.display = 'block';
+      if (DOM.themeIconDark) DOM.themeIconDark.style.display = 'none';
+      if (DOM.themeIconLight) DOM.themeIconLight.style.display = 'block';
     } else {
       DOM.body.classList.remove('theme-light');
       DOM.body.classList.add('theme-dark');
-      DOM.themeIconDark.style.display = 'block';
-      DOM.themeIconLight.style.display = 'none';
+      if (DOM.themeIconDark) DOM.themeIconDark.style.display = 'block';
+      if (DOM.themeIconLight) DOM.themeIconLight.style.display = 'none';
     }
+
+    // Keep theme selector cards in sync across Settings view and modal
+    if (DOM.shellThemeCardDark) DOM.shellThemeCardDark.classList.toggle('active', newTheme === 'dark');
+    if (DOM.shellThemeCardLight) DOM.shellThemeCardLight.classList.toggle('active', newTheme === 'light');
+    const modalDark = document.getElementById('theme-card-dark');
+    const modalLight = document.getElementById('theme-card-light');
+    if (modalDark) modalDark.classList.toggle('active', newTheme === 'dark');
+    if (modalLight) modalLight.classList.toggle('active', newTheme === 'light');
+
     updateUnderlayStyles();
     drawDonutChart();
   }
@@ -392,6 +401,27 @@
     root.style.setProperty('--dash-bg-brightness', state.underlay.brightness / 100);
     root.style.setProperty('--dash-bg-blur', `${state.underlay.blur}px`);
     root.style.setProperty('--dash-bg-opacity', state.underlay.opacity / 100);
+
+    // Sync input sliders and labels across Settings view and modal
+    if (DOM.shellSliderBrightness) DOM.shellSliderBrightness.value = state.underlay.brightness;
+    if (DOM.shellSliderBlur) DOM.shellSliderBlur.value = state.underlay.blur;
+    if (DOM.shellSliderOpacity) DOM.shellSliderOpacity.value = state.underlay.opacity;
+    if (DOM.shellValBrightness) DOM.shellValBrightness.textContent = `${state.underlay.brightness}%`;
+    if (DOM.shellValBlur) DOM.shellValBlur.textContent = `${state.underlay.blur} px`;
+    if (DOM.shellValOpacity) DOM.shellValOpacity.textContent = `${state.underlay.opacity}%`;
+
+    const mBright = document.getElementById('slider-bg-brightness');
+    const mBlur = document.getElementById('slider-bg-blur');
+    const mOpac = document.getElementById('slider-bg-opacity');
+    if (mBright) mBright.value = state.underlay.brightness;
+    if (mBlur) mBlur.value = state.underlay.blur;
+    if (mOpac) mOpac.value = state.underlay.opacity;
+    const mValBright = document.getElementById('val-bg-brightness');
+    const mValBlur = document.getElementById('val-bg-blur');
+    const mValOpac = document.getElementById('val-bg-opacity');
+    if (mValBright) mValBright.textContent = `${state.underlay.brightness}%`;
+    if (mValBlur) mValBlur.textContent = `${state.underlay.blur} px`;
+    if (mValOpac) mValOpac.textContent = `${state.underlay.opacity}%`;
   }
 
   // --- Donut Chart Renderer (Canvas-based for Desk & Mode 1 Tile 2) ---
@@ -631,27 +661,50 @@
     if (state.pomodoro.isRunning) {
       clearInterval(state.pomodoro.timerId);
       state.pomodoro.isRunning = false;
-      DOM.btnFocusStart.textContent = 'Resume Focus';
+      DOM.btnFocusStart.textContent = state.pomodoro.phase === 'break' ? 'Resume Break' : 'Resume Focus';
       if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
+      updateTimerDisplay(); // Immediately flip || icon back to ▶
     } else {
+      const preset = state.pomodoro.presets[state.pomodoro.mode];
+      const maxTime = state.pomodoro.phase === 'break' ? preset.break : preset.focus;
+      const isStartingFresh = (state.pomodoro.remaining === maxTime);
+
       state.pomodoro.isRunning = true;
-      DOM.btnFocusStart.textContent = 'Pause Focus';
+      DOM.btnFocusStart.textContent = state.pomodoro.phase === 'break' ? 'Pause Break' : 'Pause Focus';
       if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
+      updateTimerDisplay(); // Immediately flip ▶ icon to ||
+
+      // Ring Tibetan Singing Bowl tone when starting from scratch
+      if (isStartingFresh && window.DhritiAudio) {
+        window.DhritiAudio.playProceduralAlarm('singing_bowl');
+      }
 
       state.pomodoro.timerId = setInterval(() => {
         if (state.pomodoro.remaining > 0) {
           state.pomodoro.remaining--;
           updateTimerDisplay();
         } else {
-          // Timer finished!
+          // Timer finished! Ring Tibetan sound to signal end of period
           clearInterval(state.pomodoro.timerId);
           state.pomodoro.isRunning = false;
-          DOM.btnFocusStart.textContent = 'Start Focus';
           if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
 
           if (window.DhritiAudio) {
-            window.DhritiAudio.playProceduralAlarm(state.pomodoro.alarmSound);
+            window.DhritiAudio.playProceduralAlarm('singing_bowl');
           }
+
+          if (state.pomodoro.phase === 'focus') {
+            // Focus period ended -> transition to Break
+            state.pomodoro.phase = 'break';
+            state.pomodoro.remaining = preset.break;
+            DOM.btnFocusStart.textContent = 'Start Break';
+          } else {
+            // Break period ended -> transition back to Focus
+            state.pomodoro.phase = 'focus';
+            state.pomodoro.remaining = preset.focus;
+            DOM.btnFocusStart.textContent = 'Start Focus';
+          }
+          updateTimerDisplay();
         }
       }, 1000);
     }
@@ -662,9 +715,15 @@
     state.pomodoro.isRunning = false;
     DOM.btnFocusStart.textContent = 'Start Focus';
     if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
+    state.pomodoro.phase = 'focus';
     const preset = state.pomodoro.presets[state.pomodoro.mode];
     state.pomodoro.remaining = preset.focus;
     updateTimerDisplay();
+
+    // Ring Tibetan sound whenever timer resets or restarts from scratch
+    if (window.DhritiAudio) {
+      window.DhritiAudio.playProceduralAlarm('singing_bowl');
+    }
   }
 
   // --- Life Alternatives Data Synchronization ---
@@ -836,22 +895,36 @@
     }
   }
 
-  // --- Honest Stats View (L-2) ---
+  // --- Honest Stats View (L-2: 7-Day Daemon Active Time Distribution) ---
   function renderStreakRibbon() {
     if (!DOM.streakRibbon) return;
     DOM.streakRibbon.innerHTML = '';
-    const days = [
-      'Nov 07', 'Nov 08', 'Nov 09', 'Nov 10', 'Nov 11', 'Nov 12', 'Nov 13',
-      'Nov 14', 'Nov 15', 'Nov 16', 'Nov 17', 'Nov 18', 'Nov 19', 'Nov 20'
+
+    // Honest 7-Day timeline (never claiming past days met before project began)
+    const weekData = [
+      { day: 'Mon', hours: 0, label: '0h', active: false },
+      { day: 'Tue', hours: 0, label: '0h', active: false },
+      { day: 'Wed', hours: 0, label: '0h', active: false },
+      { day: 'Thu', hours: 0, label: '0h', active: false },
+      { day: 'Fri', hours: 0, label: '0h', active: false },
+      { day: 'Sat', hours: 0, label: '0h', active: false },
+      { day: 'Today', hours: 2.4, label: '2.4h', active: true, isToday: true }
     ];
-    days.forEach(d => {
-      const cell = document.createElement('div');
-      cell.className = 'streak-day-cell met';
-      cell.innerHTML = `
-        <div class="streak-day-date">${d}</div>
-        <div class="streak-day-status">MET</div>
+
+    const maxHours = 4.0;
+
+    weekData.forEach(item => {
+      const col = document.createElement('div');
+      col.className = `daemon-bar-col ${item.active ? 'active' : 'inactive'} ${item.isToday ? 'today' : ''}`;
+      const fillPct = item.hours > 0 ? Math.min(100, Math.round((item.hours / maxHours) * 100)) : 4;
+      col.innerHTML = `
+        <span class="daemon-bar-time">${item.label}</span>
+        <div class="daemon-bar-track">
+          <div class="daemon-bar-fill" style="height: ${fillPct}%;"></div>
+        </div>
+        <span class="daemon-bar-label">${item.day}</span>
       `;
-      DOM.streakRibbon.appendChild(cell);
+      DOM.streakRibbon.appendChild(col);
     });
   }
 
