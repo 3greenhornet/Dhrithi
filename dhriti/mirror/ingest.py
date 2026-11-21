@@ -31,7 +31,7 @@ YOUTUBE_PLAYLIST_ITEMS_URL = \
     "https://www.googleapis.com/youtube/v3/playlistItems"
 YOUTUBE_VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
 # The callback listener for `dhriti mirror auth`.
-LOCAL_CALLBACK_PORT = 8765
+LOCAL_CALLBACK_PORT = 8767
 
 QUOTA_COST = {"playlistItems.list": 1, "videos.list": 1}
 

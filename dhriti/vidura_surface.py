@@ -67,14 +67,15 @@ class ViduraSurfaceService:
         max_duration_s: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """Rank and return the top decay candidate for evening recall."""
+        today_prefix = self.clock.now_utc().strftime("%Y-%m-%d")
         with self.corpus._get_conn() as conn:
             query = """
                 SELECT * FROM content_item
                 WHERE (facet_intent IN ('stage', 'audience') OR facet_intent IS NULL)
                   AND (status = 'unopened' OR status IS NULL)
-                  AND (last_surfaced_at IS NULL OR date(last_surfaced_at) < date('now', 'localtime'))
+                  AND (last_surfaced_at IS NULL OR substr(last_surfaced_at, 1, 10) < ?)
             """
-            params: List[Any] = []
+            params: List[Any] = [today_prefix]
 
             if domain:
                 query += " AND facet_domain = ?"

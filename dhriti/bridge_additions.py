@@ -37,7 +37,10 @@ hash/count facts (D-075).
 
 from __future__ import annotations
 
+import json
+import os
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
 
@@ -249,6 +252,32 @@ _TOPIC_TICKS: list = []
 _DECOMPRESSION_MGR = None
 
 
+def _get_topic_ticks_path() -> Path:
+    home = Path(os.environ.get("DHRITI_HOME", Path.home() / ".dhriti"))
+    home.mkdir(parents=True, exist_ok=True)
+    return home / "topic_ticks.json"
+
+
+def _load_topic_ticks() -> list:
+    global _TOPIC_TICKS
+    if not _TOPIC_TICKS:
+        p = _get_topic_ticks_path()
+        if p.exists():
+            try:
+                _TOPIC_TICKS = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                _TOPIC_TICKS = []
+    return _TOPIC_TICKS
+
+
+def _save_topic_ticks():
+    p = _get_topic_ticks_path()
+    try:
+        p.write_text(json.dumps(_TOPIC_TICKS[-1000:]), encoding="utf-8")
+    except Exception:
+        pass
+
+
 @GuardRoutes.route("GET", "/history")
 def history(ctx, body):
     if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
@@ -267,15 +296,18 @@ def history(ctx, body):
 @GuardRoutes.route("GET", "/topic/day")
 def topic_day(ctx, body):
     from .topic_time import day_histogram
-    return 200, day_histogram(_TOPIC_TICKS)
+    ticks = _load_topic_ticks()
+    return 200, day_histogram(ticks)
 
 
 @GuardRoutes.route("POST", "/topic/tick")
 def topic_tick(ctx, body):
     from .topic_time import day_histogram
+    ticks = _load_topic_ticks()
     if body and isinstance(body, dict):
-        _TOPIC_TICKS.append(body)
-    return 200, day_histogram(_TOPIC_TICKS)
+        ticks.append(body)
+        _save_topic_ticks()
+    return 200, day_histogram(ticks)
 
 
 @GuardRoutes.route("GET", "/parking/timeline")

@@ -101,9 +101,8 @@ def launch_desktop_app(port: int = 7311, width: int = 1280, height: int = 860) -
     ensure_daemon_running(home)
     ensure_sidecar_running(home)
 
-    token_file = home / "bridge_token"
-    token = token_file.read_text(encoding="utf-8").strip() if token_file.exists() else ""
-    target_url = f"http://127.0.0.1:{port}/dashboard" + (f"?token={token}" if token else "")
+    # Local bridge serves /dashboard directly on 127.0.0.1 without leaking token into URL
+    target_url = f"http://127.0.0.1:{port}/dashboard"
 
     browser_bin = find_browser_app_binary()
     if not browser_bin:

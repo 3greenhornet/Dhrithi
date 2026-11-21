@@ -371,6 +371,13 @@ CREATE TABLE IF NOT EXISTS life_alternative(
   last_logged_at TEXT,
   UNIQUE(label));
 
+CREATE TABLE IF NOT EXISTS bubble_log(
+  id TEXT PRIMARY KEY,
+  alt_id TEXT NOT NULL,
+  at_utc TEXT NOT NULL,
+  outcome TEXT,
+  FOREIGN KEY(alt_id) REFERENCES life_alternative(id));
+
 CREATE TABLE IF NOT EXISTS emergency_contact(
   id TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,

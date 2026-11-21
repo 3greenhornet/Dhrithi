@@ -200,7 +200,7 @@
   // ------------------------------------------------------------------
   // hold card (neutral; lines are facts from the bridge)
   // ------------------------------------------------------------------
-  function showCard(lines, { tollSeconds = 0, onPark, onSend, onCancel } = {}) {
+  function showCard(lines, { tollSeconds = 0, onPark, onSend, onCancel, onAllowSafe } = {}) {
     hideCard();
     const el = document.createElement("div");
     el.className = "dhriti-card";

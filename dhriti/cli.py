@@ -1137,10 +1137,10 @@ def _mirror_dispatch(args, ctx):
 
 def cmd_mirror_auth(args, ctx):
     """The OAuth consent flow (PKCE). Opens the browser and listens
-    on 127.0.0.1:8765 for the callback."""
+    on 127.0.0.1:8767 for the callback."""
     ingest = YouTubeIngest(ctx.db, ctx.config, ctx.home, ctx.clock,
                            ctx.ledger)
-    redirect = f"http://127.0.0.1:8765/callback"
+    redirect = f"http://127.0.0.1:8767/callback"
     try:
         url, verifier, state = ingest.build_auth_url(redirect)
     except OAuthError as exc:
@@ -1148,7 +1148,7 @@ def cmd_mirror_auth(args, ctx):
     print("1. open this URL in your browser:")
     print(f"   {url}")
     print("2. approve the read-only scope; the callback lands on "
-          "127.0.0.1:8765")
+          "127.0.0.1:8767")
     if args.code:
         tokens = ingest.exchange_code(args.code, verifier, redirect)
         print("refresh token stored at "

@@ -11,6 +11,7 @@ Enters bounded Decompression Mode:
 from __future__ import annotations
 
 import time
+from urllib.parse import urlparse
 from typing import Dict, Any, List, Optional, Set
 
 
@@ -102,9 +103,16 @@ class DecompressionManager:
                 "message": f"Category '{category}' is blocked during decompression"
             }
 
-        # 2. Check if host/domain is in allowed domains
-        url_lower = url.lower()
-        is_allowed_domain = any(domain in url_lower for domain in self.allowed_domains)
+        # 2. Check if host/domain is in allowed domains (exact or subdomain match)
+        try:
+            parsed = urlparse(url if "://" in url else f"http://{url}")
+            host = (parsed.netloc or parsed.path).lower().split(":")[0]
+            is_allowed_domain = any(
+                host == d.lower() or host.endswith("." + d.lower())
+                for d in self.allowed_domains
+            )
+        except Exception:
+            is_allowed_domain = False
 
         if not is_allowed_domain:
             # If already exhausted, hard revert

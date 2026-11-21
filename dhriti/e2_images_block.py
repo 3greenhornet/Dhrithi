@@ -42,7 +42,7 @@ MARK_BEGIN = "# >>> dhriti-e2 images-vertical (managed) >>>"
 MARK_END   = "# <<< dhriti-e2 images-vertical <<<"
 
 # Positive control (D-081): must resolve to 127.0.0.1 while the block is armed.
-CANARY_HOST = "dhriti-e2-canary.local"
+CANARY_HOST = "dhriti-canary.invalid"
 
 # Dedicated entry hosts + thumbnail CDN. www.google.com search itself is NOT
 # blocked — only the Images verticals are, via the extension rings.
