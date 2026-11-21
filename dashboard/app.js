@@ -216,6 +216,14 @@
 
     // Parking & Mirror
     DOM.parkingTimelineContainer = document.getElementById('parking-timeline-container');
+    DOM.parkingCountBadge = document.getElementById('parking-count-badge');
+    DOM.parkingViewInput = document.getElementById('parking-view-input');
+    DOM.btnParkingViewAdd = document.getElementById('btn-parking-view-add');
+    DOM.parkingViewFeedback = document.getElementById('parking-view-feedback');
+    DOM.tileParkingCount = document.getElementById('tile-parking-count');
+    DOM.tileParkingLatest = document.getElementById('tile-parking-latest');
+    DOM.tileMirrorCount = document.getElementById('tile-mirror-count');
+    DOM.tileMirrorStatus = document.getElementById('tile-mirror-status');
     DOM.lifeAltList = document.getElementById('life-alt-list');
     DOM.btnAddLifeAlt = document.getElementById('btn-add-life-alt');
     DOM.lifeModal = document.getElementById('life-modal-overlay');
@@ -666,8 +674,30 @@
 
   // --- Parking Timeline View ---
   function renderParkingTimeline() {
+    if (DOM.parkingCountBadge) {
+      DOM.parkingCountBadge.textContent = `${state.parkingItems.length} Item${state.parkingItems.length === 1 ? '' : 's'}`;
+    }
+    if (DOM.tileParkingCount) {
+      DOM.tileParkingCount.textContent = `${state.parkingItems.length} waiting`;
+    }
+    if (DOM.tileParkingLatest) {
+      DOM.tileParkingLatest.textContent = state.parkingItems.length > 0
+        ? state.parkingItems[0].text
+        : 'Parking lot clear. Zero items waiting.';
+    }
+
     if (!DOM.parkingTimelineContainer) return;
     DOM.parkingTimelineContainer.innerHTML = '';
+
+    if (state.parkingItems.length === 0) {
+      DOM.parkingTimelineContainer.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: var(--text-dim); font-style: italic;">
+          No parked thoughts waiting. Use the field above to park a mid-session curiosity for cold review.
+        </div>
+      `;
+      return;
+    }
+
     state.parkingItems.forEach((item, idx) => {
       const card = document.createElement('div');
       card.className = 'task-item-row';
@@ -705,6 +735,9 @@
 
   // --- Life Alternatives View (Surfaced exclusively via Thought Bubbles D-092) ---
   function renderLifeAlts() {
+    if (DOM.tileMirrorCount) {
+      DOM.tileMirrorCount.textContent = `${state.lifeAlts.length} offline item${state.lifeAlts.length === 1 ? '' : 's'}`;
+    }
     if (!DOM.lifeAltList) return;
     DOM.lifeAltList.innerHTML = '';
     const shapes = ['shape-cloud', 'shape-oval', 'shape-rect'];
@@ -1303,15 +1336,49 @@
       });
     });
 
-    // Quick park input
+    // Helper to add parked thought from Desk or Parking Lot view
+    function addParkedThought(text, feedbackEl, inputEl) {
+      const clean = (text || '').trim();
+      if (!clean) return;
+      state.parkingItems.unshift({ id: `park-${Date.now()}`, text: clean, age_days: 0, type: 'spark' });
+      if (inputEl) inputEl.value = '';
+      if (feedbackEl) {
+        feedbackEl.textContent = 'Parked in curiosity mail slot for cold review.';
+        setTimeout(() => { if (feedbackEl) feedbackEl.textContent = ''; }, 3000);
+      }
+      renderParkingTimeline();
+      if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+        window.DhritiAudio.playPebble(1.2);
+      }
+    }
+
+    // Quick park input on The Desk
     if (DOM.btnQuickPark) {
       DOM.btnQuickPark.addEventListener('click', () => {
-        const text = DOM.quickParkInput.value.trim();
-        if (!text) return;
-        state.parkingItems.unshift({ id: `park-${Date.now()}`, text: text, age_days: 0, type: 'spark' });
-        DOM.quickParkInput.value = '';
-        DOM.quickParkFeedback.textContent = 'Parked in curiosity mail slot for cold review.';
-        setTimeout(() => { DOM.quickParkFeedback.textContent = ''; }, 3000);
+        addParkedThought(DOM.quickParkInput ? DOM.quickParkInput.value : '', DOM.quickParkFeedback, DOM.quickParkInput);
+      });
+    }
+    if (DOM.quickParkInput) {
+      DOM.quickParkInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addParkedThought(DOM.quickParkInput.value, DOM.quickParkFeedback, DOM.quickParkInput);
+        }
+      });
+    }
+
+    // Add to Parking Lot in Curiosity Parking Lot view
+    if (DOM.btnParkingViewAdd) {
+      DOM.btnParkingViewAdd.addEventListener('click', () => {
+        addParkedThought(DOM.parkingViewInput ? DOM.parkingViewInput.value : '', DOM.parkingViewFeedback, DOM.parkingViewInput);
+      });
+    }
+    if (DOM.parkingViewInput) {
+      DOM.parkingViewInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addParkedThought(DOM.parkingViewInput.value, DOM.parkingViewFeedback, DOM.parkingViewInput);
+        }
       });
     }
 
@@ -1689,6 +1756,8 @@
     updateUnderlayStyles();
     loadGallery();
     drawDonutChart();
+    renderParkingTimeline();
+    renderLifeAlts();
   }
 
   if (document.readyState === 'loading') {

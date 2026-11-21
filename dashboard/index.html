@@ -101,23 +101,24 @@
         </div>
       </div>
 
-      <!-- 2. Stage Ratio Donut Tile -->
+      <!-- 2. Curiosity Parking Lot Tile -->
       <div class="tile-wrapper">
-        <div class="tactile-tile" data-tile-id="4" data-view="desk" title="Click to open The Desk (Stage Ratio)">
+        <div class="tactile-tile" data-tile-id="4" data-view="parking" title="Click to open Curiosity Parking Lot">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">Stage Ratio Donut (88%)</span>
+            <span class="tile-front-badge">Curiosity Parking Lot</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Stage Ratio Donut</span>
-              <span class="widget-badge info">Output / Input</span>
+              <span class="widget-title">Curiosity Parking</span>
+              <span class="widget-badge info">Cold Review</span>
             </div>
-            <div class="centered-body" style="padding-top: 4px;">
-              <canvas id="tile-donut-stage-canvas" width="120" height="120"></canvas>
-              <div class="donut-legend" style="margin-top: 6px;">
-                <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
-                <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
-              </div>
+            <div class="metric-row">
+              <span class="metric-label">Parked Items</span>
+              <span class="metric-val" id="tile-parking-count">2 waiting</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 8px;">
+              <div class="capsule-key">Latest Thought</div>
+              <div class="capsule-value" id="tile-parking-latest" style="font-size: 11.5px; line-height: 1.35;">Consider PyTorch WASM inference for local text embeddings</div>
             </div>
           </div>
         </div>
@@ -179,24 +180,28 @@
         </div>
       </div>
 
-      <!-- 5. Decompression Zone Tile -->
+      <!-- 5. Life Mirror & Thought Bubbles Tile -->
       <div class="tile-wrapper">
-        <div class="tactile-tile" data-tile-id="3" data-view="guard" title="Click to open Decompression & Guard">
+        <div class="tactile-tile" data-tile-id="3" data-view="mirror" title="Click to open Life Mirror & Thought Bubbles">
           <div class="tile-face tile-face-front">
-            <span class="tile-front-badge">Decompression Status</span>
+            <span class="tile-front-badge">Life Mirror & Thought Bubbles</span>
           </div>
           <div class="tile-face tile-face-back">
             <div class="widget-header">
-              <span class="widget-title">Decompression</span>
-              <span class="widget-badge warning">Transition Lock</span>
+              <span class="widget-title">Life Mirror</span>
+              <span class="widget-badge success">Drifting</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">Status</span>
-              <span class="metric-val">Armed on Finish</span>
+              <span class="metric-label">Thought Bubbles</span>
+              <span class="metric-val" id="tile-mirror-status">Gentle Drift</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">Release</span>
-              <span class="metric-val">90m bounded</span>
+              <span class="metric-label">Life Alternatives</span>
+              <span class="metric-val" id="tile-mirror-count">3 offline items</span>
+            </div>
+            <div class="capsule-box" style="margin-top: 8px;">
+              <div class="capsule-key">Design Law L-8</div>
+              <div class="capsule-value" style="font-size: 11px;">Surfaced via drifting bubbles, zero nagging.</div>
             </div>
           </div>
         </div>
@@ -803,6 +808,21 @@
           <div>
             <h1 class="view-title">Curiosity Parking Lot</h1>
             <p class="view-subtitle">Mid-session captures awaiting cold-state review (L-1 Wall Principle).</p>
+          </div>
+        </div>
+
+        <!-- Add / Park New Thought in Curiosity Parking Lot -->
+        <div class="desk-card" style="margin-bottom: 20px;">
+          <div class="card-head">
+            <span class="card-title">Park a New Thought or Curiosity</span>
+            <span class="card-badge info">Cold Review Mail Slot</span>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <input type="text" class="form-input" id="parking-view-input" placeholder="e.g: Review distributed consensus paper or rabbit-hole URL...">
+              <button class="btn-primary" id="btn-parking-view-add" style="white-space: nowrap;">+ Add to Parking Lot</button>
+            </div>
+            <div class="park-feedback" id="parking-view-feedback" style="margin-top: 6px; font-size: 12px; color: var(--accent-emerald);"></div>
           </div>
         </div>
 
