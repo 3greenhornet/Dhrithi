@@ -632,11 +632,11 @@
       clearInterval(state.pomodoro.timerId);
       state.pomodoro.isRunning = false;
       DOM.btnFocusStart.textContent = 'Resume Focus';
-      DOM.miniTimerPill.style.display = 'none';
+      if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
     } else {
       state.pomodoro.isRunning = true;
       DOM.btnFocusStart.textContent = 'Pause Focus';
-      DOM.miniTimerPill.style.display = 'flex';
+      if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
 
       state.pomodoro.timerId = setInterval(() => {
         if (state.pomodoro.remaining > 0) {
@@ -647,7 +647,7 @@
           clearInterval(state.pomodoro.timerId);
           state.pomodoro.isRunning = false;
           DOM.btnFocusStart.textContent = 'Start Focus';
-          DOM.miniTimerPill.style.display = 'none';
+          if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
 
           if (window.DhritiAudio) {
             window.DhritiAudio.playProceduralAlarm(state.pomodoro.alarmSound);
@@ -661,7 +661,7 @@
     clearInterval(state.pomodoro.timerId);
     state.pomodoro.isRunning = false;
     DOM.btnFocusStart.textContent = 'Start Focus';
-    DOM.miniTimerPill.style.display = 'none';
+    if (DOM.miniTimerPill) DOM.miniTimerPill.style.display = 'none';
     const preset = state.pomodoro.presets[state.pomodoro.mode];
     state.pomodoro.remaining = preset.focus;
     updateTimerDisplay();

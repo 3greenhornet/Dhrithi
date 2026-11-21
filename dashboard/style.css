@@ -208,33 +208,8 @@ body.mode-dashboard .painting-canvas-underlay {
   overflow: hidden;
 }
 
-/* Floating Mini-Timer Pill */
 .mini-timer-pill {
-  position: fixed;
-  bottom: 24px;
-  right: 28px;
-  z-index: 120;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(14px);
-  padding: 8px 16px;
-  border-radius: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--text-main);
-  cursor: pointer;
-}
-
-.mini-timer-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-emerald);
-  animation: pulse-dot 1.5s infinite;
+  display: none !important;
 }
 
 /* Top Floating Header Bar */
