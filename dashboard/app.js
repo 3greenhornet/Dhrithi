@@ -105,7 +105,11 @@
     currentArtIndex: 0,
     artworks: DEFAULT_ARTWORKS,
     localArtworks: [],
+    artSets: [],
+    activeSetId: localStorage.getItem('dhriti_active_set_id') || 'set-curated-museum',
     activeArtId: localStorage.getItem('dhriti_active_art') || 'art-1',
+    inspectedSetId: null,
+    pendingUploadFiles: [],
     cycleUserUploads: localStorage.getItem('dhriti_cycle_user_uploads') === 'true',
     quotes: DEFAULT_QUOTES,
     currentQuoteIndex: 0,
@@ -283,6 +287,25 @@
     DOM.galleryStatusText = document.getElementById('gallery-status-text');
     DOM.customArtUrl = document.getElementById('custom-art-url');
     DOM.btnAddArt = document.getElementById('btn-add-art');
+
+    // Artwork Sets & Collections elements
+    DOM.artSetsGrid = document.getElementById('art-sets-grid');
+    DOM.artSetsCountPill = document.getElementById('art-sets-count-pill');
+    DOM.galleryActiveSetLabel = document.getElementById('gallery-active-set-label');
+    DOM.setInspectorOverlay = document.getElementById('set-inspector-overlay');
+    DOM.setInspectorTitle = document.getElementById('set-inspector-title');
+    DOM.setInspectorCount = document.getElementById('set-inspector-count');
+    DOM.setInspectorGrid = document.getElementById('set-inspector-grid');
+    DOM.btnUseInspectedSet = document.getElementById('btn-use-inspected-set');
+    DOM.btnCloseInspector = document.getElementById('btn-close-inspector');
+    DOM.uploadSetModalOverlay = document.getElementById('upload-set-modal-overlay');
+    DOM.uploadTargetSetSelect = document.getElementById('upload-target-set-select');
+    DOM.groupNewSetName = document.getElementById('group-new-set-name');
+    DOM.inputNewSetName = document.getElementById('input-new-set-name');
+    DOM.btnCancelUploadSet = document.getElementById('btn-cancel-upload-set');
+    DOM.btnConfirmUploadSet = document.getElementById('btn-confirm-upload-set');
+    DOM.uploadSetFilesCount = document.getElementById('upload-set-files-count');
+    DOM.btnCloseUploadSetModal = document.getElementById('btn-close-upload-set-modal');
   }
 
   // --- Dual-Mode Router ---
@@ -992,7 +1015,61 @@
     });
   }
 
+  // --- Curated Artwork Sets & Collections Architecture ---
+  function getInitialArtSets() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem('dhriti_art_sets'));
+    } catch (e) {}
+
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
+    }
+
+    const defaultSet = {
+      id: 'set-curated-museum',
+      name: 'Curated Museum Masterpieces',
+      isDefault: true,
+      images: [...DEFAULT_ARTWORKS]
+    };
+
+    let localSaved = [];
+    try {
+      localSaved = JSON.parse(localStorage.getItem('dhriti_local_gallery') || '[]');
+    } catch (e) {}
+
+    const sets = [defaultSet];
+    if (localSaved.length > 0) {
+      sets.push({
+        id: 'set-local-uploads',
+        name: 'My Local Uploads',
+        isDefault: false,
+        images: localSaved
+      });
+    }
+
+    try {
+      localStorage.setItem('dhriti_art_sets', JSON.stringify(sets));
+    } catch (e) {}
+    return sets;
+  }
+
+  function saveArtSets() {
+    try {
+      localStorage.setItem('dhriti_art_sets', JSON.stringify(state.artSets));
+      localStorage.setItem('dhriti_active_set_id', state.activeSetId);
+      localStorage.setItem('dhriti_active_art', state.activeArtId);
+      const allLocal = [];
+      state.artSets.forEach(s => {
+        if (!s.isDefault) allLocal.push(...s.images);
+      });
+      localStorage.setItem('dhriti_local_gallery', JSON.stringify(allLocal));
+    } catch (e) {}
+  }
+
   async function loadGallery() {
+    state.artSets = getInitialArtSets();
+
     let serverImages = [];
     let isServer = false;
     try {
@@ -1002,9 +1079,7 @@
         serverImages = data.images || [];
         isServer = true;
       }
-    } catch (e) {
-      // Standalone mode
-    }
+    } catch (e) {}
 
     if (isServer) {
       if (DOM.galleryServerStatus) {
@@ -1012,89 +1087,219 @@
         if (DOM.galleryStatusText) DOM.galleryStatusText.textContent = 'Local Server Permanent Storage';
       }
       state.localArtworks = serverImages;
-      try {
-        localStorage.setItem('dhriti_server_gallery_cache', JSON.stringify(serverImages));
-      } catch (err) {}
+      if (serverImages.length > 0) {
+        let localSet = state.artSets.find(s => s.id === 'set-local-uploads');
+        if (!localSet) {
+          localSet = { id: 'set-local-uploads', name: 'My Local Uploads', isDefault: false, images: [] };
+          state.artSets.push(localSet);
+        }
+        serverImages.forEach(img => {
+          if (!localSet.images.some(i => i.filename === img.filename)) {
+            localSet.images.push(img);
+          }
+        });
+        saveArtSets();
+      }
     } else {
       if (DOM.galleryServerStatus) {
         DOM.galleryServerStatus.classList.add('offline');
         if (DOM.galleryStatusText) DOM.galleryStatusText.textContent = 'Browser Storage (Offline/Static)';
       }
-      try {
-        const saved = localStorage.getItem('dhriti_local_gallery');
-        state.localArtworks = saved ? JSON.parse(saved) : [];
-      } catch (err) {
-        state.localArtworks = [];
-      }
     }
 
-    renderLocalArtGrid();
-    renderPresetArtGrid();
+    renderArtSets();
     applyActiveArtwork();
   }
 
-  function renderLocalArtGrid() {
-    if (!DOM.localArtGrid) return;
-    DOM.localArtGrid.innerHTML = '';
+  function renderArtSets() {
+    if (!DOM.artSetsGrid) return;
+    DOM.artSetsGrid.innerHTML = '';
 
-    const count = state.localArtworks.length;
-    if (DOM.localImagesCountPill) {
-      DOM.localImagesCountPill.textContent = `${count} uploaded image${count === 1 ? '' : 's'}`;
+    const count = state.artSets.length;
+    if (DOM.artSetsCountPill) {
+      DOM.artSetsCountPill.textContent = `${count} collection${count === 1 ? '' : 's'}`;
     }
 
-    if (count === 0) {
-      DOM.localArtGrid.innerHTML = `
-        <div class="gallery-empty-state">
-          <span>No local images uploaded yet. Drop image files into the zone above to store your set permanently.</span>
+    const activeSet = state.artSets.find(s => s.id === state.activeSetId) || state.artSets[0];
+    if (DOM.galleryActiveSetLabel && activeSet) {
+      DOM.galleryActiveSetLabel.textContent = `Active Set: ${activeSet.name}`;
+    }
+
+    state.artSets.forEach(set => {
+      const card = document.createElement('div');
+      const isActive = (state.activeSetId === set.id);
+      card.className = `art-set-card ${isActive ? 'active' : ''} ${set.isDefault ? 'default' : ''}`;
+
+      const img1 = set.images[0];
+      const img2 = set.images[1];
+      const img3 = set.images[2];
+
+      card.innerHTML = `
+        <div class="art-stack-container" title="Click to view artworks inside ${set.name}">
+          ${img3 ? `<div class="art-stack-back layer-3" style="background-image: url('${img3.url}')"></div>` : ''}
+          ${img2 ? `<div class="art-stack-back layer-2" style="background-image: url('${img2.url}')"></div>` : ''}
+          ${img1 ? `<div class="art-stack-front" style="background-image: url('${img1.url}')"></div>` : '<div class="art-stack-front empty-stack">Empty Collection</div>'}
+        </div>
+        <div class="art-set-info">
+          <div class="art-set-title-row">
+            <span class="art-set-name">${set.name}</span>
+            ${set.isDefault ? '<span class="set-badge default">Default Set</span>' : ''}
+            ${isActive ? '<span class="set-badge active">Active Set</span>' : ''}
+          </div>
+          <div class="set-meta-row">
+            <span class="set-count-pill">${set.images.length} artwork${set.images.length === 1 ? '' : 's'}</span>
+          </div>
+          <div class="art-set-actions">
+            <button type="button" class="btn-sec btn-sm btn-open-set">Open Set</button>
+            <button type="button" class="btn-primary btn-sm btn-use-set">${isActive ? 'In Use' : 'Use Set'}</button>
+            ${!set.isDefault ? `<button type="button" class="btn-sec btn-sm btn-del-set" title="Delete set">Delete Set</button>` : ''}
+          </div>
+        </div>
+      `;
+
+      card.querySelector('.art-stack-container').addEventListener('click', () => openSetInspector(set.id));
+      card.querySelector('.btn-open-set').addEventListener('click', () => openSetInspector(set.id));
+      card.querySelector('.btn-use-set').addEventListener('click', () => activateSet(set.id));
+      const delBtn = card.querySelector('.btn-del-set');
+      if (delBtn) {
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteSet(set.id);
+        });
+      }
+
+      DOM.artSetsGrid.appendChild(card);
+    });
+  }
+
+  function openSetInspector(setId) {
+    const set = state.artSets.find(s => s.id === setId);
+    if (!set) return;
+    state.inspectedSetId = setId;
+
+    if (DOM.setInspectorTitle) DOM.setInspectorTitle.textContent = set.name;
+    if (DOM.setInspectorCount) DOM.setInspectorCount.textContent = `${set.images.length} artwork${set.images.length === 1 ? '' : 's'}`;
+
+    renderSetInspectorGrid(set);
+    if (DOM.setInspectorOverlay) DOM.setInspectorOverlay.style.display = 'flex';
+  }
+
+  function renderSetInspectorGrid(set) {
+    if (!DOM.setInspectorGrid) return;
+    DOM.setInspectorGrid.innerHTML = '';
+
+    if (set.images.length === 0) {
+      DOM.setInspectorGrid.innerHTML = `
+        <div class="gallery-empty-state" style="grid-column: 1 / -1;">
+          <span>This collection has no images. Upload images into it above.</span>
         </div>
       `;
       return;
     }
 
-    state.localArtworks.forEach(img => {
+    set.images.forEach(img => {
       const card = document.createElement('div');
-      const isActive = state.activeArtId === img.id;
-      card.className = `local-art-card ${isActive ? 'active' : ''}`;
-
-      const sizeStr = img.size ? (img.size > 1048576 ? `${(img.size / 1048576).toFixed(1)} MB` : `${Math.round(img.size / 1024)} KB`) : 'Local';
+      const isActive = (state.activeArtId === img.id);
+      card.className = `set-img-card ${isActive ? 'active' : ''}`;
 
       card.innerHTML = `
-        <img class="local-art-thumb" src="${img.url}" alt="${img.title}" loading="lazy">
-        <div class="local-art-info">
-          <div>
-            <div class="local-art-name" title="${img.title}">${img.title}</div>
-            <div class="local-art-size">${sizeStr} • Local disk</div>
-          </div>
-          <div class="local-art-actions">
-            <button type="button" class="btn-set-active">${isActive ? 'Active' : 'Use Art'}</button>
-            <button type="button" class="btn-delete-art" title="Delete image">Delete</button>
+        <img class="set-img-thumb" src="${img.url}" alt="${img.title}" loading="lazy">
+        <div class="set-img-body">
+          <div class="set-img-title" title="${img.title}">${img.title}</div>
+          <div class="set-img-actions">
+            <button type="button" class="btn-sec btn-sm btn-use-img">${isActive ? 'Active' : 'Use Art'}</button>
+            <button type="button" class="btn-sec btn-sm btn-del-img" style="color: var(--accent-rose);" title="Delete picture">Delete</button>
           </div>
         </div>
       `;
 
-      card.querySelector('.btn-set-active').addEventListener('click', () => setActiveArtwork(img));
-      card.querySelector('.local-art-thumb').addEventListener('click', () => setActiveArtwork(img));
-      card.querySelector('.btn-delete-art').addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteArtwork(img);
+      card.querySelector('.btn-use-img').addEventListener('click', () => {
+        state.activeSetId = set.id;
+        setActiveArtwork(img);
+        renderSetInspectorGrid(set);
       });
 
-      DOM.localArtGrid.appendChild(card);
+      card.querySelector('.btn-del-img').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteImageFromSet(set.id, img.id);
+      });
+
+      DOM.setInspectorGrid.appendChild(card);
     });
   }
 
-  function renderPresetArtGrid() {
-    if (!DOM.artPresetGrid) return;
-    DOM.artPresetGrid.innerHTML = '';
-    DEFAULT_ARTWORKS.forEach(art => {
-      const card = document.createElement('div');
-      const isActive = state.activeArtId === art.id;
-      card.className = `art-preset-card ${isActive ? 'active' : ''}`;
-      card.style.backgroundImage = `url('${art.url}')`;
-      card.title = art.title;
-      card.addEventListener('click', () => setActiveArtwork(art));
-      DOM.artPresetGrid.appendChild(card);
+  async function deleteImageFromSet(setId, imgId) {
+    const set = state.artSets.find(s => s.id === setId);
+    if (!set) return;
+    const img = set.images.find(i => i.id === imgId);
+    if (!img) return;
+
+    if (!confirm(`Delete "${img.title}" from "${set.name}"?`)) return;
+
+    if (img.filename) {
+      try {
+        await fetch('/api/gallery/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: img.filename })
+        });
+      } catch (e) {}
+    }
+
+    set.images = set.images.filter(i => i.id !== imgId);
+    saveArtSets();
+
+    if (state.activeArtId === imgId) {
+      const fallbackImg = set.images[0] || (state.artSets[0] && state.artSets[0].images[0]) || DEFAULT_ARTWORKS[0];
+      setActiveArtwork(fallbackImg);
+    }
+
+    if (DOM.setInspectorCount) DOM.setInspectorCount.textContent = `${set.images.length} artwork${set.images.length === 1 ? '' : 's'}`;
+    renderSetInspectorGrid(set);
+    renderArtSets();
+    if (window.DhritiAudio) window.DhritiAudio.playChime(3, 0.25);
+  }
+
+  function deleteSet(setId) {
+    const set = state.artSets.find(s => s.id === setId);
+    if (!set || set.isDefault) return;
+
+    if (!confirm(`Permanently delete the entire collection "${set.name}" (${set.images.length} artworks)?`)) return;
+
+    set.images.forEach(img => {
+      if (img.filename) {
+        try {
+          fetch('/api/gallery/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: img.filename })
+          });
+        } catch (e) {}
+      }
     });
+
+    state.artSets = state.artSets.filter(s => s.id !== setId);
+    if (state.activeSetId === setId) {
+      state.activeSetId = state.artSets[0].id;
+      setActiveArtwork(state.artSets[0].images[0] || DEFAULT_ARTWORKS[0]);
+    }
+
+    saveArtSets();
+    renderArtSets();
+    if (window.DhritiAudio) window.DhritiAudio.playChime(3, 0.25);
+  }
+
+  function activateSet(setId) {
+    const set = state.artSets.find(s => s.id === setId);
+    if (!set) return;
+    state.activeSetId = setId;
+    localStorage.setItem('dhriti_active_set_id', setId);
+
+    if (set.images.length > 0) {
+      setActiveArtwork(set.images[0]);
+    }
+    renderArtSets();
+    if (window.DhritiAudio) window.DhritiAudio.playChime(5, 0.35);
   }
 
   function setActiveArtwork(art) {
@@ -1105,16 +1310,23 @@
     document.documentElement.style.setProperty('--bg-image', `url('${art.url}')`);
     document.body.style.setProperty('--bg-image', `url('${art.url}')`);
 
-    renderLocalArtGrid();
-    renderPresetArtGrid();
+    renderArtSets();
+    if (state.inspectedSetId) {
+      const inspected = state.artSets.find(s => s.id === state.inspectedSetId);
+      if (inspected) renderSetInspectorGrid(inspected);
+    }
     if (window.DhritiAudio) window.DhritiAudio.playChime(4, 0.28);
   }
 
   function applyActiveArtwork() {
-    const savedId = state.activeArtId;
-    let found = state.localArtworks.find(a => a.id === savedId);
+    const activeSet = state.artSets.find(s => s.id === state.activeSetId) || state.artSets[0];
+    let found = null;
+    if (activeSet && activeSet.images) {
+      found = activeSet.images.find(a => a.id === state.activeArtId);
+      if (!found) found = activeSet.images[0];
+    }
     if (!found) {
-      found = DEFAULT_ARTWORKS.find(a => a.id === savedId) || DEFAULT_ARTWORKS[0];
+      found = DEFAULT_ARTWORKS[0];
     }
     if (found && found.url) {
       document.documentElement.style.setProperty('--bg-image', `url('${found.url}')`);
@@ -1122,7 +1334,7 @@
     }
   }
 
-  async function handleBatchImageUpload(files) {
+  function handleBatchImageUpload(files) {
     if (!files || files.length === 0) return;
     const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
     if (validFiles.length === 0) {
@@ -1130,13 +1342,67 @@
       return;
     }
 
-    if (DOM.uploadProgressWrap) DOM.uploadProgressWrap.style.display = 'block';
-    let processed = 0;
-    const total = validFiles.length;
+    state.pendingUploadFiles = validFiles;
 
-    for (const file of validFiles) {
+    if (DOM.uploadSetFilesCount) {
+      DOM.uploadSetFilesCount.textContent = `${validFiles.length} image${validFiles.length === 1 ? '' : 's'} selected to upload.`;
+    }
+
+    if (DOM.uploadTargetSetSelect) {
+      DOM.uploadTargetSetSelect.innerHTML = '';
+      state.artSets.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `${s.name} (${s.images.length} images)`;
+        if (s.id === state.activeSetId) opt.selected = true;
+        DOM.uploadTargetSetSelect.appendChild(opt);
+      });
+      const newOpt = document.createElement('option');
+      newOpt.value = '__new__';
+      newOpt.textContent = '＋ Create a New Set...';
+      DOM.uploadTargetSetSelect.appendChild(newOpt);
+    }
+
+    if (DOM.groupNewSetName) {
+      DOM.groupNewSetName.style.display = (DOM.uploadTargetSetSelect && DOM.uploadTargetSetSelect.value === '__new__') ? 'block' : 'none';
+    }
+    if (DOM.inputNewSetName) DOM.inputNewSetName.value = '';
+
+    if (DOM.uploadSetModalOverlay) DOM.uploadSetModalOverlay.style.display = 'flex';
+  }
+
+  async function confirmUploadIntoSet() {
+    const files = state.pendingUploadFiles;
+    if (!files || files.length === 0) return;
+
+    let targetSetId = DOM.uploadTargetSetSelect ? DOM.uploadTargetSetSelect.value : '__new__';
+    let targetSet = null;
+
+    if (targetSetId === '__new__') {
+      const newName = (DOM.inputNewSetName && DOM.inputNewSetName.value.trim()) || 'My Custom Collection';
+      targetSet = {
+        id: `set-${Date.now()}`,
+        name: newName,
+        isDefault: false,
+        images: []
+      };
+      state.artSets.push(targetSet);
+      targetSetId = targetSet.id;
+    } else {
+      targetSet = state.artSets.find(s => s.id === targetSetId);
+    }
+
+    if (!targetSet) return;
+
+    if (DOM.uploadSetModalOverlay) DOM.uploadSetModalOverlay.style.display = 'none';
+    if (DOM.uploadProgressWrap) DOM.uploadProgressWrap.style.display = 'block';
+
+    let processed = 0;
+    const total = files.length;
+
+    for (const file of files) {
       if (DOM.uploadProgressText) {
-        DOM.uploadProgressText.textContent = `Saving ${file.name} (${processed + 1}/${total}) permanently...`;
+        DOM.uploadProgressText.textContent = `Saving ${file.name} to "${targetSet.name}" (${processed + 1}/${total})...`;
       }
       if (DOM.uploadProgressFill) {
         DOM.uploadProgressFill.style.width = `${Math.round(((processed + 0.3) / total) * 100)}%`;
@@ -1161,9 +1427,7 @@
             uploadedImage = resData.image;
           }
         }
-      } catch (e) {
-        // Fallback to local offline client storage
-      }
+      } catch (e) {}
 
       if (!uploadedImage) {
         uploadedImage = {
@@ -1173,15 +1437,10 @@
           url: dataUrl,
           size: file.size
         };
-        try {
-          const current = JSON.parse(localStorage.getItem('dhriti_local_gallery') || '[]');
-          current.unshift(uploadedImage);
-          localStorage.setItem('dhriti_local_gallery', JSON.stringify(current));
-        } catch (err) {}
       }
 
-      if (!state.localArtworks.some(img => img.filename === uploadedImage.filename && img.id === uploadedImage.id)) {
-        state.localArtworks.unshift(uploadedImage);
+      if (!targetSet.images.some(img => img.filename === uploadedImage.filename && img.id === uploadedImage.id)) {
+        targetSet.images.unshift(uploadedImage);
       }
 
       processed++;
@@ -1190,16 +1449,19 @@
       }
     }
 
-    if (state.localArtworks.length > 0) {
-      setActiveArtwork(state.localArtworks[0]);
+    state.activeSetId = targetSet.id;
+    if (targetSet.images.length > 0) {
+      setActiveArtwork(targetSet.images[0]);
     }
+
+    saveArtSets();
 
     setTimeout(() => {
       if (DOM.uploadProgressWrap) DOM.uploadProgressWrap.style.display = 'none';
       if (DOM.uploadProgressFill) DOM.uploadProgressFill.style.width = '0%';
     }, 1200);
 
-    renderLocalArtGrid();
+    renderArtSets();
     if (window.DhritiAudio) window.DhritiAudio.playChime(6, 0.45);
   }
 
@@ -1210,32 +1472,6 @@
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-  }
-
-  async function deleteArtwork(img) {
-    if (!confirm(`Permanently delete "${img.title}" from your local gallery?`)) return;
-
-    try {
-      await fetch('/api/gallery/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: img.filename })
-      });
-    } catch (e) {}
-
-    state.localArtworks = state.localArtworks.filter(a => a.id !== img.id && a.filename !== img.filename);
-
-    try {
-      const saved = JSON.parse(localStorage.getItem('dhriti_local_gallery') || '[]');
-      const filtered = saved.filter(a => a.id !== img.id && a.filename !== img.filename);
-      localStorage.setItem('dhriti_local_gallery', JSON.stringify(filtered));
-    } catch (err) {}
-
-    if (state.activeArtId === img.id) {
-      setActiveArtwork(DEFAULT_ARTWORKS[0]);
-    } else {
-      renderLocalArtGrid();
-    }
   }
 
   function wireGalleryStudio() {
@@ -1298,6 +1534,49 @@
       });
     }
 
+    if (DOM.uploadTargetSetSelect) {
+      DOM.uploadTargetSetSelect.addEventListener('change', (e) => {
+        if (DOM.groupNewSetName) {
+          DOM.groupNewSetName.style.display = e.target.value === '__new__' ? 'block' : 'none';
+        }
+      });
+    }
+
+    if (DOM.btnConfirmUploadSet) {
+      DOM.btnConfirmUploadSet.addEventListener('click', confirmUploadIntoSet);
+    }
+
+    if (DOM.btnCancelUploadSet) {
+      DOM.btnCancelUploadSet.addEventListener('click', () => {
+        if (DOM.uploadSetModalOverlay) DOM.uploadSetModalOverlay.style.display = 'none';
+        state.pendingUploadFiles = [];
+      });
+    }
+
+    if (DOM.btnCloseUploadSetModal) {
+      DOM.btnCloseUploadSetModal.addEventListener('click', () => {
+        if (DOM.uploadSetModalOverlay) DOM.uploadSetModalOverlay.style.display = 'none';
+        state.pendingUploadFiles = [];
+      });
+    }
+
+    if (DOM.btnCloseInspector) {
+      DOM.btnCloseInspector.addEventListener('click', () => {
+        if (DOM.setInspectorOverlay) DOM.setInspectorOverlay.style.display = 'none';
+        state.inspectedSetId = null;
+      });
+    }
+
+    if (DOM.btnUseInspectedSet) {
+      DOM.btnUseInspectedSet.addEventListener('click', () => {
+        if (state.inspectedSetId) {
+          activateSet(state.inspectedSetId);
+          if (DOM.setInspectorOverlay) DOM.setInspectorOverlay.style.display = 'none';
+          state.inspectedSetId = null;
+        }
+      });
+    }
+
     if (DOM.btnAddArt && DOM.customArtUrl) {
       DOM.btnAddArt.addEventListener('click', () => {
         const url = DOM.customArtUrl.value.trim();
@@ -1309,7 +1588,17 @@
           url: url,
           size: 0
         };
-        state.localArtworks.unshift(customItem);
+        let targetSet = state.artSets.find(s => s.id === state.activeSetId);
+        if (!targetSet || targetSet.isDefault) {
+          targetSet = state.artSets.find(s => s.id === 'set-local-uploads');
+          if (!targetSet) {
+            targetSet = { id: 'set-local-uploads', name: 'My Local Uploads', isDefault: false, images: [] };
+            state.artSets.push(targetSet);
+          }
+        }
+        targetSet.images.unshift(customItem);
+        saveArtSets();
+        renderArtSets();
         setActiveArtwork(customItem);
         DOM.customArtUrl.value = '';
       });
@@ -1318,14 +1607,10 @@
 
   // --- Artwork & Quote Rotation ---
   function cycleArtwork() {
-    if (state.cycleUserUploads && state.localArtworks.length > 0) {
-      state.currentArtIndex = (state.currentArtIndex + 1) % state.localArtworks.length;
-      setActiveArtwork(state.localArtworks[state.currentArtIndex]);
-    } else {
-      const pool = DEFAULT_ARTWORKS;
-      state.currentArtIndex = (state.currentArtIndex + 1) % pool.length;
-      setActiveArtwork(pool[state.currentArtIndex]);
-    }
+    const activeSet = state.artSets.find(s => s.id === state.activeSetId) || state.artSets[0];
+    const pool = (activeSet && activeSet.images && activeSet.images.length > 0) ? activeSet.images : DEFAULT_ARTWORKS;
+    state.currentArtIndex = (state.currentArtIndex + 1) % pool.length;
+    setActiveArtwork(pool[state.currentArtIndex]);
   }
 
   function cycleQuote() {
