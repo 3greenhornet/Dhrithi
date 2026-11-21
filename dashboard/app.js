@@ -284,7 +284,7 @@
       DOM.body.classList.remove('mode-picture');
       DOM.body.classList.add('mode-dashboard');
       DOM.appShell.style.display = 'flex';
-      DOM.modeBadgeText.textContent = 'Dashboard Shell';
+      if (DOM.modeBadgeText) DOM.modeBadgeText.textContent = 'Dashboard Shell';
       if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Still Mode';
       if (window.DhritiBubbles && typeof window.DhritiBubbles.clear === 'function') {
         window.DhritiBubbles.clear();
@@ -296,7 +296,7 @@
       DOM.body.classList.remove('mode-dashboard');
       DOM.body.classList.add('mode-picture');
       DOM.appShell.style.display = 'none';
-      DOM.modeBadgeText.textContent = 'Still Mode';
+      if (DOM.modeBadgeText) DOM.modeBadgeText.textContent = 'Still Mode';
       if (DOM.btnToggleText) DOM.btnToggleText.textContent = 'Enter Dashboard Shell';
       if (window.DhritiBubbles && typeof window.DhritiBubbles.updateLoopState === 'function') {
         window.DhritiBubbles.updateLoopState();

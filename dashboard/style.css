@@ -340,27 +340,60 @@ body.mode-dashboard .painting-canvas-underlay {
 .header-pomo-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 6px 14px;
   background: var(--capsule-bg);
   border: 1px solid var(--accent-primary);
   border-radius: 20px;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   box-shadow: 0 2px 10px var(--accent-glow);
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   user-select: none;
+  cursor: pointer;
 }
 
-.header-pomo-pill:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px var(--accent-glow);
+/* In Photo Mode (Still Mode): Centered, Translucent Quote-Like Glass Backdrop */
+body:not(.mode-dashboard) .header-pomo-pill,
+body.mode-picture .header-pomo-pill {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 101;
+  padding: 8px 18px;
+  background: rgba(10, 14, 26, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.40);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body:not(.mode-dashboard) .header-pomo-pill:hover,
+body.mode-picture .header-pomo-pill:hover {
+  background: rgba(10, 14, 26, 0.78);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+body.theme-light:not(.mode-dashboard) .header-pomo-pill,
+body.theme-light.mode-picture .header-pomo-pill {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.90);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+body.theme-light:not(.mode-dashboard) .header-pomo-pill:hover,
+body.theme-light.mode-picture .header-pomo-pill:hover {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 1);
 }
 
 .pomo-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--accent-primary);
+  background-color: var(--accent-emerald);
+  box-shadow: 0 0 8px var(--accent-emerald);
   transition: background-color 0.3s ease;
 }
 
@@ -374,40 +407,76 @@ body.mode-dashboard .painting-canvas-underlay {
   100% { transform: scale(0.9); opacity: 0.7; }
 }
 
+/* Hide word "FOCUS" / phase inside timer pill everywhere */
 .pomo-phase {
-  font-size: 10.5px;
-  font-weight: 700;
-  font-style: italic;
-  font-family: var(--font-serif);
-  letter-spacing: 0.8px;
-  color: var(--accent-primary);
-  text-transform: uppercase;
+  display: none !important;
 }
 
 .pomo-time {
-  font-size: 13.5px;
+  font-family: var(--font-display);
+  font-size: 16.5px;
   font-weight: 700;
-  color: var(--text-main);
-  letter-spacing: 0.5px;
-  min-width: 44px;
+  font-style: italic;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  min-width: 48px;
   text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+}
+
+body.theme-light .pomo-time {
+  color: #0f172a;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.85);
+}
+
+/* In Dashboard Mode: Restored in Right Header without Covering Content */
+body.mode-dashboard .header-pomo-pill {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  background: var(--capsule-bg);
+  border: 1px solid var(--accent-primary);
+  box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+body.mode-dashboard .header-pomo-pill:hover {
+  transform: translateY(-1px);
+}
+
+body.mode-dashboard .header-pomo-pill .pomo-time {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--text-main);
+  text-shadow: none;
 }
 
 .pomo-quick-btn {
   background: none;
   border: none;
-  color: var(--accent-primary);
+  color: #f1dfb8;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 4px;
+  padding: 3px 5px;
   border-radius: 4px;
-  transition: color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .pomo-quick-btn:hover {
-  color: var(--accent-secondary);
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+body.theme-light .pomo-quick-btn {
+  color: #1e293b;
+}
+
+body.theme-light .pomo-quick-btn:hover {
+  color: #0f172a;
 }
 
 .status-dot {
