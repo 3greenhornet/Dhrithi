@@ -14,6 +14,12 @@ APP_NAME = "dhriti"
 HOMEDIR_ENV = "DHRITI_HOME"
 BRIDGE_TOKEN_ENV = "DHRITI_BRIDGE_TOKEN"
 
+DEFAULT_HOME = Path(os.environ.get(HOMEDIR_ENV) or (Path.home() / f".{APP_NAME}"))
+DB_NAME = "dhriti.sqlite3"
+DB_VIDURA_NAME = "vidura.sqlite3"
+DB_PATH = DEFAULT_HOME / DB_NAME
+DB_VIDURA_PATH = DEFAULT_HOME / DB_VIDURA_NAME
+
 # Six founding principles (PDF section 2.3) — referenced by TRACEABILITY.md.
 PRINCIPLES = [
     "commitment_precedes_temptation",

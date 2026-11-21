@@ -225,6 +225,59 @@ class ViduraCorpus:
 
         return count
 
+    def ingest_youtube_playlist_json(self, json_data_or_path: Any, source: str = "youtube_watch_later") -> int:
+        """Ingest yt-dlp playlist JSON dump (Watch Later, Liked, or channel playlist)."""
+        data = None
+        if isinstance(json_data_or_path, (str, Path)) and Path(str(json_data_or_path)).exists():
+            with open(str(json_data_or_path), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        elif isinstance(json_data_or_path, str):
+            data = json.loads(json_data_or_path)
+        elif isinstance(json_data_or_path, dict):
+            data = json_data_or_path
+
+        if not data:
+            return 0
+
+        entries = data.get("entries", [])
+        if not entries and "title" in data and "id" in data:
+            entries = [data]
+
+        count = 0
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            v_id = entry.get("id")
+            title = entry.get("title") or "Untitled Video"
+            if not v_id or title == "[Private video]" or title == "[Deleted video]":
+                continue
+
+            url = entry.get("url") or f"https://www.youtube.com/watch?v={v_id}"
+            duration = int(entry.get("duration") or 0)
+            uploader = entry.get("uploader") or entry.get("channel") or ""
+            desc = entry.get("description") or ""
+
+            topics = []
+            if uploader:
+                topics.append(uploader)
+            tags = entry.get("tags") or []
+            if isinstance(tags, list):
+                topics.extend([t for t in tags[:3] if isinstance(t, str)])
+
+            self.add_item(
+                url=url,
+                title=title,
+                kind="video",
+                source=source,
+                description=desc[:500] if desc else "",
+                duration_s=duration,
+                external_id=v_id,
+                topic_labels=topics if topics else None
+            )
+            count += 1
+
+        return count
+
     def stats(self) -> Dict[str, Any]:
         with self._get_conn() as conn:
             total_items = conn.execute("SELECT count(*) FROM content_item").fetchone()[0]
