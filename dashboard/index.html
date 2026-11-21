@@ -1037,29 +1037,32 @@
           <div class="desk-card card-span-2">
             <div class="card-head">
               <span class="card-title">Underlay Dials & Transparency</span>
-              <span class="card-badge info">Live Canvas</span>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button type="button" class="btn-sec btn-sm" id="btn-reset-underlay-shell" title="Reset background wallpaper to 0px blur and 100% brightness">Reset to Defaults</button>
+                <span class="card-badge info">Live Canvas</span>
+              </div>
             </div>
             <div class="card-body">
               <div class="slider-control-group">
                 <div class="slider-header">
                   <span class="slider-title">Background Brightness</span>
-                  <span class="slider-value-pill" id="shell-val-brightness">88%</span>
+                  <span class="slider-value-pill" id="shell-val-brightness">100%</span>
                 </div>
-                <input type="range" class="styled-range-slider" id="shell-slider-brightness" min="40" max="120" value="88">
+                <input type="range" class="styled-range-slider" id="shell-slider-brightness" min="40" max="120" value="100">
               </div>
               <div class="slider-control-group" style="margin-top: 14px;">
                 <div class="slider-header">
                   <span class="slider-title">Background Blur Filter</span>
-                  <span class="slider-value-pill" id="shell-val-blur">5 px</span>
+                  <span class="slider-value-pill" id="shell-val-blur">0 px</span>
                 </div>
-                <input type="range" class="styled-range-slider" id="shell-slider-blur" min="0" max="25" value="5">
+                <input type="range" class="styled-range-slider" id="shell-slider-blur" min="0" max="25" value="0">
               </div>
               <div class="slider-control-group" style="margin-top: 14px;">
                 <div class="slider-header">
                   <span class="slider-title">Background Opacity</span>
-                  <span class="slider-value-pill" id="shell-val-opacity">88%</span>
+                  <span class="slider-value-pill" id="shell-val-opacity">100%</span>
                 </div>
-                <input type="range" class="styled-range-slider" id="shell-slider-opacity" min="20" max="100" value="88">
+                <input type="range" class="styled-range-slider" id="shell-slider-opacity" min="20" max="100" value="100">
               </div>
             </div>
           </div>
@@ -1202,23 +1205,26 @@
             <div class="slider-control-group" style="margin-top: 16px;">
               <div class="slider-header">
                 <span class="slider-title">Brightness</span>
-                <span class="slider-value-pill" id="val-bg-brightness">88%</span>
+                <span class="slider-value-pill" id="val-bg-brightness">100%</span>
               </div>
-              <input type="range" class="styled-range-slider" id="slider-bg-brightness" min="40" max="120" value="88">
+              <input type="range" class="styled-range-slider" id="slider-bg-brightness" min="40" max="120" value="100">
             </div>
             <div class="slider-control-group" style="margin-top: 12px;">
               <div class="slider-header">
                 <span class="slider-title">Blur</span>
-                <span class="slider-value-pill" id="val-bg-blur">5 px</span>
+                <span class="slider-value-pill" id="val-bg-blur">0 px</span>
               </div>
-              <input type="range" class="styled-range-slider" id="slider-bg-blur" min="0" max="25" value="5">
+              <input type="range" class="styled-range-slider" id="slider-bg-blur" min="0" max="25" value="0">
             </div>
             <div class="slider-control-group" style="margin-top: 12px;">
               <div class="slider-header">
                 <span class="slider-title">Opacity</span>
-                <span class="slider-value-pill" id="val-bg-opacity">88%</span>
+                <span class="slider-value-pill" id="val-bg-opacity">100%</span>
               </div>
-              <input type="range" class="styled-range-slider" id="slider-bg-opacity" min="20" max="100" value="88">
+              <input type="range" class="styled-range-slider" id="slider-bg-opacity" min="20" max="100" value="100">
+            </div>
+            <div style="margin-top: 18px; display: flex; justify-content: flex-end;">
+              <button type="button" class="btn-sec btn-sm" id="btn-reset-underlay-modal" title="Reset background wallpaper to 0px blur and 100% brightness">Reset to Defaults</button>
             </div>
           </div>
           <!-- Tab: Art & Local Image Studio -->

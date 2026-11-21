@@ -98,9 +98,9 @@
     currentView: 'desk',
     theme: 'dark', // 'dark' | 'light'
     underlay: {
-      brightness: 88,
-      blur: 5,
-      opacity: 88
+      brightness: parseInt(localStorage.getItem('dhriti_bg_brightness') || '100', 10),
+      blur: parseInt(localStorage.getItem('dhriti_bg_blur') || '0', 10),
+      opacity: parseInt(localStorage.getItem('dhriti_bg_opacity') || '100', 10)
     },
     currentArtIndex: 0,
     artworks: DEFAULT_ARTWORKS,
@@ -263,6 +263,16 @@
     DOM.shellValOpacity = document.getElementById('shell-val-opacity');
     DOM.shellThemeCardDark = document.getElementById('shell-theme-card-dark');
     DOM.shellThemeCardLight = document.getElementById('shell-theme-card-light');
+    DOM.modalSliderBrightness = document.getElementById('slider-bg-brightness');
+    DOM.modalSliderBlur = document.getElementById('slider-bg-blur');
+    DOM.modalSliderOpacity = document.getElementById('slider-bg-opacity');
+    DOM.modalValBrightness = document.getElementById('val-bg-brightness');
+    DOM.modalValBlur = document.getElementById('val-bg-blur');
+    DOM.modalValOpacity = document.getElementById('val-bg-opacity');
+    DOM.modalThemeCardDark = document.getElementById('theme-card-dark');
+    DOM.modalThemeCardLight = document.getElementById('theme-card-light');
+    DOM.btnResetUnderlayShell = document.getElementById('btn-reset-underlay-shell');
+    DOM.btnResetUnderlayModal = document.getElementById('btn-reset-underlay-modal');
     DOM.artPresetGrid = document.getElementById('art-preset-grid');
     DOM.quotesManagerList = document.getElementById('quotes-manager-list');
     DOM.streakRibbon = document.getElementById('stats-streak-ribbon');
@@ -425,6 +435,13 @@
     root.style.setProperty('--dash-bg-blur', `${state.underlay.blur}px`);
     root.style.setProperty('--dash-bg-opacity', state.underlay.opacity / 100);
 
+    // Persist to local storage
+    try {
+      localStorage.setItem('dhriti_bg_brightness', state.underlay.brightness);
+      localStorage.setItem('dhriti_bg_blur', state.underlay.blur);
+      localStorage.setItem('dhriti_bg_opacity', state.underlay.opacity);
+    } catch (e) {}
+
     // Sync input sliders and labels across Settings view and modal
     if (DOM.shellSliderBrightness) DOM.shellSliderBrightness.value = state.underlay.brightness;
     if (DOM.shellSliderBlur) DOM.shellSliderBlur.value = state.underlay.blur;
@@ -433,18 +450,23 @@
     if (DOM.shellValBlur) DOM.shellValBlur.textContent = `${state.underlay.blur} px`;
     if (DOM.shellValOpacity) DOM.shellValOpacity.textContent = `${state.underlay.opacity}%`;
 
-    const mBright = document.getElementById('slider-bg-brightness');
-    const mBlur = document.getElementById('slider-bg-blur');
-    const mOpac = document.getElementById('slider-bg-opacity');
-    if (mBright) mBright.value = state.underlay.brightness;
-    if (mBlur) mBlur.value = state.underlay.blur;
-    if (mOpac) mOpac.value = state.underlay.opacity;
-    const mValBright = document.getElementById('val-bg-brightness');
-    const mValBlur = document.getElementById('val-bg-blur');
-    const mValOpac = document.getElementById('val-bg-opacity');
-    if (mValBright) mValBright.textContent = `${state.underlay.brightness}%`;
-    if (mValBlur) mValBlur.textContent = `${state.underlay.blur} px`;
-    if (mValOpac) mValOpac.textContent = `${state.underlay.opacity}%`;
+    if (DOM.modalSliderBrightness) DOM.modalSliderBrightness.value = state.underlay.brightness;
+    if (DOM.modalSliderBlur) DOM.modalSliderBlur.value = state.underlay.blur;
+    if (DOM.modalSliderOpacity) DOM.modalSliderOpacity.value = state.underlay.opacity;
+    if (DOM.modalValBrightness) DOM.modalValBrightness.textContent = `${state.underlay.brightness}%`;
+    if (DOM.modalValBlur) DOM.modalValBlur.textContent = `${state.underlay.blur} px`;
+    if (DOM.modalValOpacity) DOM.modalValOpacity.textContent = `${state.underlay.opacity}%`;
+  }
+
+  function resetUnderlayDefaults() {
+    state.underlay = {
+      brightness: 100,
+      blur: 0,
+      opacity: 100
+    };
+    setTheme('dark');
+    updateUnderlayStyles();
+    if (window.DhritiAudio) window.DhritiAudio.playChime(5, 0.35);
   }
 
   // --- Donut Chart Renderer (Canvas-based for Desk & Mode 1 Tile 2) ---
@@ -1928,31 +1950,55 @@
     if (DOM.btnSettings) DOM.btnSettings.addEventListener('click', () => DOM.settingsOverlay.classList.add('active'));
     if (DOM.btnCloseSettings) DOM.btnCloseSettings.addEventListener('click', () => DOM.settingsOverlay.classList.remove('active'));
 
-    // Settings Dials (Shell View)
+    // Settings Dials (Shell View) - Real-time synchronization
     if (DOM.shellSliderBrightness) {
       DOM.shellSliderBrightness.addEventListener('input', e => {
         state.underlay.brightness = parseInt(e.target.value, 10);
-        DOM.shellValBrightness.textContent = `${state.underlay.brightness}%`;
         updateUnderlayStyles();
       });
     }
     if (DOM.shellSliderBlur) {
       DOM.shellSliderBlur.addEventListener('input', e => {
         state.underlay.blur = parseInt(e.target.value, 10);
-        DOM.shellValBlur.textContent = `${state.underlay.blur} px`;
         updateUnderlayStyles();
       });
     }
     if (DOM.shellSliderOpacity) {
       DOM.shellSliderOpacity.addEventListener('input', e => {
         state.underlay.opacity = parseInt(e.target.value, 10);
-        DOM.shellValOpacity.textContent = `${state.underlay.opacity}%`;
         updateUnderlayStyles();
       });
     }
 
+    // Settings Dials (Modal View) - Real-time synchronization
+    if (DOM.modalSliderBrightness) {
+      DOM.modalSliderBrightness.addEventListener('input', e => {
+        state.underlay.brightness = parseInt(e.target.value, 10);
+        updateUnderlayStyles();
+      });
+    }
+    if (DOM.modalSliderBlur) {
+      DOM.modalSliderBlur.addEventListener('input', e => {
+        state.underlay.blur = parseInt(e.target.value, 10);
+        updateUnderlayStyles();
+      });
+    }
+    if (DOM.modalSliderOpacity) {
+      DOM.modalSliderOpacity.addEventListener('input', e => {
+        state.underlay.opacity = parseInt(e.target.value, 10);
+        updateUnderlayStyles();
+      });
+    }
+
+    // Theme Choosers (Both Shell and Modal)
     if (DOM.shellThemeCardDark) DOM.shellThemeCardDark.addEventListener('click', () => setTheme('dark'));
     if (DOM.shellThemeCardLight) DOM.shellThemeCardLight.addEventListener('click', () => setTheme('light'));
+    if (DOM.modalThemeCardDark) DOM.modalThemeCardDark.addEventListener('click', () => setTheme('dark'));
+    if (DOM.modalThemeCardLight) DOM.modalThemeCardLight.addEventListener('click', () => setTheme('light'));
+
+    // Reset Wallpaper Underlay to Defaults
+    if (DOM.btnResetUnderlayShell) DOM.btnResetUnderlayShell.addEventListener('click', resetUnderlayDefaults);
+    if (DOM.btnResetUnderlayModal) DOM.btnResetUnderlayModal.addEventListener('click', resetUnderlayDefaults);
 
     // Triple-click gesture
     let clickCount = 0;

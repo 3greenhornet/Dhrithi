@@ -57,10 +57,10 @@
   --badge-color: #c4bbf0;
   --progress-fill: linear-gradient(90deg, #6c5ce7, #8b78f6);
 
-  /* Live Underlay Controls (Bright & Clear by default) */
-  --dash-bg-brightness: 0.88;
-  --dash-bg-blur: 5px;
-  --dash-bg-opacity: 0.88;
+  /* Live Underlay Controls (Bright & Crystal Clear by default: 0px blur) */
+  --dash-bg-brightness: 1;
+  --dash-bg-blur: 0px;
+  --dash-bg-opacity: 1;
 
   --glass-bg: rgba(20, 24, 42, 0.80);
   --glass-border: rgba(139, 120, 246, 0.25);
@@ -117,9 +117,9 @@ body.theme-light {
   --badge-color: #00b894;
   --progress-fill: linear-gradient(90deg, #00b894, #06b6d4);
 
-  --dash-bg-brightness: 0.95;
-  --dash-bg-blur: 6px;
-  --dash-bg-opacity: 0.92;
+  --dash-bg-brightness: 1;
+  --dash-bg-blur: 0px;
+  --dash-bg-opacity: 1;
 
   --glass-bg: rgba(255, 255, 255, 0.88);
   --glass-border: rgba(226, 232, 240, 0.9);
@@ -196,8 +196,8 @@ html, body {
 }
 
 body.mode-dashboard .painting-canvas-underlay {
-  opacity: var(--dash-bg-opacity, 0.88);
-  filter: blur(var(--dash-bg-blur, 5px)) brightness(var(--dash-bg-brightness, 0.88)) saturate(0.95);
+  opacity: var(--dash-bg-opacity, 1);
+  filter: blur(var(--dash-bg-blur, 0px)) brightness(var(--dash-bg-brightness, 1));
 }
 
 /* Floating Screensaver Thought Bubbles Layer (Life Mirror D-092) */
