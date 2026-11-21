@@ -36,11 +36,25 @@ def get_ytdlp_cmd(browser: str = "brave", playlist_url: str = "https://www.youtu
         print("[+] Running without cookies (public playlist mode)...")
         cookie_args = []
     else:
-        # Check for local Netscape cookies.txt file first (zero lock contention)
-        cookies_txt = Path("cookies.txt")
-        if cookies_txt.exists():
-            print(f"[+] Found local 'cookies.txt'. Using it directly (no browser lock issues)...")
-            cookie_args = ["--cookies", str(cookies_txt.resolve())]
+        # Check for local Netscape cookies file first (zero lock contention)
+        candidate_cookies = [
+            Path("www.youtube.com_cookies.txt"),
+            Path("cookies.txt"),
+            Path("youtube.com_cookies.txt")
+        ]
+        found_cookie_file = None
+        for cand in candidate_cookies:
+            if cand.exists():
+                found_cookie_file = cand
+                break
+        if not found_cookie_file:
+            for cand in Path(".").glob("*cookie*.txt"):
+                found_cookie_file = cand
+                break
+
+        if found_cookie_file:
+            print(f"[+] Found cookie file '{found_cookie_file.name}'. Using it directly (zero browser lock contention)...")
+            cookie_args = ["--cookies", str(found_cookie_file.resolve())]
         else:
             print(f"[+] Attempting to extract session cookies from {browser.capitalize()} browser...")
             cookie_args = ["--cookies-from-browser", browser]

@@ -9,6 +9,9 @@
 guard_content.sqlite3*
 bridge_token*
 *.token
+*cookie*.txt
+watch_later.json
+brave_cookies_temp*
 daemon.lock
 hosts/
 extension_last_seen
