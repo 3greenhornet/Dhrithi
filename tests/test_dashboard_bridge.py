@@ -50,6 +50,18 @@ def test_dashboard_static_routes():
             js = resp.read().decode("utf-8")
             assert "DhritiAudio" in js
 
+        # 6. Test /thought_bubbles.js
+        with urllib.request.urlopen(f"{base_url}/thought_bubbles.js") as resp:
+            assert resp.status == 200
+            assert "javascript" in resp.headers.get("Content-Type")
+
+        # 7. Test POST /api/vidura/sync
+        req = urllib.request.Request(f"{base_url}/api/vidura/sync", data=b"{}", headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = resp.read().decode("utf-8")
+            assert "started" in data
+
     finally:
         server.stop()
 

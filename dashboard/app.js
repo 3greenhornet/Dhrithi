@@ -2151,17 +2151,218 @@
     }
   }
 
+  // --- Vidura Surfacing & Recall-Before-Reveal Protocol ---
+  let currentRecallItem = null;
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  async function loadDailySurfacingCard() {
+    try {
+      const resp = await fetch('/api/vidura/surface');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data.ok || !data.card) {
+        const promptEl = document.getElementById('vidura-prompt-text');
+        if (promptEl) promptEl.textContent = 'All saved items reviewed! No pending decay items for today.';
+        return;
+      }
+      currentRecallItem = data.card;
+      const domainEl = document.getElementById('vidura-domain-pill');
+      if (domainEl) domainEl.textContent = `Domain: ${data.card.domain || 'general'}`;
+      const effortEl = document.getElementById('vidura-effort-pill');
+      if (effortEl) effortEl.textContent = `Effort: ${data.card.effort || '30min'}`;
+      const promptEl = document.getElementById('vidura-prompt-text');
+      if (promptEl) {
+        promptEl.textContent = `"${data.card.title}" — ${data.card.prompt}`;
+      }
+      const maskedView = document.getElementById('vidura-recall-masked-view');
+      const revealedView = document.getElementById('vidura-recall-revealed-view');
+      if (maskedView) maskedView.style.display = 'block';
+      if (revealedView) revealedView.style.display = 'none';
+    } catch (e) {
+      console.warn('Vidura surfacing load notice:', e);
+    }
+  }
+
+  async function submitViduraRecall(answer) {
+    if (!currentRecallItem) return;
+    try {
+      const resp = await fetch('/api/vidura/recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: currentRecallItem.item_id, answer: answer || '' })
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.ok && data.result) {
+        const maskedView = document.getElementById('vidura-recall-masked-view');
+        const revealedView = document.getElementById('vidura-recall-revealed-view');
+        if (maskedView) maskedView.style.display = 'none';
+        if (revealedView) revealedView.style.display = 'block';
+
+        const statusEl = document.getElementById('vidura-revealed-status');
+        if (statusEl) {
+          if (data.result.recalled) {
+            statusEl.textContent = 'Recall Successful — Item Unlocked';
+            statusEl.style.color = '#00b894';
+          } else {
+            statusEl.textContent = 'Recall Acknowledged (Decay Recorded) — Item Unlocked';
+            statusEl.style.color = '#fdcb6e';
+          }
+        }
+        const titleEl = document.getElementById('vidura-revealed-title');
+        if (titleEl) titleEl.textContent = data.result.title;
+        const descEl = document.getElementById('vidura-revealed-desc');
+        if (descEl) descEl.textContent = data.result.description || 'Saved resource unlocked from Vidura archive.';
+        const linkEl = document.getElementById('vidura-revealed-link');
+        if (linkEl) linkEl.href = data.result.url;
+        const metaEl = document.getElementById('vidura-revealed-meta');
+        if (metaEl) {
+          metaEl.textContent = `Source: ${data.result.source || 'vidura'} | Domain: ${data.result.facet_domain}`;
+        }
+      }
+    } catch (e) {
+      console.warn('Vidura recall error:', e);
+    }
+  }
+
+  async function loadLifeInstruments() {
+    try {
+      const resp = await fetch('/api/vidura/instruments');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data.ok || !data.instruments) return;
+
+      const container = document.getElementById('vidura-instruments-list');
+      const badge = document.getElementById('badge-instrument-count');
+      if (badge) badge.textContent = `${data.count} Interactive Tools`;
+      if (!container) return;
+
+      container.innerHTML = '';
+      data.instruments.forEach(inst => {
+        const card = document.createElement('div');
+        card.className = 'alt-bubble-chip';
+        card.style.flexDirection = 'column';
+        card.style.alignItems = 'flex-start';
+        card.style.gap = '6px';
+        card.style.padding = '10px 14px';
+        card.style.borderRadius = '10px';
+
+        card.innerHTML = `
+          <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); line-height: 1.3;">
+            ${escapeHtml(inst.title)}
+          </div>
+          <div style="font-size: 11px; opacity: 0.7; color: var(--text-secondary);">
+            Domain: ${escapeHtml(inst.facet_domain || 'craft')} | Effort: ${escapeHtml(inst.facet_effort || 'tool')}
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 4px; width: 100%;">
+            <a href="${escapeHtml(inst.url)}" target="_blank" class="btn-primary btn-sm" style="text-decoration: none; padding: 3px 8px; font-size: 11px;">
+              Launch Tool
+            </a>
+            <button type="button" class="btn-sec btn-sm btn-log-inst" style="padding: 3px 8px; font-size: 11px;">
+              Log Practice
+            </button>
+          </div>
+        `;
+
+        const logBtn = card.querySelector('.btn-log-inst');
+        if (logBtn) {
+          logBtn.addEventListener('click', () => {
+            logBtn.textContent = 'Logged!';
+            logBtn.disabled = true;
+            logBtn.style.opacity = '0.6';
+          });
+        }
+        container.appendChild(card);
+      });
+    } catch (e) {
+      console.warn('Instruments load notice:', e);
+    }
+  }
+
+  function wireViduraControls() {
+    const btnUnlock = document.getElementById('btn-vidura-unlock');
+    const input = document.getElementById('vidura-recall-input');
+    if (btnUnlock && input) {
+      btnUnlock.addEventListener('click', () => {
+        submitViduraRecall(input.value);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitViduraRecall(input.value);
+      });
+    }
+
+    const btnForgot = document.getElementById('btn-vidura-forgot');
+    if (btnForgot) {
+      btnForgot.addEventListener('click', () => {
+        submitViduraRecall('forgot');
+      });
+    }
+
+    const btnSkip = document.getElementById('btn-vidura-skip');
+    if (btnSkip) {
+      btnSkip.addEventListener('click', () => {
+        const card = document.getElementById('card-vidura-recall');
+        if (card) card.style.opacity = '0.4';
+      });
+    }
+
+    // YouTube Sync buttons
+    const syncButtons = [
+      document.getElementById('btn-sync-youtube'),
+      document.getElementById('btn-sync-youtube-top')
+    ];
+    const syncStatus = document.getElementById('sync-youtube-status');
+
+    syncButtons.forEach(btn => {
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = 'Syncing Queue...';
+        if (syncStatus) syncStatus.textContent = 'Executing Vidura YouTube sync in background...';
+
+        try {
+          const resp = await fetch('/api/vidura/sync', { method: 'POST' });
+          const res = await resp.json();
+          if (syncStatus) syncStatus.textContent = res.message || 'Sync started in background.';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = originalText;
+            loadDailySurfacingCard();
+            loadLifeInstruments();
+          }, 3500);
+        } catch (err) {
+          if (syncStatus) syncStatus.textContent = 'Failed to trigger sync: ' + err;
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      });
+    });
+  }
+
   // --- Initialization ---
   function init() {
     window.DhritiState = state;
     initDOM();
     wireEvents();
+    wireViduraControls();
     updateTimerDisplay();
     updateUnderlayStyles();
     loadGallery();
     drawDonutChart();
     renderParkingTimeline();
     renderLifeAlts();
+    loadDailySurfacingCard();
+    loadLifeInstruments();
   }
 
   if (document.readyState === 'loading') {

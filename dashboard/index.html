@@ -513,6 +513,7 @@
             <p class="view-subtitle">Executive overview: contract state, topic distribution, return anchor, and stage ratio.</p>
           </div>
           <div class="view-actions">
+            <button type="button" class="btn-sec btn-sm" id="btn-sync-youtube-top" title="Sync YouTube Watch Later & Liked Videos into Vidura">Sync YouTube Queue</button>
             <span class="session-pill active">Session Active: 42m</span>
           </div>
         </div>
@@ -634,6 +635,49 @@
                 <button class="btn-primary" id="btn-quick-park">Park Thought</button>
               </div>
               <div class="park-feedback" id="quick-park-feedback"></div>
+            </div>
+          </div>
+
+          <!-- Daily Vidura Surfacing Card: Recall-Before-Reveal (D-098) -->
+          <div class="desk-card card-span-3" id="card-vidura-recall">
+            <div class="card-head">
+              <span class="card-title">Vidura Memory: Recall-Before-Reveal (Evening Surfacing)</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-badge info" id="vidura-domain-pill">Domain: General</span>
+                <span class="card-badge warning" id="vidura-effort-pill">Effort: 30min</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="vidura-recall-masked-view">
+                <div class="capsule-box" style="margin-bottom: 12px;">
+                  <div class="capsule-key">Anti-Recency Prompt</div>
+                  <div class="capsule-value" id="vidura-prompt-text" style="font-size: 13.5px; font-weight: 500; line-height: 1.5;">
+                    Loading today's uninspected archive item...
+                  </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                  <input type="text" class="form-input" id="vidura-recall-input" placeholder="Recall: Why did you save this or what context does it belong to?" style="flex: 1; min-width: 280px;">
+                  <button type="button" class="btn-primary" id="btn-vidura-unlock">I Remember (Unlock)</button>
+                  <button type="button" class="btn-sec" id="btn-vidura-forgot">Forgot</button>
+                  <button type="button" class="btn-sec" id="btn-vidura-skip">Skip</button>
+                </div>
+                <div style="font-size: 11.5px; opacity: 0.65; margin-top: 4px;">
+                  Honest retrieval practice: answering reinforces memory consolidation before exposing the link.
+                </div>
+              </div>
+              <div id="vidura-recall-revealed-view" style="display: none; margin-top: 8px;">
+                <div class="capsule-box" style="margin-bottom: 12px; border-left: 3px solid #00b894;">
+                  <div class="capsule-key" id="vidura-revealed-status" style="color: #00b894; font-weight: 600;">Item Unlocked</div>
+                  <div class="capsule-value" id="vidura-revealed-title" style="font-size: 14.5px; font-weight: 600; margin-bottom: 4px;"></div>
+                  <div id="vidura-revealed-desc" style="font-size: 12px; opacity: 0.8; margin-bottom: 8px;"></div>
+                  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <a href="#" target="_blank" class="btn-primary btn-sm" id="vidura-revealed-link" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                      Open Original Resource
+                    </a>
+                    <span id="vidura-revealed-meta" style="font-size: 11px; opacity: 0.6;"></span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -898,6 +942,22 @@
               </div>
             </div>
           </div>
+
+          <!-- Practice Instruments Routed from Vidura (D-098) -->
+          <div class="desk-card card-span-3" id="card-life-instruments">
+            <div class="card-head">
+              <span class="card-title">Cadence Practice Instruments (Vidura Routing)</span>
+              <span class="card-badge success" id="badge-instrument-count">10 Interactive Tools</span>
+            </div>
+            <div class="card-body">
+              <p class="chart-desc" style="margin-bottom: 12px;">
+                Interactive tools identified from your personal library, routed into Life Mirror for regular cadence practice exempt from memory decay.
+              </p>
+              <div class="bubbles-pool-grid" id="vidura-instruments-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1086,6 +1146,23 @@
                     <div class="theme-desc">Pure White (#ffffff) with Cyan accents (#00b894).</div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vidura Corpus & YouTube Sync Card -->
+          <div class="desk-card card-span-3">
+            <div class="card-head">
+              <span class="card-title">Vidura Corpus & YouTube Synchronization</span>
+              <span class="card-badge info">Personal Archive</span>
+            </div>
+            <div class="card-body">
+              <p class="chart-desc">
+                Syncs Watch Later and Liked Videos using session cookies, categorizing items with 4-facet classification (Domain, Intent, Form, Effort).
+              </p>
+              <div style="display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn-primary" id="btn-sync-youtube">Sync YouTube Queue Now</button>
+                <span id="sync-youtube-status" style="font-size: 12.5px; opacity: 0.85;"></span>
               </div>
             </div>
           </div>

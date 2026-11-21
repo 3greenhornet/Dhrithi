@@ -22,6 +22,8 @@ import base64
 import json
 import re
 import secrets
+import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -114,7 +116,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/gallery/images", "/api/gallery/upload", "/api/gallery/delete"
         )
         if (ok or self.path.startswith("/healthz") or path in dashboard_paths
-                or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")):
+                or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")
+                or path.startswith("/api/vidura/")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -172,6 +175,24 @@ class BridgeHandler(BaseHTTPRequestHandler):
             js_file = dashboard_dir / "audio_synth.js"
             if js_file.exists():
                 self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
+                return
+        elif path in ("/thought_bubbles.js", "/dashboard/thought_bubbles.js"):
+            js_file = dashboard_dir / "thought_bubbles.js"
+            if js_file.exists():
+                self._send_bytes(200, js_file.read_bytes(), "application/javascript; charset=utf-8")
+                return
+        elif path.endswith((".ttf", ".woff2", ".woff", ".otf")):
+            clean_font = Path(path).name
+            font_file = dashboard_dir / clean_font
+            if font_file.exists() and font_file.is_file():
+                ext = font_file.suffix.lower()
+                mimes = {
+                    ".ttf": "font/ttf",
+                    ".woff2": "font/woff2",
+                    ".woff": "font/woff",
+                    ".otf": "font/otf"
+                }
+                self._send_bytes(200, font_file.read_bytes(), mimes.get(ext, "font/ttf"))
                 return
         elif path in ("/popup.html", "/extension"):
             popup_file = extension_dir / "popup.html"
@@ -298,16 +319,31 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length") or 0)
         max_bytes = 50_000_000 if path == "/api/gallery/upload" else 1_000_000
-        if length <= 0 or length > max_bytes:
+        if length < 0 or length > max_bytes:
             self._send(400, {"error": "invalid body size"})
             return
-        try:
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
-        except Exception:
-            self._send(400, {"error": "invalid JSON"})
+        payload = {}
+        if length > 0:
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            except Exception:
+                self._send(400, {"error": "invalid JSON"})
+                return
+
+        if path == "/api/vidura/sync":
+            repo_dir = Path(__file__).parent.parent
+            sync_script = repo_dir / "sync_playlist.py"
+            def run_sync():
+                try:
+                    subprocess.run([sys.executable, str(sync_script)], cwd=str(repo_dir), check=False)
+                except Exception as e:
+                    print(f"Vidura sync error: {e}")
+            t = threading.Thread(target=run_sync, daemon=True, name="vidura-sync-worker")
+            t.start()
+            self._send(200, {"ok": True, "message": "Vidura playlist synchronization started in background."})
             return
 
-        if path == "/api/gallery/upload":
+        elif path == "/api/gallery/upload":
             dashboard_dir = Path(__file__).parent.parent / "dashboard"
             gallery_dir = dashboard_dir / "gallery"
             gallery_dir.mkdir(parents=True, exist_ok=True)
