@@ -67,26 +67,19 @@ def get_ytdlp_cmd(browser: str = "brave", playlist_url: str = "https://www.youtu
     ]
 
 
-def sync_playlist():
-    parser = argparse.ArgumentParser(description="Dhriti Vidura YouTube Sync Engine")
-    parser.add_argument("--browser", default="brave", choices=["brave", "chrome", "edge", "firefox"], help="Browser to extract cookies from (default: brave)")
-    parser.add_argument("--url", default="https://www.youtube.com/playlist?list=WL", help="YouTube playlist URL (default: Watch Later)")
-    parser.add_argument("--output", default="watch_later.json", help="Output JSON path (default: watch_later.json)")
-    parser.add_argument("--no-cookies", action="store_true", help="Fetch without cookies (for public playlists)")
-    args = parser.parse_args()
-
-    output_path = Path(args.output)
+def sync_single_playlist(url: str, output_path: Path, source_name: str, browser: str, no_cookies: bool) -> bool:
+    """Fetch one playlist and ingest into Vidura."""
     print("=" * 60)
-    print("  DHRITI VIDURA - YOUTUBE PLAYLIST SYNC")
-    print(f"  Target:     {args.url}")
-    print(f"  Browser:    {args.browser if not args.no_cookies else 'none (public)'}")
+    print(f"  DHRITI VIDURA - SYNCING: {source_name.upper()}")
+    print(f"  Target:     {url}")
+    print(f"  Browser:    {browser if not no_cookies else 'none (public)'}")
     print(f"  Output:     {output_path.resolve()}")
     print("=" * 60)
 
-    cmd = get_ytdlp_cmd(browser=args.browser, playlist_url=args.url, no_cookies=args.no_cookies)
+    cmd = get_ytdlp_cmd(browser=browser, playlist_url=url, no_cookies=no_cookies)
 
     try:
-        print("\n[*] Fetching playlist metadata via yt-dlp...")
+        print(f"\n[*] Fetching metadata via yt-dlp (this may take a moment for large playlists)...")
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
         if result.returncode != 0:
@@ -96,17 +89,17 @@ def sync_playlist():
 
             if "Could not copy Chrome cookie database" in err or "used by another process" in err or "WinError 32" in err:
                 print("\n" + "!" * 60)
-                print(f"[!] BROWSER COOKIE DATABASE IS LOCKED BY {args.browser.upper()}!")
+                print(f"[!] BROWSER COOKIE DATABASE IS LOCKED BY {browser.upper()}!")
                 print("!" * 60)
-                print(f"Why this happens: When {args.browser.capitalize()} is open, Windows enforces an exclusive")
+                print(f"Why this happens: When {browser.capitalize()} is open, Windows enforces an exclusive")
                 print("kernel file-lock on its cookie database for security.\n")
                 print("YOU HAVE TWO SIMPLE WAYS TO SOLVE THIS:")
                 print(f"  Method 1 (Easiest - 10 Seconds):")
-                print(f"    1. Completely close all {args.browser.capitalize()} windows.")
+                print(f"    1. Completely close all {browser.capitalize()} windows.")
                 print(f"    2. Run 'python sync_playlist.py' again in this terminal.")
-                print(f"    3. Reopen {args.browser.capitalize()}.\n")
+                print(f"    3. Reopen {browser.capitalize()}.\n")
                 print(f"  Method 2 (No browser restart needed):")
-                print(f"    1. Install the extension 'Get cookies.txt LOCALLY' in {args.browser.capitalize()}.")
+                print(f"    1. Install the extension 'Get cookies.txt LOCALLY' in {browser.capitalize()}.")
                 print(f"    2. On youtube.com, click export and save 'cookies.txt' into this repo folder.")
                 print(f"    3. Run 'python sync_playlist.py'. It will use 'cookies.txt' instantly.\n")
             elif "Private video" in err or "Sign in" in err:
@@ -114,13 +107,12 @@ def sync_playlist():
                 print("Make sure you are logged into YouTube in your chosen browser.")
             return False
 
-        # Parse json to verify it's valid
         playlist_data = json.loads(result.stdout)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(playlist_data, f, indent=2, ensure_ascii=False)
 
         entries = playlist_data.get("entries", [])
-        print(f"\n[+] Successfully saved {len(entries)} videos to {output_path.name}!")
+        print(f"[+] Successfully saved {len(entries)} videos to {output_path.name}!")
 
         # Automatic ingestion into Vidura SQLite database
         try:
@@ -128,17 +120,50 @@ def sync_playlist():
             from dhriti.vidura_corpus import ViduraCorpus
 
             corpus = ViduraCorpus(DB_VIDURA_PATH)
-            ingested_count = corpus.ingest_youtube_playlist_json(playlist_data, source="youtube_watch_later")
-            print(f"[+] Automatically ingested {ingested_count} videos into Vidura Corpus ({DB_VIDURA_PATH.name})")
-            print(f"[+] Total Vidura Corpus items now: {corpus.stats()['total_items']}")
+            ingested_count = corpus.ingest_youtube_playlist_json(playlist_data, source=source_name)
+            print(f"[+] Ingested {ingested_count} videos into Vidura Corpus ({DB_VIDURA_PATH.name})")
+            stats = corpus.stats()
+            print(f"[+] Total Vidura Corpus items now: {stats['total_items']} ({stats['total_topics']} topic nodes)\n")
         except Exception as ingest_err:
-            print(f"[!] Note: JSON saved, but Vidura corpus auto-ingest had a notice: {ingest_err}")
+            print(f"[!] Note: JSON saved, but Vidura corpus auto-ingest had a notice: {ingest_err}\n")
 
         return True
 
     except Exception as e:
         print(f"\n[-] Unexpected error during sync: {e}")
         return False
+
+
+def sync_playlist():
+    parser = argparse.ArgumentParser(description="Dhriti Vidura YouTube Sync Engine")
+    parser.add_argument("--browser", default="brave", choices=["brave", "chrome", "edge", "firefox"], help="Browser to extract cookies from (default: brave)")
+    parser.add_argument("--url", default=None, help="YouTube playlist URL (if omitted, syncs both Watch Later and Liked Videos)")
+    parser.add_argument("--output", default=None, help="Output JSON path (optional)")
+    parser.add_argument("--liked-only", action="store_true", help="Sync only Liked Videos")
+    parser.add_argument("--watch-later-only", action="store_true", help="Sync only Watch Later")
+    parser.add_argument("--no-cookies", action="store_true", help="Fetch without cookies (for public playlists)")
+    args = parser.parse_args()
+
+    targets = []
+    if args.url:
+        out = Path(args.output or "custom_playlist.json")
+        targets.append((args.url, out, "youtube_custom"))
+    elif args.liked_only:
+        targets.append(("https://www.youtube.com/playlist?list=LL", Path(args.output or "liked_videos.json"), "youtube_liked"))
+    elif args.watch_later_only:
+        targets.append(("https://www.youtube.com/playlist?list=WL", Path(args.output or "watch_later.json"), "youtube_watch_later"))
+    else:
+        # Default: sync BOTH Watch Later and Liked Videos
+        targets.append(("https://www.youtube.com/playlist?list=WL", Path("watch_later.json"), "youtube_watch_later"))
+        targets.append(("https://www.youtube.com/playlist?list=LL", Path("liked_videos.json"), "youtube_liked"))
+
+    overall_success = True
+    for url, out_path, source in targets:
+        ok = sync_single_playlist(url=url, output_path=out_path, source_name=source, browser=args.browser, no_cookies=args.no_cookies)
+        if not ok:
+            overall_success = False
+
+    return overall_success
 
 
 if __name__ == "__main__":

@@ -11,6 +11,8 @@ bridge_token*
 *.token
 *cookie*.txt
 watch_later.json
+liked_videos.json
+*playlist*.json
 brave_cookies_temp*
 daemon.lock
 hosts/
