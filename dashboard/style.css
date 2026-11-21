@@ -880,41 +880,24 @@ body.theme-light ::placeholder {
   color: #ffffff;
   border-color: var(--accent-rose);
 }
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(14px);
-  padding: 8px 22px;
-  border-radius: 30px;
-  font-size: 13px;
-  letter-spacing: 1.5px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 50;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-  pointer-events: auto;
-  cursor: pointer;
-}
 
 /* Suspended Poem Section */
 .poem-section {
   position: relative;
-  width: 100vw;
-  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
   z-index: 10;
-  padding: 80px 20px 140px 20px;
+  padding: 60px 20px 40px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-sizing: border-box;
 }
 
 .poem-section-header {
   text-align: center;
-  max-width: 840px;
-  margin-bottom: 24px;
+  width: min(860px, 94vw);
+  margin: 0 auto 24px auto;
   z-index: 20;
   background: rgba(14, 18, 30, 0.76);
   backdrop-filter: blur(12px);
@@ -923,6 +906,7 @@ body.theme-light ::placeholder {
   border-radius: 18px;
   padding: 22px 34px;
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
 }
 
 .poem-section-title {
@@ -936,21 +920,6 @@ body.theme-light ::placeholder {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85), 0 0 20px rgba(139, 120, 246, 0.5);
 }
 
-.poem-section-subtitle {
-  font-family: var(--font-serif);
-  font-size: 14.5px;
-  color: #e2e8f0;
-  line-height: 1.6;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-}
-
-.poem-section-subtitle strong {
-  font-family: var(--font-serif);
-  font-weight: 700;
-  font-style: italic;
-  color: #b4a8fb;
-}
-
 body.theme-light .poem-section-header {
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(226, 232, 240, 0.95);
@@ -962,25 +931,17 @@ body.theme-light .poem-section-title {
   text-shadow: none;
 }
 
-body.theme-light .poem-section-subtitle {
-  color: #475569;
-  text-shadow: none;
-}
-
-body.theme-light .poem-section-subtitle strong {
-  color: #00b894;
-}
-
 .poem-canvas-container {
-  width: 100vw;
+  width: 100%;
   max-width: 100%;
-  height: 130vh;
-  min-height: 1350px;
+  height: 770px;
   position: relative;
   overflow: visible;
   display: flex;
   justify-content: center;
-  padding-bottom: 120px;
+  margin: 0 auto;
+  padding-bottom: 0;
+  box-sizing: border-box;
 }
 
 #chimes-canvas {

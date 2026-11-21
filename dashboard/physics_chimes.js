@@ -768,8 +768,9 @@
     const container = canvas.parentElement;
     if (!container) return;
 
-    canvasW = container.clientWidth || window.innerWidth || 1400;
-    canvasH = Math.max(container.clientHeight || 0, Math.ceil(window.innerHeight * 1.30), 1350);
+    canvasW = container.clientWidth || window.innerWidth || 1200;
+    // Exactly sized to the chains length (CONFIG.height = 680) plus ~80px breathing room below
+    canvasH = Math.ceil(CONFIG.height + 80);
     dpr = window.devicePixelRatio || 1;
 
     canvas.width = Math.ceil(canvasW * dpr);
@@ -777,7 +778,7 @@
     canvas.style.width = `${canvasW}px`;
     canvas.style.height = `${canvasH}px`;
 
-    originX = Math.max(20, (canvasW - CONFIG.width) / 2);
+    originX = Math.max(10, (canvasW - CONFIG.width) / 2);
     originY = 25;
 
     preRenderAssets();
