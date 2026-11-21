@@ -155,13 +155,27 @@
 
     const bubble = document.createElement("div");
     bubble.className = `thought-bubble ${shape} ${size}`;
-    bubble.textContent = text;
 
-    // Random placement across viewport
-    const leftVw = 10 + Math.random() * 66;
+    const textSpan = document.createElement("span");
+    textSpan.className = "bubble-text";
+    textSpan.textContent = text;
+    bubble.appendChild(textSpan);
+
+    // Append authentic comic trailing dots for cloud shape (Image 1 reference)
+    if (shape === "shape-cloud") {
+      const tail = document.createElement("span");
+      tail.className = "cloud-tail";
+      tail.innerHTML = `<span class="cloud-dot-1"></span><span class="cloud-dot-2"></span>`;
+      bubble.appendChild(tail);
+    }
+
+    // Corridor Placement: Spawn strictly in side corridors (6vw-24vw or 74vw-92vw)
+    // to preserve unobstructed visibility of the central quote and painting!
+    const isLeft = Math.random() < 0.5;
+    const leftVw = isLeft ? (6 + Math.random() * 18) : (74 + Math.random() * 18);
     const topVh = 74 + Math.random() * 16;
     const durSec = CFG.riseSeconds[0] + Math.random() * (CFG.riseSeconds[1] - CFG.riseSeconds[0]);
-    const driftVw = (Math.random() * 8 - 4).toFixed(1);
+    const driftVw = (Math.random() * 6 - 3).toFixed(1);
 
     bubble.style.left = `${leftVw}vw`;
     bubble.style.top = `${topVh}vh`;

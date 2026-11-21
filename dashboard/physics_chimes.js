@@ -73,9 +73,9 @@
   // --- Ideal Standard Configuration (Spacious, Roomy Draped Installation) ---
   const CONFIG = {
     width: 1080,
-    height: 700,
+    height: 680,
     gridW: 32,
-    gridH: 34,
+    gridH: 32,
     gravity: 0.20,
     damping: 0.990,
     iterationsPerFrame: 5,
@@ -377,10 +377,10 @@
       charCanvases[ch] = off;
     });
 
-    // 2. Pre-render poem stanza cards once with Arvo bold-italic and Poiret One fonts
+    // 2. Pre-render poem stanza cards once with Arvo bold-italic and bottom-right corner numeral
     stanzaCanvases = currentPoem.stanzas.map((lines, sIdx) => {
       const cardW = 310;
-      const cardH = 82 + lines.length * 26;
+      const cardH = 46 + lines.length * 26;
       const off = document.createElement("canvas");
       off.width = Math.ceil(cardW * dpr);
       off.height = Math.ceil(cardH * dpr);
@@ -410,18 +410,19 @@
       octx.strokeStyle = "rgba(216, 180, 106, 0.50)";
       octx.stroke();
 
-      // Top Header Line in Poiret One bold-italic
-      octx.font = '700 italic 13px "Poiret One", sans-serif';
-      octx.fillStyle = '#e0d3b8';
-      octx.textAlign = 'left';
-      octx.fillText(`STANZA ${sIdx + 1} • ${currentPoem.author.toUpperCase()}`, 18, 28);
-
       // Stanza Lines in Arvo bold-italic (User's preferred combination!)
       octx.font = '700 italic 14px "Arvo", Georgia, serif';
       octx.fillStyle = '#fdfcf8';
+      octx.textAlign = 'left';
       lines.forEach((line, lIdx) => {
-        octx.fillText(line, 18, 56 + lIdx * 26);
+        octx.fillText(line, 18, 28 + lIdx * 26);
       });
+
+      // Single number at bottom-right end corner (1, 2, 3...)
+      octx.font = '700 13px "Poiret One", sans-serif';
+      octx.fillStyle = 'rgba(216, 180, 106, 0.75)';
+      octx.textAlign = 'right';
+      octx.fillText(`${sIdx + 1}`, cardW - 16, cardH - 12);
 
       return off;
     });
@@ -448,11 +449,11 @@
     // Stanzas are distributed across 3 distinct columns with ample spacing
     const stanzaConfigs = [
       { col: 4,  startRow: 3,  stanzaIdx: 0 },
-      { col: 4,  startRow: 16, stanzaIdx: 1 },
+      { col: 4,  startRow: 15, stanzaIdx: 1 },
       { col: 15, startRow: 5,  stanzaIdx: 2 },
-      { col: 15, startRow: 18, stanzaIdx: 3 },
+      { col: 15, startRow: 17, stanzaIdx: 3 },
       { col: 26, startRow: 4,  stanzaIdx: 4 },
-      { col: 26, startRow: 17, stanzaIdx: 5 }
+      { col: 26, startRow: 16, stanzaIdx: 5 }
     ];
 
     // 1. Create Particles
@@ -757,7 +758,7 @@
     if (!container) return;
 
     canvasW = container.clientWidth || window.innerWidth || 1400;
-    canvasH = Math.max(container.clientHeight || 0, Math.ceil(window.innerHeight * 1.05), 1000);
+    canvasH = Math.max(container.clientHeight || 0, Math.ceil(window.innerHeight * 1.30), 1350);
     dpr = window.devicePixelRatio || 1;
 
     canvas.width = Math.ceil(canvasW * dpr);

@@ -655,29 +655,29 @@ body.theme-light .tactile-tile:hover .tile-face-front {
 .floating-quote-card {
   width: 100%;
   pointer-events: auto;
-  background: rgba(18, 22, 38, 0.32);
+  background: rgba(12, 16, 28, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   border-radius: 24px;
   padding: 18px 24px;
   text-align: center;
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.25);
   transition: all 0.35s ease;
 }
 
 body.theme-light .floating-quote-card {
-  background: rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-color: rgba(255, 255, 255, 0.45);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: rgba(255, 255, 255, 0.40);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
 }
 
 .floating-quote-card:hover {
   transform: translateY(-2px);
-  background: rgba(18, 22, 38, 0.36);
-  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(12, 16, 28, 0.26);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 .quote-mark {
@@ -807,12 +807,13 @@ body.theme-light .poem-section-subtitle strong {
 .poem-canvas-container {
   width: 100vw;
   max-width: 100%;
-  height: 105vh;
-  min-height: 1000px;
+  height: 130vh;
+  min-height: 1350px;
   position: relative;
   overflow: visible;
   display: flex;
   justify-content: center;
+  padding-bottom: 120px;
 }
 
 #chimes-canvas {
@@ -1525,10 +1526,12 @@ body.theme-light .tp-num-input {
 }
 
 .chart-desc {
-  font-size: 12.5px;
+  font-family: var(--font-aqua), -apple-system, sans-serif;
+  font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 16px;
   line-height: 1.5;
+  letter-spacing: 0.2px;
 }
 
 /* Topic-Time Stacked Bar Chart (D-091) */
@@ -2499,12 +2502,12 @@ body.theme-light .upload-dropzone.drag-active {
   font-style: italic;
   font-weight: 700;
   color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-  background: rgba(18, 22, 38, 0.74);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 2px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 4px 5px 0px rgba(0, 0, 0, 0.5), 0 12px 30px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  background: rgba(14, 18, 30, 0.72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 4px 5px 0px rgba(0, 0, 0, 0.65), 0 12px 28px rgba(0, 0, 0, 0.35);
   opacity: 0;
   pointer-events: none;
   line-height: 1.45;
@@ -2512,101 +2515,133 @@ body.theme-light .upload-dropzone.drag-active {
 }
 
 body.theme-light .thought-bubble {
-  background: rgba(255, 255, 255, 0.92);
-  border: 2px solid #1e293b;
-  box-shadow: 4px 5px 0px rgba(15, 23, 42, 0.75), 0 12px 24px rgba(0, 0, 0, 0.12);
-  color: #0f172a;
+  background: rgba(255, 255, 255, 0.88);
+  border: 2px solid #111827;
+  box-shadow: 4px 5px 0px rgba(17, 24, 39, 0.85), 0 12px 24px rgba(0, 0, 0, 0.12);
+  color: #111827;
   text-shadow: none;
 }
 
-/* Shape 1: Comic Thought Cloud (Image 2 bottom reference) */
+/* Shape 1: Comic Thought Cloud (Image 1 bottom reference) */
 .thought-bubble.shape-cloud {
-  border-radius: 28px 28px 28px 28px;
+  border-radius: 40px 36px 36px 40px;
+  position: absolute;
 }
 
 .thought-bubble.shape-cloud::before {
   content: '';
   position: absolute;
-  bottom: -11px;
-  left: 26px;
-  width: 10px;
-  height: 10px;
+  top: -12px;
+  left: 20%;
+  width: 44%;
+  height: 22px;
   border-radius: 50%;
-  background: rgba(18, 22, 38, 0.85);
-  border: 2px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4);
+  background: inherit;
+  border-top: 2px solid rgba(255, 255, 255, 0.85);
+  pointer-events: none;
 }
 
 .thought-bubble.shape-cloud::after {
   content: '';
   position: absolute;
-  bottom: -20px;
-  left: 18px;
-  width: 6px;
-  height: 6px;
+  top: -9px;
+  right: 18%;
+  width: 38%;
+  height: 18px;
   border-radius: 50%;
-  background: rgba(18, 22, 38, 0.85);
-  border: 1.5px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4);
+  background: inherit;
+  border-top: 2px solid rgba(255, 255, 255, 0.85);
+  pointer-events: none;
 }
 
-body.theme-light .thought-bubble.shape-cloud::before {
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #1e293b;
-  box-shadow: 2px 2px 0px rgba(15, 23, 42, 0.6);
-}
-
+body.theme-light .thought-bubble.shape-cloud::before,
 body.theme-light .thought-bubble.shape-cloud::after {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1.5px solid #1e293b;
-  box-shadow: 2px 2px 0px rgba(15, 23, 42, 0.6);
+  border-top-color: #111827;
 }
 
-/* Shape 2: Comic Speech Oval (Image 2 top left reference) */
+/* Cloud trailing pointer dots (bottom-left) */
+.thought-bubble.shape-cloud .cloud-tail {
+  position: absolute;
+  bottom: -22px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.thought-bubble.shape-cloud .cloud-dot-1 {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(14, 18, 30, 0.85);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+}
+
+.thought-bubble.shape-cloud .cloud-dot-2 {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(14, 18, 30, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+  margin-left: -6px;
+}
+
+body.theme-light .thought-bubble.shape-cloud .cloud-dot-1,
+body.theme-light .thought-bubble.shape-cloud .cloud-dot-2 {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #111827;
+  box-shadow: 2px 2px 0px rgba(17, 24, 39, 0.6);
+}
+
+/* Shape 2: Comic Speech Oval (Image 1 top left reference) */
 .thought-bubble.shape-oval {
-  border-radius: 46px;
+  border-radius: 48px;
 }
 
 .thought-bubble.shape-oval::after {
   content: '';
   position: absolute;
-  bottom: -14px;
+  bottom: -15px;
   left: 28px;
   width: 0;
   height: 0;
   border-left: 12px solid transparent;
   border-right: 4px solid transparent;
-  border-top: 14px solid rgba(255, 255, 255, 0.7);
-  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.4));
+  border-top: 15px solid rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(3px 3px 0px rgba(0, 0, 0, 0.6));
 }
 
 body.theme-light .thought-bubble.shape-oval::after {
-  border-top-color: #1e293b;
-  filter: drop-shadow(2px 2px 0px rgba(15, 23, 42, 0.6));
+  border-top-color: #111827;
+  filter: drop-shadow(3px 3px 0px rgba(17, 24, 39, 0.6));
 }
 
-/* Shape 3: Comic Dialogue Rect (Image 2 top right reference) */
+/* Shape 3: Comic Dialogue Rect (Image 1 top right reference) */
 .thought-bubble.shape-rect {
-  border-radius: 4px;
-  box-shadow: 5px 6px 0px rgba(0, 0, 0, 0.5), 0 12px 28px rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  box-shadow: 5px 6px 0px rgba(0, 0, 0, 0.70), 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
 .thought-bubble.shape-rect::after {
   content: '';
   position: absolute;
-  bottom: -15px;
-  left: 30px;
+  bottom: -16px;
+  left: 28px;
   width: 0;
   height: 0;
   border-left: 14px solid transparent;
-  border-right: 2px solid transparent;
-  border-top: 15px solid rgba(255, 255, 255, 0.7);
-  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.4));
+  border-right: 3px solid transparent;
+  border-top: 16px solid rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(3px 3px 0px rgba(0, 0, 0, 0.6));
 }
 
 body.theme-light .thought-bubble.shape-rect::after {
-  border-top-color: #1e293b;
-  filter: drop-shadow(2px 2px 0px rgba(15, 23, 42, 0.6));
+  border-top-color: #111827;
+  filter: drop-shadow(3px 3px 0px rgba(17, 24, 39, 0.6));
 }
 
 .thought-bubble.size-1 { font-size: 13.5px; max-width: 260px; }
