@@ -80,157 +80,148 @@
        ========================================================================= -->
   <main class="hero-viewport" id="hero-viewport">
 
-    <!-- Tactile Bento Grid with 3-Column Architecture: Left Tiles | Center Quote | Right Tiles -->
+    <!-- Tactile Bento Grid: 6 Unnumbered Glass Tiles (3x2) Directly Above Quote -->
     <div class="grid-board" id="grid-board">
 
-      <!-- Left Column: Desk Widgets (Tiles 1, 3, 5) -->
-      <div class="tile-column tile-column-left">
-        <!-- 1. Return Anchor Capsule Tile -->
-        <div class="tile-wrapper">
-          <div class="tactile-tile" data-tile-id="2" data-view="desk" title="Click to open The Desk (Return Anchor)">
-            <div class="tile-face tile-face-front">
-              <span class="tile-front-badge">01 • Return Anchor</span>
+      <!-- 1. Return Anchor Capsule Tile -->
+      <div class="tile-wrapper">
+        <div class="tactile-tile" data-tile-id="2" data-view="desk" title="Click to open The Desk (Return Anchor)">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">Return Anchor</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">Return Anchor</span>
+              <span class="widget-badge success">Sovereign</span>
             </div>
-            <div class="tile-face tile-face-back">
-              <div class="widget-header">
-                <span class="widget-title">Return Anchor</span>
-                <span class="widget-badge success">Sovereign</span>
-              </div>
-              <div class="capsule-box" style="margin-bottom: 6px;">
-                <div class="capsule-key">Next Concrete Step</div>
-                <div class="capsule-value" id="tile-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
-              </div>
-              <div class="capsule-box">
-                <div class="capsule-key">Active Blocker</div>
-                <div class="capsule-value" id="tile-anchor-blocker">None detected. Sovereign execution path unobstructed.</div>
-              </div>
+            <div class="capsule-box" style="margin-bottom: 6px;">
+              <div class="capsule-key">Next Concrete Step</div>
+              <div class="capsule-value" id="tile-anchor-next">Finalize tactile Lego texture projection and app shell routing.</div>
+            </div>
+            <div class="capsule-box">
+              <div class="capsule-key">Active Blocker</div>
+              <div class="capsule-value" id="tile-anchor-blocker">None detected. Sovereign execution path unobstructed.</div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- 3. Active Daily Contract Tile -->
-        <div class="tile-wrapper">
-          <div class="tactile-tile" data-tile-id="1" data-view="tasks" title="Click to open Active Tasks Contract">
-            <div class="tile-face tile-face-front">
-              <span class="tile-front-badge">03 • Active Daily Contract</span>
-            </div>
-            <div class="tile-face tile-face-back">
-              <div class="widget-header">
-                <span class="widget-title">Active Daily Contract</span>
-                <span class="widget-badge success">3 Targets</span>
-              </div>
-              <div class="metric-row" style="margin-bottom: 4px;">
-                <span class="metric-label">Tactile Lego Projection</span>
-                <span class="card-badge success">machine_check</span>
-              </div>
-              <div class="metric-row" style="margin-bottom: 4px;">
-                <span class="metric-label">Modern App Shell</span>
-                <span class="card-badge success">pytest_pass</span>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">Life Mirror Thought Bubbles</span>
-                <span class="card-badge info">browser_verify</span>
-              </div>
-            </div>
+      <!-- 2. Stage Ratio Donut Tile -->
+      <div class="tile-wrapper">
+        <div class="tactile-tile" data-tile-id="4" data-view="desk" title="Click to open The Desk (Stage Ratio)">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">Stage Ratio Donut (88%)</span>
           </div>
-        </div>
-
-        <!-- 5. Decompression Zone Tile -->
-        <div class="tile-wrapper">
-          <div class="tactile-tile" data-tile-id="3" data-view="guard" title="Click to open Decompression & Guard">
-            <div class="tile-face tile-face-front">
-              <span class="tile-front-badge">05 • Decompression Status</span>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">Stage Ratio Donut</span>
+              <span class="widget-badge info">Output / Input</span>
             </div>
-            <div class="tile-face tile-face-back">
-              <div class="widget-header">
-                <span class="widget-title">Decompression</span>
-                <span class="widget-badge warning">Transition Lock</span>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">Status</span>
-                <span class="metric-val">Armed on Finish</span>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">Release</span>
-                <span class="metric-val">90m bounded</span>
+            <div class="centered-body" style="padding-top: 4px;">
+              <canvas id="tile-donut-stage-canvas" width="120" height="120"></canvas>
+              <div class="donut-legend" style="margin-top: 6px;">
+                <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
+                <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Center Open Corridor (Unobstructed View of the Oil Painting!) -->
-      <div class="grid-open-center" aria-hidden="true"></div>
-
-      <!-- Right Column: Desk Widgets (Tiles 2, 4, 6) -->
-      <div class="tile-column tile-column-right">
-        <!-- 2. Stage Ratio Donut Tile -->
-        <div class="tile-wrapper">
-          <div class="tactile-tile" data-tile-id="4" data-view="desk" title="Click to open The Desk (Stage Ratio)">
-            <div class="tile-face tile-face-front">
-              <span class="tile-front-badge">02 • Stage Ratio Donut (88%)</span>
+      <!-- 3. Active Daily Contract Tile -->
+      <div class="tile-wrapper">
+        <div class="tactile-tile" data-tile-id="1" data-view="tasks" title="Click to open Active Tasks Contract">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">Active Daily Contract</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">Active Daily Contract</span>
+              <span class="widget-badge success">3 Targets</span>
             </div>
-            <div class="tile-face tile-face-back">
-              <div class="widget-header">
-                <span class="widget-title">Stage Ratio Donut</span>
-                <span class="widget-badge info">Output / Input</span>
+            <div class="metric-row" style="margin-bottom: 4px;">
+              <span class="metric-label">Tactile Lego Projection</span>
+              <span class="card-badge success">machine_check</span>
+            </div>
+            <div class="metric-row" style="margin-bottom: 4px;">
+              <span class="metric-label">Modern App Shell</span>
+              <span class="card-badge success">pytest_pass</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Life Mirror Thought Bubbles</span>
+              <span class="card-badge info">browser_verify</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Topic-Time Distribution Tile -->
+      <div class="tile-wrapper">
+        <div class="tactile-tile" data-tile-id="0" data-view="topics" title="Click to open Topics & Time Distribution">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">Topic-Time Distribution</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">Topic-Time</span>
+              <span class="widget-badge info">Honest Metrics</span>
+            </div>
+            <div class="topic-bars-container" style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
+              <div class="topic-bar-row">
+                <div class="topic-bar-header"><span class="topic-domain">github.com</span><span class="topic-dur">2.3h</span></div>
+                <div class="topic-track"><div class="topic-fill stage-fill" style="width: 78%;"></div></div>
               </div>
-              <div class="centered-body" style="padding-top: 4px;">
-                <canvas id="tile-donut-stage-canvas" width="120" height="120"></canvas>
-                <div class="donut-legend" style="margin-top: 6px;">
-                  <div><span class="legend-dot stage"></span> Stage: 88% (3h 40m)</div>
-                  <div><span class="legend-dot aud"></span> Audience: 12% (30m)</div>
-                </div>
+              <div class="topic-bar-row">
+                <div class="topic-bar-header"><span class="topic-domain">localhost:7311</span><span class="topic-dur">1.3h</span></div>
+                <div class="topic-track"><div class="topic-fill stage-fill" style="width: 44%;"></div></div>
+              </div>
+              <div class="topic-bar-row">
+                <div class="topic-bar-header"><span class="topic-domain">google.com</span><span class="topic-dur">0.4h</span></div>
+                <div class="topic-track"><div class="topic-fill aud-fill" style="width: 14%;"></div></div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- 4. Topic-Time Distribution Tile -->
-        <div class="tile-wrapper">
-          <div class="tactile-tile" data-tile-id="0" data-view="topics" title="Click to open Topics & Time Distribution">
-            <div class="tile-face tile-face-front">
-              <span class="tile-front-badge">04 • Topic-Time Distribution</span>
+      <!-- 5. Decompression Zone Tile -->
+      <div class="tile-wrapper">
+        <div class="tactile-tile" data-tile-id="3" data-view="guard" title="Click to open Decompression & Guard">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">Decompression Status</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">Decompression</span>
+              <span class="widget-badge warning">Transition Lock</span>
             </div>
-            <div class="tile-face tile-face-back">
-              <div class="widget-header">
-                <span class="widget-title">Topic-Time</span>
-                <span class="widget-badge info">Honest Metrics</span>
-              </div>
-              <div class="topic-bars-container" style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
-                <div class="topic-bar-row">
-                  <div class="topic-bar-header"><span class="topic-domain">github.com</span><span class="topic-dur">2.3h</span></div>
-                  <div class="topic-track"><div class="topic-fill stage-fill" style="width: 78%;"></div></div>
-                </div>
-                <div class="topic-bar-row">
-                  <div class="topic-bar-header"><span class="topic-domain">localhost:7311</span><span class="topic-dur">1.3h</span></div>
-                  <div class="topic-track"><div class="topic-fill stage-fill" style="width: 44%;"></div></div>
-                </div>
-                <div class="topic-bar-row">
-                  <div class="topic-bar-header"><span class="topic-domain">google.com</span><span class="topic-dur">0.4h</span></div>
-                  <div class="topic-track"><div class="topic-fill aud-fill" style="width: 14%;"></div></div>
-                </div>
-              </div>
+            <div class="metric-row">
+              <span class="metric-label">Status</span>
+              <span class="metric-val">Armed on Finish</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Release</span>
+              <span class="metric-val">90m bounded</span>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- 6. 14 Day Streak Tile (Diverts directly to Honest Metrics & Statistics) -->
-        <div class="tile-wrapper">
-          <div class="tactile-tile" data-tile-id="5" data-view="stats" title="Click to view Honest Metrics & 14 Day Streak">
-            <div class="tile-face tile-face-front">
-              <span class="tile-front-badge">06 • 14 Day Streak</span>
+      <!-- 6. 14 Day Streak Tile (Diverts directly to Honest Metrics & Statistics) -->
+      <div class="tile-wrapper">
+        <div class="tactile-tile" data-tile-id="5" data-view="stats" title="Click to view Honest Metrics & 14 Day Streak">
+          <div class="tile-face tile-face-front">
+            <span class="tile-front-badge">14 Day Streak</span>
+          </div>
+          <div class="tile-face tile-face-back">
+            <div class="widget-header">
+              <span class="widget-title">14 Day Streak</span>
+              <span class="widget-badge success">Honest Metrics</span>
             </div>
-            <div class="tile-face tile-face-back">
-              <div class="widget-header">
-                <span class="widget-title">14 Day Streak</span>
-                <span class="widget-badge success">Honest Metrics</span>
-              </div>
-              <div class="stat-figure" style="font-size: 38px; margin: 8px 0 2px 0;">14</div>
-              <div class="stat-meta" style="margin-bottom: 6px;">Consecutive Run Days</div>
-              <div class="capsule-box" style="margin-top: auto;">
-                <div class="capsule-value">Neutral completion record (L-2 verified). Sovereign continuity.</div>
-              </div>
+            <div class="stat-figure" style="font-size: 38px; margin: 8px 0 2px 0;">14</div>
+            <div class="stat-meta" style="margin-bottom: 6px;">Consecutive Run Days</div>
+            <div class="capsule-box" style="margin-top: auto;">
+              <div class="capsule-value">Neutral completion record (L-2 verified). Sovereign continuity.</div>
             </div>
           </div>
         </div>
