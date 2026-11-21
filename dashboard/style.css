@@ -1413,12 +1413,19 @@ body.theme-light .tp-num-input {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-family: var(--font-aqua), -apple-system, sans-serif;
+  font-size: 14.5px;
   font-weight: 500;
+  letter-spacing: 0.6px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
   width: 100%;
+}
+
+.nav-item span {
+  font-family: var(--font-aqua), -apple-system, sans-serif;
+  letter-spacing: 0.6px;
 }
 
 .nav-item:hover {
@@ -1455,8 +1462,10 @@ body.theme-light .tp-num-input {
   background: var(--btn-sec-bg);
   border: 1px solid var(--card-border-back);
   color: var(--accent-primary);
-  font-size: 12.5px;
+  font-family: var(--font-aqua), -apple-system, sans-serif;
+  font-size: 13.5px;
   font-weight: 600;
+  letter-spacing: 0.6px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1475,7 +1484,9 @@ body.theme-light .tp-num-input {
   background: transparent;
   border: 1px dashed var(--sidebar-border);
   color: var(--text-muted);
-  font-size: 12px;
+  font-family: var(--font-aqua), -apple-system, sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
