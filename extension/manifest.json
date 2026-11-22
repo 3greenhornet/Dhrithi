@@ -93,7 +93,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["blocked.html", "interstitial.html"],
+      "resources": ["blocked.html"],
       "matches": ["<all_urls>"]
     }
   ],

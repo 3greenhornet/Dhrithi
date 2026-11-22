@@ -74,11 +74,17 @@ class AftermathService:
             from .contract import ContractService
             contract = ContractService(self.db, self.clock).for_day(
                 date_iso)
+        parks = self.db.query(
+            "SELECT * FROM parking_lot WHERE date(created_at)=? "
+            "ORDER BY created_at", (date_iso,))
+        events = self.db.query(
+            "SELECT * FROM event WHERE date(occurred_at_utc)=? "
+            "ORDER BY seq", (date_iso,))
         return {
             "scope": f"day:{date_iso}", "date": date_iso, "day": day,
             "sessions": sessions, "evidence": evidence, "breaks": breaks,
             "review": review, "leisure_rows": leisure_rows,
-            "contract": contract,
+            "contract": contract, "parks": parks, "events": events,
         }
 
     def _week_data(self, week_start_iso: str) -> dict:
@@ -114,12 +120,19 @@ class AftermathService:
         contract = None
         if days:
             contract = self._contract_for(days[-1])
+        parks = self.db.query(
+            "SELECT * FROM parking_lot WHERE created_at>=? AND created_at<? "
+            "ORDER BY created_at", (week_start_iso, end))
+        events = self.db.query(
+            "SELECT * FROM event WHERE occurred_at_utc>=? AND occurred_at_utc<? "
+            "ORDER BY seq", (week_start_iso, end))
         return {
             "scope": f"week:{week_start_iso}",
             "date": week_start_iso, "day": days[-1] if days else None,
             "days": days, "sessions": sessions, "evidence": evidence,
             "breaks": breaks, "review": review,
             "leisure_rows": leisure_rows, "contract": contract,
+            "parks": parks, "events": events,
         }
 
     def _contract_for(self, day: Optional[dict]) -> Optional[dict]:

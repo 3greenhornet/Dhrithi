@@ -115,12 +115,14 @@ def launch_desktop_app(port: int = 7311, width: int = 1280, height: int = 860) -
     user_data_dir = home / "app_profile"
     user_data_dir.mkdir(parents=True, exist_ok=True)
 
+    ext_dir = repo_root / "extension"
     args = [
         browser_bin,
         f"--app={target_url}",
         f"--window-size={width},{height}",
         f"--user-data-dir={user_data_dir}",
-        "--disable-extensions",
+        f"--load-extension={ext_dir}",
+        f"--disable-extensions-except={ext_dir}",
         "--no-first-run",
         "--no-default-browser-check"
     ]

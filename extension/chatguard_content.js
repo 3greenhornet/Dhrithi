@@ -99,11 +99,19 @@
   // helpers
   // ------------------------------------------------------------------
   const qsa = (root, sel) => (root ? Array.from(root.querySelectorAll(sel)) : []);
-  const SHA = (s) => {
-    let h = 5381;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-    return "h" + h.toString(16) + "-" + s.length;
-  };
+  async function computeSHA256(s) {
+    try {
+      const msgBuffer = new TextEncoder().encode(s);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (_) {
+      let h = 5381;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+      return "h" + h.toString(16) + "-" + s.length;
+    }
+  }
+  const SHA = computeSHA256;
   // pierce open shadow roots (Gemini)
   function pierce(rootSel) {
     const direct = qsa(document, rootSel);
@@ -257,7 +265,7 @@
   async function gateSend(input, ev) {
     const text = currentPrompt(input);
     if (!text) return false;
-    const promptHash = SHA(text);
+    const promptHash = await computeSHA256(text);
     const threadId = threadIdentity();
     const resp = await send({ type: "guard_send", site: S.adapter.site,
                               thread_id: threadId, prompt_hash: promptHash,
@@ -350,7 +358,7 @@
     for (const u of users) {
       const text = (u.innerText || "").trim();
       if (!text) continue;
-      const h = SHA(text);
+      const h = await computeSHA256(text);
       if (S.userMsgSeen.has(h)) continue;
       S.userMsgSeen.add(h);
       if (!S.approved.has(h)) {

@@ -207,7 +207,7 @@ against it:
 
 1. Does it speak in anything but the user's own words? (L-1)
 2. Does it praise, shame, or compare? (L-2)
-3. Does it make blind, crude decisions instead of on-device semantic relevance? (L-4r)
+3. Does it read content rather than count structure? (L-4)
 4. Can it lock or watch beyond its declared bound? (L-5)
 5. Did changing it require a hot reload? (L-3)
 6. Is it on by default when it widens scope? (L-6)

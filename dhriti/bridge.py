@@ -118,7 +118,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if (ok or self.path.startswith("/healthz") or path in dashboard_paths
                 or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")
                 or path.startswith("/api/vidura/")
-                or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/api/check_query", "/api/safe_anchor")):
+                or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -319,16 +319,42 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "SELECT payload_json FROM contract WHERE kind='daily' AND scope_date=? AND state='SEALED'",
                     (today,)
                 )
-                if not row:
-                    self._send(200, {"ok": True, "sealed": False, "targets": [], "contract_line": "No contract sealed for today."})
-                    return
-                payload = json.loads(row["payload_json"])
-                targets = payload.get("targets", [])
+                contract_targets = []
+                contract_line = ""
+                sealed = False
+                if row:
+                    sealed = True
+                    payload = json.loads(row["payload_json"])
+                    contract_line = payload.get("contract_line", "")
+                    contract_targets = payload.get("targets", [])
+
+                # UNION active pivots from day_pivot (F1)
+                pivot_targets = []
+                remaining_pivots = 3
+                try:
+                    from .pivot import PivotService
+                    pivot_svc = PivotService(db)
+                    active_pivots = pivot_svc.list_active_pivots(today)
+                    remaining_pivots = pivot_svc.remaining_today(today)
+                    for p in active_pivots:
+                        pivot_targets.append({
+                            "id": p["id"],
+                            "label": p["topic"],
+                            "kind": "pivot",
+                            "is_pivot": True,
+                            "expires_at": p["expires_at"],
+                            "evidence": {"class": "learning"}
+                        })
+                except Exception:
+                    pass
+
+                all_targets = contract_targets + pivot_targets
                 self._send(200, {
                     "ok": True,
-                    "sealed": True,
-                    "contract_line": payload.get("contract_line", ""),
-                    "targets": targets
+                    "sealed": sealed,
+                    "contract_line": contract_line,
+                    "targets": all_targets,
+                    "pivots_remaining": remaining_pivots
                 })
             except Exception as e:
                 self._send(500, {"error": str(e)})
@@ -448,6 +474,24 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == "/targets/claim":
             target_id = payload.get("target_id")
             self._send(200, {"ok": True, "claimed": True, "target_id": target_id})
+            return
+
+        elif path in ("/pivot/declare", "/pivot/confirm"):
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .pivot import PivotService, PivotError
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                pivot_svc = PivotService(db, ledger=self.ledger)
+                topic = payload.get("topic") or payload.get("text", "")
+                reason = payload.get("reason", "Declared study priority shift")
+                minutes = int(payload.get("minutes", 120))
+                pivot = pivot_svc.declare(topic, reason, minutes=minutes)
+                self._send(200, {"ok": True, "pivot": pivot})
+            except PivotError as pe:
+                self._send(400, {"error": str(pe)})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
             return
 
         elif path == "/api/check_query":

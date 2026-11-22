@@ -174,7 +174,7 @@ def guard_learn_safe(ctx, body):
 @GuardRoutes.route("POST", "/guard/park")
 def guard_park(ctx, body):
     """Hidden/held prompt -> parking lot item (D-071 unification).
-    Text goes to the sidecar; the ledger gets the fact only."""
+    Text goes to the sidecar and parking_lot; the ledger gets the fact only."""
     st = ctx.state
     thread_id = str(body.get("thread_id", ""))
     text = str(body.get("text", ""))
@@ -184,6 +184,22 @@ def guard_park(ctx, body):
                                     ttl_days=ctx.config.get(
                                         "retention", {})
                                         .get("raw_text_days", 14.0))
+    # Also write directly to the primary parking_lot table in dhriti.sqlite3 (H1 unification)
+    try:
+        from .constants import DB_PATH
+        from .db import Database
+        from .review import ParkingLotService
+        db = ctx.db if hasattr(ctx, "db") and ctx.db else Database(DB_PATH)
+        parking = ParkingLotService(db)
+        parking.park(
+            question=text[:200] if text else "Held prompt",
+            source=f"chatguard:{site}" if site else "chatguard",
+            kind="question",
+            sparked_by_url=f"thread:{thread_id}" if thread_id else None
+        )
+    except Exception:
+        pass
+
     ctx.emit({"type": cg.EVENT_PARKED, "ts": _now(), "site": site,
               "thread_id": thread_id,
               "prompt_hash": str(body.get("prompt_hash", "")),

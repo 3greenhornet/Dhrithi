@@ -38,7 +38,7 @@ fi
 if [ "$DRILL" = "all" ] || [ "$DRILL" = "4" ]; then
   echo "--- Drill 4: token revocation"
   manual "rotate the bridge token; fire one request with the old token"
-  check "bridge rejects old token (401)" sh -c "curl -s -o /dev/null -w '%{http_code}' -H 'X-Dhriti-Token: stale' http://127.0.0.1:8710/guard/state | grep -q 401"
+  check "bridge rejects old token (401)" sh -c "curl -s -o /dev/null -w '%{http_code}' -H 'X-Dhriti-Token: stale' http://127.0.0.1:7311/guard/state | grep -q 401"
   manual "expect: bridge_token_rejected event, rate-limited"
 fi
 

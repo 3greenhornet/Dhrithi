@@ -15,12 +15,18 @@
  * call — the payload shape is the same.
  */
 
-// [PLUG-IN] match your bridge config: loopback origin + the storage key that
-// holds the X-Dhriti-Token minted at first-run pairing.
-const BRIDGE = {
-  origin: 'http://127.0.0.1:8791',
-  tokenKey: 'bridgeToken',
-};
+async function getImagesBridgeConfig() {
+  const cfg = self.DHRITI_CONFIG || {};
+  let tok = (cfg.bridgeToken && cfg.bridgeToken !== "PASTE_BRIDGE_TOKEN_HERE") ? cfg.bridgeToken : "";
+  try {
+    const stored = await chrome.storage.local.get("token");
+    if (stored && stored.token) tok = stored.token;
+  } catch (e) {}
+  return {
+    origin: cfg.bridgeUrl || 'http://127.0.0.1:7311',
+    token: tok
+  };
+}
 
 // Mirror of host_permissions — keep in sync (manifest-additions.json).
 const URL_FILTERS = [
@@ -39,12 +45,11 @@ const IMG_RX = /(?:images|lens)\.google\.[a-z.]+|google\.[a-z.]+\/(?:imghp|imgre
 
 async function bridgePost(path, payload) {
   try {
-    const stored = await chrome.storage.local.get(BRIDGE.tokenKey);
-    const token = stored[BRIDGE.tokenKey];
-    if (!token) return; // bridge not paired yet: fail-safe TTL behavior, stay silent
-    await fetch(BRIDGE.origin + path, {
+    const bridge = await getImagesBridgeConfig();
+    if (!bridge.token) return; // bridge not paired yet: fail-safe TTL behavior, stay silent
+    await fetch(bridge.origin + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Dhriti-Token': token },
+      headers: { 'Content-Type': 'application/json', 'X-Dhriti-Token': bridge.token },
       body: JSON.stringify(payload),
     });
   } catch (_) {

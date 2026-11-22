@@ -242,6 +242,20 @@ CREATE INDEX IF NOT EXISTS idx_parking_lot_disposition
 CREATE INDEX IF NOT EXISTS idx_event_type_session
   ON event(event_type, session_id);
 
+-- Declared Pivots (v0.7.0+ / L-6 §6.3): Bounded hot target additions mid-session.
+CREATE TABLE IF NOT EXISTS day_pivot(
+  id TEXT PRIMARY KEY,
+  day_id TEXT,
+  topic TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  units REAL NOT NULL DEFAULT 1.0,
+  declared_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  consumed_at TEXT,
+  source_query_sha TEXT);
+CREATE INDEX IF NOT EXISTS idx_day_pivot_day
+  ON day_pivot(day_id);
+
 -- Vidura (v0.5.0): the spaced-review scheduler for the user's own
 -- answers. See dhriti/vidura.py and docs/VIDURA.md.
 CREATE TABLE IF NOT EXISTS vidura_item(

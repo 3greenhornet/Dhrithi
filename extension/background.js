@@ -107,37 +107,6 @@ async function applyPolicy(policy) {
       wanted.push(...ruleFor(domain, wanted.length / 2 | 0));
     }
   }
-
-  // Declared study video allowlisting (§11.2) - study videos declared in today's contract must NEVER be blocked
-  try {
-    const cfg = self.DHRITI_CONFIG || {};
-    const token = await getEffectiveToken();
-    const targetsResp = await fetch((cfg.bridgeUrl || 'http://127.0.0.1:7311') + "/targets", {
-      headers: { "X-Dhriti-Token": token }
-    });
-    if (targetsResp.ok) {
-      const tData = await targetsResp.json();
-      const targets = tData.targets || [];
-      let allowIdx = 0;
-      for (const t of targets) {
-        const text = (typeof t === "string" ? t : (t.label || t.target || t.url || ""));
-        const ytMatch = text.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-        if (ytMatch && ytMatch[1]) {
-          const videoId = ytMatch[1];
-          wanted.push({
-            id: 20000 + allowIdx++,
-            priority: 50,
-            action: { type: "allow" },
-            condition: {
-              urlFilter: `*youtube.com/watch*${videoId}*`,
-              resourceTypes: ["main_frame", "sub_frame", "media", "xmlhttprequest", "script"]
-            }
-          });
-        }
-      }
-    }
-  } catch (e) {}
-
   const options = { removeRuleIds: currentRuleIds, addRules: wanted };
   await chrome.declarativeNetRequest.updateDynamicRules(options);
   currentRuleIds = wanted.map((r) => r.id);
@@ -353,45 +322,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Dhriti-Token": token },
           body: JSON.stringify({ target_id: msg.target_id, label: msg.label })
-        });
-        sendResponse({ ok: resp.ok });
-      } catch (e) {
-        sendResponse({ ok: false });
-      }
-    })();
-    return true;
-  }
-  if (msg && msg.type === "check_query") {
-    (async () => {
-      const cfg = self.DHRITI_CONFIG || {};
-      const token = await getEffectiveToken();
-      try {
-        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/api/check_query`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Dhriti-Token": token },
-          body: JSON.stringify({ query: msg.query || "", url: msg.url || "" })
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          sendResponse(data);
-        } else {
-          sendResponse({ allowed: true, score: 1.0, reason: "bridge_err" });
-        }
-      } catch (e) {
-        sendResponse({ allowed: true, score: 1.0, reason: "bridge_unreachable" });
-      }
-    })();
-    return true;
-  }
-  if (msg && msg.type === "learn_safe_anchor") {
-    (async () => {
-      const cfg = self.DHRITI_CONFIG || {};
-      const token = await getEffectiveToken();
-      try {
-        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/api/safe_anchor`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Dhriti-Token": token },
-          body: JSON.stringify({ anchor: msg.anchor || "", source: "user_pivot" })
         });
         sendResponse({ ok: resp.ok });
       } catch (e) {

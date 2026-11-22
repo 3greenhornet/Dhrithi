@@ -1222,8 +1222,8 @@ def cmd_mirror_surface(args, ctx):
             context = _ask("the re-entry context (one sentence: why "
                            "are you opening this?)")
             try:
-                MirrorStore(ctx.db, ctx.config, ctx.ledger,
-                            ctx.clock).declare_reentry(
+                MirrorStore(ctx.db, ctx.config, ctx.clock,
+                            ctx.ledger).declare_reentry(
                                 item["id"], context,
                                 day_date=_local_today(ctx))
             except ValueError as exc:
@@ -1676,10 +1676,12 @@ def cmd_guard_status(args, ctx):
         return
     st = GuardState.from_snapshot(raw)
     snap = snapshot_for_digest(st, time.time())
+    used = snap.get("prompt_budget_used", 0)
+    limit = snap.get("prompt_budget_limit", 0)
     print(f"Guard Mode: {st.mode.value}")
-    print(f"Prompt budget: {snap.get('prompt_budget_remaining', 0)} / {snap.get('prompt_budget_limit', 0)}")
-    print(f"Burst active: {snap.get('burst_toll_active', False)}")
-    print(f"Debt: {snap.get('debt_accumulated', 0.0):.2f}")
+    print(f"Prompt budget: {used} / {limit} (remaining: {max(0, limit - used)})")
+    print(f"Burst active: {snap.get('bursting', False)}")
+    print(f"Debt: {snap.get('debt_value', 0.0):.2f}")
     print(f"Sidecar armed: {st.sidecar_armed}")
 
 

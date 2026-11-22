@@ -96,6 +96,23 @@ def test_dashboard_static_routes():
             data = _json.loads(resp.read().decode("utf-8"))
             assert data.get("ok") is True
 
+        # 12. Test POST /pivot/declare
+        pivot_body = b'{"topic": "Quantitative Aptitude: Time and Work", "reason": "Pivoting study to clear assessment drill"}'
+        req = urllib.request.Request(f"{base_url}/pivot/declare", data=pivot_body, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            import json as _json
+            data = _json.loads(resp.read().decode("utf-8"))
+            assert data.get("ok") is True
+
+        # Verify GET /targets includes the declared pivot
+        with urllib.request.urlopen(f"{base_url}/targets") as resp:
+            assert resp.status == 200
+            import json as _json
+            data = _json.loads(resp.read().decode("utf-8"))
+            labels = [t.get("label") for t in data.get("targets", [])]
+            assert "Quantitative Aptitude: Time and Work" in labels
+
     finally:
         server.stop()
 
