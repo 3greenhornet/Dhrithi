@@ -70,6 +70,17 @@ class TestHostsAudit(unittest.TestCase):
         out = audit_hosts_entries("0.0.0.0 dhriti-canary.invalid\n")
         self.assertEqual(out["findings"], [])
 
+    def test_safesearch_vip_never_flagged_as_non_blackhole_ip(self):
+        # §B3.1 SafeSearch VIP entries are authorized and must not trigger non_blackhole_ip
+        content = (
+            "216.239.38.120 www.google.com\n"
+            "216.239.38.120 forcesafesearch.google.com\n"
+            "204.79.197.220 www.bing.com\n"
+        )
+        out = audit_hosts_entries(content)
+        kinds = [f["kind"] for f in out["hard"]]
+        self.assertNotIn("non_blackhole_ip", kinds)
+
     def test_mixed_case_soft(self):
         out = audit_hosts_entries("0.0.0.0 ChatGPT.com\n")
         kinds = [f["kind"] for f in out["soft"]]

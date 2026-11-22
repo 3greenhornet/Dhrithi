@@ -23,7 +23,7 @@ class DecompressionManager:
         self.window_minutes = int(self.config.get("window_minutes", 90))
         self.max_strikes = int(self.config.get("springboard_strikes_allowed", 4))
         self.allowed_domains: List[str] = self.config.get(
-            "release", ["google.com", "images.google.com", "google.co.in"]
+            "release", ["google.com", "google.co.in"]
         )
         self.blocked_categories: List[str] = self.config.get(
             "still_blocked_categories", ["video", "social", "entertainment"]

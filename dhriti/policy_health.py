@@ -77,9 +77,12 @@ def check_layer0() -> tuple[int, int]:
         total += 1
         incog = reg_read(key, incog_name)
         doh = reg_read(key, "DnsOverHttpsMode")
+        safesearch = reg_read(key, "ForceGoogleSafeSearch")
+        safesites = reg_read(key, "SafeSitesFilterBehavior")
+        incog_allow = reg_read(key, "IncognitoModeUrlAllowlist")
         blocklist = reg_subkey_values(key)
 
-        incog_ok = incog == 1
+        incog_ok = incog == 1 and not incog_allow
         doh_ok = isinstance(doh, str) and doh.lower() == "off"
         tokens_ok = all(any(tok in v for v in blocklist) for tok in REQUIRED_TOKENS) \
             and all(any(h == v for v in blocklist) for h in REQUIRED_HOSTS) \
@@ -90,11 +93,15 @@ def check_layer0() -> tuple[int, int]:
         state = "CLOSED" if full_ok else "OPEN"
         detail = []
         if not incog_ok:
-            detail.append("private-mode not disabled")
+            detail.append("private-mode not disabled or allowlist present")
         if not doh_ok:
             detail.append("DoH not forced off")
         if not tokens_ok:
             detail.append(f"URLBlocklist incomplete ({len(blocklist)} entries)")
+        if safesearch != 1:
+            detail.append("ForceGoogleSafeSearch!=1")
+        if safesites != 1:
+            detail.append("SafeSitesFilterBehavior!=1")
         print(f"L0  {brand:<6} {state}{'  (' + '; '.join(detail) + ')' if detail else ''}"
               f"  [incognito={'1' if incog_ok else (incog if incog is not None else 'missing')},"
               f" doh={doh if doh is not None else 'missing'}]")

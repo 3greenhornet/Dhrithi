@@ -66,6 +66,27 @@ def hosts_line(hostname: str) -> str:
 
 BLACKHOLE_IPS = BLACKHOLES  # alias: same set, clearer name for the audit
 
+# SafeSearch VIP pairs mapped to enforce SafeSearch via DNS (§B3.1 / forcesafesearch.google.com)
+SAFESEARCH_VIP_PAIRS = {
+    ("216.239.38.120", "forcesafesearch.google.com"),
+    ("216.239.38.120", "www.google.com"),
+    ("216.239.38.120", "google.com"),
+    ("216.239.38.120", "www.google.co.in"),
+    ("216.239.38.120", "google.co.in"),
+    ("216.239.38.120", "www.google.co.uk"),
+    ("216.239.38.120", "www.google.ca"),
+    ("216.239.38.120", "www.google.com.au"),
+    ("216.239.38.120", "www.google.de"),
+    ("216.239.38.120", "www.google.fr"),
+    ("204.79.197.220", "www.bing.com"),
+    ("204.79.197.220", "bing.com"),
+    ("216.239.38.120", "www.youtube.com"),
+    ("216.239.38.120", "m.youtube.com"),
+    ("216.239.38.120", "youtubei.googleapis.com"),
+    ("216.239.38.120", "youtube.googleapis.com"),
+    ("216.239.38.120", "www.youtube-nocookie.com"),
+}
+
 
 def normalize_hostname(name: str) -> str:
     """Canonical form for comparison ONLY: lowercase, strip one trailing
@@ -103,7 +124,7 @@ def audit_hosts_entries(content: str) -> dict:
             continue
         ip, host = parts[0], parts[-1]
         canon = normalize_hostname(host)
-        if ip not in BLACKHOLE_IPS:
+        if ip not in BLACKHOLE_IPS and (ip, canon) not in SAFESEARCH_VIP_PAIRS:
             findings.append({"line": lineno, "kind": "non_blackhole_ip",
                              "detail": f"{host} -> {ip} (public address)",
                              "host": canon})

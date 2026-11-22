@@ -53,8 +53,31 @@ BLOCKED_HOSTS = [
     "encrypted-tbn1.gstatic.com",
     "encrypted-tbn2.gstatic.com",
     "encrypted-tbn3.gstatic.com",
+    "encrypted-tbn.l.google.com",
+    "encrypted-tbn.l.gstatic.com",
+    "tbn.l.google.com",
     # "photos.google.com",  # optional: your own photo library — uncomment if you
     #                       # want that exiled too; then mirror it in the DNR rules
+]
+
+SAFESEARCH_VIP_HOSTS = [
+    ("216.239.38.120", "forcesafesearch.google.com"),
+    ("216.239.38.120", "www.google.com"),
+    ("216.239.38.120", "google.com"),
+    ("216.239.38.120", "www.google.co.in"),
+    ("216.239.38.120", "google.co.in"),
+    ("216.239.38.120", "www.google.co.uk"),
+    ("216.239.38.120", "www.google.ca"),
+    ("216.239.38.120", "www.google.com.au"),
+    ("216.239.38.120", "www.google.de"),
+    ("216.239.38.120", "www.google.fr"),
+    ("204.79.197.220", "www.bing.com"),
+    ("204.79.197.220", "bing.com"),
+    ("216.239.38.120", "www.youtube.com"),
+    ("216.239.38.120", "m.youtube.com"),
+    ("216.239.38.120", "youtubei.googleapis.com"),
+    ("216.239.38.120", "youtube.googleapis.com"),
+    ("216.239.38.120", "www.youtube-nocookie.com"),
 ]
 
 
