@@ -208,12 +208,37 @@ class DayService:
             "SELECT e.class AS class, e.kind AS kind, e.detail_json AS "
             "detail FROM evidence e JOIN session s ON e.session_id=s.id "
             "WHERE s.day_id=? AND e.verdict='ACCEPTED'", (day["id"],))
+
+        # Check ledger/event table for verified learning proof events for this contract/date
+        verified_learning_target_ids = set()
+        try:
+            contract_row = self.db.query_one("SELECT id FROM contract WHERE scope_date=?", (day["date"],))
+            contract_id = contract_row["id"] if contract_row else None
+            ev_rows = self.db.query("SELECT observed_payload FROM event WHERE event_type='learning_proof_verified'")
+            for r in ev_rows:
+                try:
+                    payload = json.loads(r["observed_payload"] or "{}")
+                    cid = payload.get("contract_id")
+                    if cid is None or str(cid) == str(contract_id):
+                        tid = payload.get("target_id")
+                        if tid is not None:
+                            verified_learning_target_ids.add(str(tid))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         if not targets:
-            return len(accepted) > 0
+            return len(accepted) > 0 or len(verified_learning_target_ids) > 0
+
         for target in targets:
+            tid = str(target.get("id", ""))
+            if tid and tid in verified_learning_target_ids:
+                continue
             ev = target.get("evidence") or {}
             ev_class = ev.get("class")
-            wanted = "machine" if ev_class == "machine" else ev_class
+            if tid and "target_id" not in ev:
+                ev = {**ev, "target_id": tid}
             if not any(self._matches_target(a, ev) for a in accepted):
                 return False
         return True
@@ -226,7 +251,8 @@ class DayService:
         ev_class = ev_spec.get("class")
         row_class = {"machine": "MACHINE_CHECKED",
                      "file": "SUBMITTED",
-                     "manual": "SUBMITTED"}.get(ev_class, ev_class)
+                     "manual": "SUBMITTED",
+                     "learning": "MACHINE_CHECKED"}.get(ev_class, ev_class)
         if accepted_row["class"] != row_class:
             return False
         if ev_class == "manual":
@@ -238,6 +264,11 @@ class DayService:
             detail = json.loads(accepted_row.get("detail") or "{}")
         except Exception:
             detail = {}
+        if ev_class == "learning":
+            wanted_id = str(ev_spec.get("target_id") or "").strip()
+            if wanted_id and "target_id" in detail:
+                return str(detail.get("target_id") or "").strip() == wanted_id
+            return accepted_row["kind"] == "learning_proof" or detail.get("kind") == "learning_proof"
         if ev_class == "machine":
             wanted_cmd = (ev_spec.get("command") or "").strip()
             if wanted_cmd:

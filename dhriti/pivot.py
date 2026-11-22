@@ -63,12 +63,11 @@ class PivotService:
 
     def list_active_pivots(self, day_date: Optional[str] = None) -> List[Dict]:
         now_iso = self._now().isoformat()
-        target_date = day_date or self._now().date().isoformat()
         rows = self.db.query("""
             SELECT * FROM day_pivot
-            WHERE date(declared_at)=? AND expires_at > ? AND consumed_at IS NULL
+            WHERE expires_at > ? AND consumed_at IS NULL
             ORDER BY declared_at DESC
-        """, (target_date, now_iso))
+        """, (now_iso,))
         return rows
 
     def declare(self, topic: str, reason: str, minutes: int = 120,

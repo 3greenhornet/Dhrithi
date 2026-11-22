@@ -219,7 +219,13 @@ class ProjectDefenseService:
         for idx, q in enumerate(questions):
             ext_id = f"defense:{p.name}:{idx+1}"
             title = f"Project Defense: {q['category']} — {p.name}"
-            description = f"Q: {q['question']}\n\nSample Answer:\n{q.get('sample_answer', '')}"
+            kp = "\n- ".join(q.get("key_points", []))
+            kp_section = f"\n\nKey Concepts to Cover:\n- {kp}" if kp else ""
+            description = (
+                f"Q: {q['question']}{kp_section}\n\n"
+                f"<!-- RECALL_BEFORE_REVEAL -->\n"
+                f"Sample Defense:\n{q.get('sample_answer', '')}"
+            )
             item_id = corpus.add_item(
                 url=f"file:///{p.resolve().as_posix()}#q{idx+1}",
                 title=title,

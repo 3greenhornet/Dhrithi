@@ -199,6 +199,40 @@ consumption. Undeclared video remains Audience.
 
 ---
 
+## L-12. No synthetic operator data (Anti-Hallucination Principle)
+
+The interface shall never fabricate or assume operator intentions, goals, or history.
+Hardcoded mock arrays representing personal desires (e.g. guitar practice, back exercises),
+invented backlog tasks, or fake streaks violate operator sovereignty.
+
+1. **Honest Empty States:** If the operator has not declared offline alternatives or backlog items,
+   surfaces must render neutral, clear placeholders ("Not declared yet") rather than synthetic life goals.
+2. **Preservation with Sovereign Defaults:** Pre-existing default configurations or examples must
+   be retained strictly as commented reference fallbacks or explicit template options, never as active state.
+3. **Pure Arithmetic Solvers:** Task balancers (e.g. Pick-Your-Poison) must evaluate real operator tasks
+   or state an honest lack of input, never injecting hardcoded corporate/analytical dummy tasks.
+
+*Tests:* `tests/test_dashboard_truth.py`.
+
+---
+
+## L-13. Authorship-honest capability proof (Sovereign Builder Clause)
+
+Prompting an AI is not human mastery. Watching an LLM generate solutions does not prepare
+a candidate for an on-site whiteboard, technical placement defense, or closed-world assessment.
+
+1. **Closed-World Capability Verification:** When testing core placement competence (DSA algorithms,
+   quantitative aptitude, system design), solutions must be verified in a closed sandbox without external
+   AI prompt streaming.
+2. **Blind Recall Before Reveal:** Technical project defense flashcards and interview questions
+   must hide the canonical sample answer until the operator has actively attempted and typed their own recall.
+3. **Authorship Metric Honesty:** Time spent prompting agents is classified as tool orchestration,
+   not core programming capability. Dhriti measures what the human can author, defend, and compile.
+
+*Tests:* `tests/test_placement_readiness.py`.
+
+---
+
 ## How to use these laws
 
 When adding any surface (page, report, message, notification-shaped
@@ -207,10 +241,12 @@ against it:
 
 1. Does it speak in anything but the user's own words? (L-1)
 2. Does it praise, shame, or compare? (L-2)
-3. Does it read content rather than count structure? (L-4)
+3. Does it violate local sovereign semantic processing or exfiltrate private data? (L-4r)
 4. Can it lock or watch beyond its declared bound? (L-5)
 5. Did changing it require a hot reload? (L-3)
 6. Is it on by default when it widens scope? (L-6)
+7. Does it invent synthetic or fake operator data? (L-12)
+8. Does it mistake AI prompting for sovereign human capability? (L-13)
 
 One "yes" is a rewrite. The laws are short so that they can be
 remembered in the moment they are about to be broken.

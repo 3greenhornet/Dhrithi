@@ -14,7 +14,7 @@ const CONFIG = {
   // The daemon's local bridge. Default matches dhriti.config.json.
   bridgeUrl: "http://127.0.0.1:7311",
   // Bridge token from ~/.dhriti/bridge_token:
-  bridgeToken: "SG39re63LbgTc7p_xYXJjUpvX5xxI_qJdOOi6NRh2JI",
+  bridgeToken: "PASTE_BRIDGE_TOKEN_HERE",
   // Poll the daemon this often (seconds).
   pollSeconds: 30,
 };

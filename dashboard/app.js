@@ -72,7 +72,9 @@
     }
   ];
 
-  // --- Declared Life Alternatives (D-092) ---
+  // --- Declared Life Alternatives (D-092 / L-12) ---
+  // Past synthetic defaults preserved as reference fallbacks; never active by default:
+  /*
   const DEFAULT_LIFE_ALTS = [
     { id: 'life-1', label: 'Back exercises — min 10m', category: 'physical', duration: 10 },
     { id: 'life-2', label: 'Walk around neighborhood — 15m', category: 'nature', duration: 15 },
@@ -81,7 +83,6 @@
     { id: 'life-5', label: 'Read physical book chapter — 15m', category: 'reading', duration: 15 }
   ];
 
-  // --- Backlog Repository (D-093) ---
   const DEFAULT_BACKLOG = [
     { id: 'task-101', title: 'Write zero-sample synthesized chime tests', units: 1.0, tier: 'medium' },
     { id: 'task-102', title: 'Verify FTS5 virtual table synchronization', units: 2.0, tier: 'hard' },
@@ -91,6 +92,12 @@
     { id: 'task-106', title: 'Format daily topic-time stacked bar renderer', units: 0.5, tier: 'light' },
     { id: 'task-107', title: 'Full compiler optimization pass on audit chain', units: 3.0, tier: 'challenging' }
   ];
+  */
+
+  let initialLifeAlts = [];
+  try { initialLifeAlts = JSON.parse(localStorage.getItem('dhriti_life_alts') || '[]'); } catch (_) {}
+  let initialBacklog = [];
+  try { initialBacklog = JSON.parse(localStorage.getItem('dhriti_backlog') || '[]'); } catch (_) {}
 
   // --- App State ---
   const state = {
@@ -113,8 +120,8 @@
     cycleUserUploads: localStorage.getItem('dhriti_cycle_user_uploads') === 'true',
     quotes: DEFAULT_QUOTES,
     currentQuoteIndex: 0,
-    lifeAlts: DEFAULT_LIFE_ALTS,
-    backlog: DEFAULT_BACKLOG,
+    lifeAlts: initialLifeAlts,
+    backlog: initialBacklog,
     activeTasks: [],
     completedTasks: [],
     parkingItems: [],
@@ -624,29 +631,55 @@
     });
   }
 
-  // --- Pick Your Poison Equivalence Solver (D-093) ---
-  function openPickYourPoison() {
+  // --- Pick Your Poison Equivalence Solver (D-093 / L-12) ---
+  async function openPickYourPoison() {
     if (!DOM.poisonOptionsGrid) return;
     DOM.poisonOptionsGrid.innerHTML = '';
 
-    // Generate 3 balanced equivalence options (each sum to ~2.0 - 2.5u)
-    const options = [
-      {
-        label: 'Option A: Analytical & Testing Focus',
-        units: 2.0,
-        items: ['Verify FTS5 virtual table synchronization (2u)']
-      },
-      {
-        label: 'Option B: Balanced Core & Review',
-        units: 2.0,
-        items: ['Write synthesized chime procedural tests (1u)', 'Review topic tokenizer stopwords (0.5u)', 'Format topic-time stacked bar (0.5u)']
-      },
-      {
-        label: 'Option C: Architecture Deep-Dive',
-        units: 2.5,
-        items: ['Implement Vidura topic tree tests (2u)', 'Review topic tokenizer stopwords (0.5u)']
+    // L-12: If backlog has no items, display honest empty state rather than synthetic illusions
+    if (!state.backlog || state.backlog.length === 0) {
+      DOM.poisonOptionsGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 36px 20px;">
+          <p style="font-size: 15px; font-weight: 500; color: var(--text-main);">No backlog tasks available to balance.</p>
+          <p style="font-size: 12px; margin-top: 8px;">Add engineering tasks or interview prep targets to your backlog first.</p>
+        </div>
+      `;
+      DOM.poisonModal.classList.add('active');
+      return;
+    }
+
+    let options = [];
+    try {
+      const resp = await fetch('/api/task/poison', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deficit: 2.0, backlog: state.backlog })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        options = data.options || [];
       }
-    ];
+    } catch (_) {}
+
+    // Fallback in-browser solver from real active backlog tasks if bridge is offline
+    if (options.length === 0 && state.backlog.length > 0) {
+      const b1 = state.backlog.slice(0, 2);
+      const b2 = state.backlog.slice(1, 3);
+      if (b1.length > 0) {
+        options.push({
+          label: 'Option A: Primary Task Combo',
+          units: b1.reduce((acc, t) => acc + (t.units || 1.0), 0),
+          items: b1.map(t => `${t.title} (${t.units || 1.0}u)`)
+        });
+      }
+      if (b2.length > 0 && b2 !== b1) {
+        options.push({
+          label: 'Option B: Alternative Task Combo',
+          units: b2.reduce((acc, t) => acc + (t.units || 1.0), 0),
+          items: b2.map(t => `${t.title} (${t.units || 1.0}u)`)
+        });
+      }
+    }
 
     options.forEach(opt => {
       const card = document.createElement('div');
@@ -672,8 +705,8 @@
           });
         });
         DOM.poisonModal.classList.remove('active');
-        renderContractTasks();
-        if (window.DhritiAudio) window.DhritiAudio.playBell();
+        if (typeof renderContractTasks === 'function') renderContractTasks();
+        if (window.DhritiAudio && typeof window.DhritiAudio.playBell === 'function') window.DhritiAudio.playBell();
       });
       DOM.poisonOptionsGrid.appendChild(card);
     });
@@ -694,7 +727,7 @@
 
     // Persistent Header Pomodoro Timer Pill update
     if (DOM.headerPomoTime) DOM.headerPomoTime.textContent = str;
-    if (DOM.headerPomoPhase) DOM.headerPomoPhase.textContent = state.pomodoro.mode === 'break' ? 'REST' : 'FOCUS';
+    if (DOM.headerPomoPhase) DOM.headerPomoPhase.textContent = (state.pomodoro.phase === 'break') ? 'REST' : 'FOCUS';
     if (DOM.headerPomoPill) {
       if (state.pomodoro.isRunning) {
         DOM.headerPomoPill.classList.add('running');
@@ -850,6 +883,19 @@
     }
     if (!DOM.lifeAltList) return;
     DOM.lifeAltList.innerHTML = '';
+
+    if (state.lifeAlts.length === 0) {
+      const emptyCard = document.createElement('div');
+      emptyCard.className = 'empty-state-card';
+      emptyCard.style.cssText = 'padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 16px;';
+      emptyCard.innerHTML = `
+        <p style="font-size: 14px; font-weight: 500; color: var(--text-main);">No offline life alternatives declared yet.</p>
+        <p style="font-size: 12px; margin-top: 6px;">Declare what you actually love doing offline (reading, walk, gym, music) using the input below.</p>
+      `;
+      DOM.lifeAltList.appendChild(emptyCard);
+      return;
+    }
+
     const shapes = ['shape-cloud', 'shape-oval', 'shape-rect'];
     state.lifeAlts.forEach((alt, idx) => {
       const chip = document.createElement('div');
@@ -889,6 +935,19 @@
   function renderBacklogTable() {
     if (!DOM.backlogTableContainer) return;
     DOM.backlogTableContainer.innerHTML = '';
+
+    if (state.backlog.length === 0) {
+      const emptyRow = document.createElement('div');
+      emptyRow.className = 'empty-state-card';
+      emptyRow.style.cssText = 'padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px;';
+      emptyRow.innerHTML = `
+        <p style="font-size: 14px; font-weight: 500; color: var(--text-main);">No backlog tasks queued.</p>
+        <p style="font-size: 12px; margin-top: 6px;">Add real engineering tasks or DSA targets to populate your backlog.</p>
+      `;
+      DOM.backlogTableContainer.appendChild(emptyRow);
+      return;
+    }
+
     state.backlog.forEach((item, idx) => {
       const row = document.createElement('div');
       row.className = 'task-item-row';

@@ -90,7 +90,8 @@ class LearningProofService:
             raise LearningProofError(f"Target '{target_id}' not found in today's contract.")
 
         # In Dhriti, sealed contracts are strictly immutable (abort_contract_update trigger).
-        # We record the verified proof and target claim into the append-only ledger.
+        # We record the verified proof and target claim into the append-only ledger and evidence store.
+        now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
         if self.ledger:
             self.ledger.record(
                 "learning_proof_verified",
@@ -104,14 +105,49 @@ class LearningProofService:
                 }
             )
         else:
-            now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
             self.db.execute(
                 """INSERT INTO event (event_id, occurred_at_utc, source_adapter, event_type, observed_payload, telemetry_quality, prev_hash, row_hash)
                    VALUES (?, ?, 'learning_proof', 'learning_proof_verified', ?, 'OK', 'GENESIS', ?)""",
                 (str(proof_meta["sha256"][:16]), now_iso,
-                 json.dumps({"target_id": target_id, "target_label": target_label, "proof_hash": proof_meta["sha256"]}),
+                 json.dumps({"contract_id": contract_id, "target_id": target_id, "target_label": target_label, "proof_hash": proof_meta["sha256"]}),
                  proof_meta["sha256"])
             )
+
+        # If a session exists for today, also record an accepted evidence entry
+        try:
+            today_date = dt.date.today().isoformat()
+            sess = self.db.query_one(
+                "SELECT s.id FROM session s JOIN day d ON s.day_id=d.id WHERE d.date=? AND s.state='ACTIVE' LIMIT 1",
+                (today_date,)
+            )
+            if not sess:
+                sess = self.db.query_one(
+                    "SELECT s.id FROM session s JOIN day d ON s.day_id=d.id WHERE d.date=? ORDER BY s.started_at DESC LIMIT 1",
+                    (today_date,)
+                )
+            if sess:
+                import uuid
+                ev_id = str(uuid.uuid4())
+                detail_json = json.dumps({
+                    "target_id": target_id,
+                    "target_label": target_label,
+                    "kind": "learning_proof",
+                    "sha256": proof_meta["sha256"],
+                    "word_count": proof_meta["word_count"]
+                })
+                self.db.insert("evidence", {
+                    "id": ev_id,
+                    "session_id": sess["id"],
+                    "class": "MACHINE_CHECKED",
+                    "kind": "learning_proof",
+                    "submitted_at": now_iso,
+                    "detail_json": detail_json,
+                    "verdict": "ACCEPTED",
+                    "verdict_reason": "Recall verified by LearningProofService",
+                    "checked_at": now_iso
+                })
+        except Exception:
+            pass
 
         return {
             "ok": True,

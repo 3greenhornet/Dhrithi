@@ -120,7 +120,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 or path.startswith("/api/vidura/") or path.startswith("/ledger/") or path.startswith("/stats/")
                 or path.startswith("/api/defense/") or path.startswith("/api/oa/")
                 or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/targets/verify_recall",
-                            "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm", "/lockdown/engage")):
+                            "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm", "/lockdown/engage", "/api/task/poison")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -564,7 +564,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "substitute_budget": str(payload.get("substitute_budget") or "0 hours per week")
                 }
 
-                sealed = contracts.seal(today, full_payload, user_override_path=(DEFAULT_HOME / f"contract-{today}.json"))
+                sealed = contracts.seal(today, full_payload)
+                try:
+                    override_file = DEFAULT_HOME / f"contract-{today}.json"
+                    override_file.write_text(json.dumps(full_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+                except Exception:
+                    pass
                 if self.ledger:
                     self.ledger.record("contract_sealed", observed={"date": today, "targets": len(targets)}, action_taken="contract sealed via UI ritual")
                 self._send(200, {"ok": True, "sealed": True, "date": today, "targets": targets, "contract_line": contract_line})
@@ -574,6 +579,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         elif path == "/targets/claim":
             target_id = payload.get("target_id")
+            label = payload.get("label", "")
+            if self.ledger:
+                self.ledger.record("target_claimed", observed={"target_id": target_id, "label": label})
             self._send(200, {"ok": True, "claimed": True, "target_id": target_id})
             return
 
@@ -738,11 +746,33 @@ class BridgeHandler(BaseHTTPRequestHandler):
             try:
                 if self.ledger:
                     self.ledger.record("lockdown_engaged", observed={"reason": "Emergency dashboard lockdown"})
+                if hasattr(self, "guard_ctx") and self.guard_ctx and hasattr(self.guard_ctx, "state"):
+                    self.guard_ctx.state.mode = "FULL_LOCK"
                 self._send(200, {
                     "ok": True,
                     "locked": True,
                     "message": "Daily Lockdown Engaged. Enforcement active until tomorrow morning."
                 })
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/task/poison":
+            try:
+                from .task_balancer import pick_your_poison
+                deficit = float(payload.get("deficit", 2.0))
+                backlog = payload.get("backlog", [])
+                options = pick_your_poison(deficit, backlog, max_options=3)
+                formatted = []
+                for idx, basket in enumerate(options):
+                    total_u = sum(item.get("units", 1.0) for item in basket)
+                    label = f"Option {chr(65+idx)}: " + (" & ".join(t.get("title", "") for t in basket[:2]))
+                    formatted.append({
+                        "label": label,
+                        "units": round(total_u, 1),
+                        "items": [f"{t.get('title', '')} ({t.get('units', 1.0)}u)" for t in basket]
+                    })
+                self._send(200, {"ok": True, "options": formatted})
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return

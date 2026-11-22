@@ -24,7 +24,9 @@
   const SHAPES = ["shape-cloud", "shape-oval", "shape-rect"];
   const SIZES = ["size-1", "size-2", "size-3"];
 
-  // Strictly operator-declared offline life alternatives (L-8 / D-092)
+  // L-12: Strictly operator-declared offline life alternatives (L-8 / D-092 / L-12)
+  // Hardcoded synthetic defaults preserved below as reference fallbacks; never active by default:
+  /*
   const DEFAULT_LIFE_ALTS = [
     "Back exercises — min 10m",
     "Walk around neighborhood — 15m",
@@ -32,11 +34,12 @@
     "Deep breathing & posture reset — 5m",
     "Read physical book chapter — 15m"
   ];
+  */
 
   // Default mode is strictly OFF unless explicitly enabled or saved by user
   let mode = localStorage.getItem(KEY) || "off";
   let decompressionActive = false;
-  let feed = [...DEFAULT_LIFE_ALTS];
+  let feed = [];
   let spawnTimer = null;
 
   // Single persistent thought layer attached to body
@@ -96,7 +99,7 @@
     if (gathered.length > 0) {
       feed = gathered;
     } else {
-      feed = [...DEFAULT_LIFE_ALTS];
+      feed = []; // L-12: Honest empty state when nothing declared yet
     }
   }
 

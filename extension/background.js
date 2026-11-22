@@ -256,7 +256,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const token = await getEffectiveToken();
       const q = encodeURIComponent(msg.query || "");
       try {
-        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:8080'}/api/vidura/search?q=${q}&limit=5`, {
+        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/api/vidura/search?q=${q}&limit=5`, {
           headers: { "X-Dhriti-Token": token }
         });
         if (resp.ok) {
@@ -355,7 +355,7 @@ if (chrome.omnibox) {
     const cfg = self.DHRITI_CONFIG || {};
     const token = await getEffectiveToken();
     try {
-      const res = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:8080'}/api/vidura/search?q=${encodeURIComponent(query)}&limit=6`, {
+      const res = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/api/vidura/search?q=${encodeURIComponent(query)}&limit=6`, {
         headers: { "X-Dhriti-Token": token }
       });
       if (res.ok) {
@@ -378,7 +378,7 @@ if (chrome.omnibox) {
     let targetUrl = (text || "").trim();
     if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
       const cfg = self.DHRITI_CONFIG || {};
-      targetUrl = `${cfg.bridgeUrl || 'http://127.0.0.1:8080'}/dashboard/?q=${encodeURIComponent(targetUrl)}`;
+      targetUrl = `${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/dashboard/?q=${encodeURIComponent(targetUrl)}`;
     }
     if (disposition === "currentTab") {
       chrome.tabs.update({ url: targetUrl });

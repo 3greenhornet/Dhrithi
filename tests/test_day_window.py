@@ -106,5 +106,34 @@ class TestDayWindow(DhritiTestCase):
         self.assertEqual(day["state"], DayState.CLOSED_INCOMPLETE.value)
 
 
+    def test_learning_evidence_satisfies_targets_met(self):
+        from test_plumbing import payload_for
+        from dhriti.learning_proof import LearningProofService
+        payload = payload_for(self.home)
+        payload["targets"] = [
+            {"id": "t-learn-1", "label": "Dynamic Programming Study", "evidence": {"class": "learning"}}
+        ]
+        self.seal_today(payload)
+        day = self.days.ensure_day(self.today)
+
+        # Before proof: targets are not met
+        self.assertFalse(self.days.targets_met(day))
+
+        # Claim proof via LearningProofService
+        svc = LearningProofService(self.db, ledger=self.ledger)
+        synthesis = (
+            "Dynamic programming solves subproblems once and memoizes results for future lookups. "
+            "In this study session, we traced optimal substructure and overlapping subproblems in "
+            "the classic longest common subsequence problem, calculating state transitions O(N*M) "
+            "space and time complexity while comparing bottom-up tabulation against top-down memoization "
+            "with full recursive call tree proofs and space optimization."
+        )
+        res = svc.claim_with_proof("t-learn-1", synthesis, scope_date=self.today.isoformat())
+        self.assertTrue(res["ok"])
+
+        # Now targets_met must be True (The Day Can Be Won)
+        self.assertTrue(self.days.targets_met(day))
+
+
 if __name__ == "__main__":
     unittest.main()
