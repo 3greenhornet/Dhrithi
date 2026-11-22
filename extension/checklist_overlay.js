@@ -12,7 +12,8 @@
 
   const host = document.createElement("div");
   host.id = "dhriti-overlay-host";
-  host.style.cssText = "position:fixed;top:88px;right:18px;z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+  // Start dormant (display:none) until active daemon and targets are verified
+  host.style.cssText = "position:fixed;top:88px;right:18px;z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:none;";
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: "closed" });
@@ -37,11 +38,18 @@
       transition: width 0.2s ease, max-height 0.2s ease, border-radius 0.2s ease;
     }
     .overlay-collapsed {
-      width: 84px !important;
-      height: 32px !important;
-      max-height: 32px !important;
-      border-radius: 16px;
+      width: 114px !important;
+      height: 34px !important;
+      max-height: 34px !important;
+      border-radius: 17px;
       padding: 0;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      background: rgba(24, 28, 46, 0.96);
+    }
+    .overlay-collapsed:hover {
+      background: rgba(35, 41, 68, 0.98);
+      border-color: #8b78f6;
     }
     .overlay-header {
       display: flex;
@@ -60,6 +68,18 @@
       border-bottom: none;
       padding: 6px 10px;
       height: 100%;
+      cursor: pointer;
+    }
+    .overlay-collapsed .header-title {
+      font-size: 11.5px;
+      gap: 5px;
+    }
+    .overlay-collapsed .header-btn {
+      font-size: 13px;
+      font-weight: bold;
+      color: #a78bfa;
+      padding: 2px 4px;
+      cursor: pointer;
     }
     .header-title {
       display: flex;
@@ -289,17 +309,31 @@
     isCollapsed = collapse;
     if (isCollapsed) {
       card.classList.add("overlay-collapsed");
-      btnToggle.textContent = "{+}";
+      card.title = "Click to expand checklist (Alt+Shift+C)";
+      btnToggle.textContent = "⤢";
+      btnToggle.title = "Expand Checklist";
     } else {
       card.classList.remove("overlay-collapsed");
-      btnToggle.textContent = "{–}";
+      card.removeAttribute("title");
+      btnToggle.textContent = "–";
+      btnToggle.title = "Collapse Checklist (Alt+Shift+C)";
     }
     try {
       chrome.storage.local.set({ "dhriti_overlay_collapsed": isCollapsed });
     } catch (e) {}
   }
 
-  btnToggle.addEventListener("click", () => setCollapsed(!isCollapsed));
+  // When collapsed, clicking ANYWHERE on the card or pellet expands it
+  card.addEventListener("click", (e) => {
+    if (isCollapsed && !isDragging) {
+      setCollapsed(false);
+    }
+  });
+
+  btnToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setCollapsed(!isCollapsed);
+  });
 
   // Restore stored state
   try {
@@ -331,21 +365,32 @@
   function refreshTargets() {
     try {
       chrome.runtime.sendMessage({ type: "get_targets" }, (res) => {
+        // If bridge is offline or daemon not responding, stay dormant and invisible
         if (!res || !res.ok) {
-          const lbl = card.querySelector("#contract-label");
-          if (lbl) lbl.textContent = "Daemon offline or dormant.";
+          host.style.display = "none";
           return;
         }
+
+        const targets = res.targets || [];
+        const isSealed = Boolean(res.sealed);
+
+        // If no contract sealed and no targets declared, remain dormant outside enforcement
+        if (!isSealed && targets.length === 0) {
+          host.style.display = "none";
+          return;
+        }
+
+        // Active study day verified: display the overlay
+        host.style.display = "block";
 
         const contractLabel = card.querySelector("#contract-label");
         const list = card.querySelector("#targets-list");
         if (contractLabel) {
-          contractLabel.textContent = res.contract_line || (res.sealed ? "Active Contract Sealed" : "No contract sealed for today");
+          contractLabel.textContent = res.contract_line || (isSealed ? "Active Contract Sealed" : "Daily Targets");
         }
 
         if (list) {
           list.innerHTML = "";
-          const targets = res.targets || [];
           if (targets.length === 0) {
             list.innerHTML = `<div style="font-size:11.5px;opacity:0.65;padding:4px;">No active targets. Open dashboard ritual to set targets.</div>`;
             return;
@@ -365,7 +410,6 @@
 
             const checkBtn = item.querySelector(".target-check");
             checkBtn.addEventListener("click", () => {
-              // Toggle or claim
               if (state === "pending") {
                 chrome.runtime.sendMessage({
                   type: "claim_target",
@@ -379,7 +423,9 @@
           });
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      host.style.display = "none";
+    }
   }
 
   // Quick Park Submission
