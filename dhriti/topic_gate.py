@@ -10,6 +10,8 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 
+from dhriti.classifier_sidecar.vision_axis import classify_query_intent
+
 logger = logging.getLogger("dhriti.topic_gate")
 
 # Known sovereign study keywords that always pass without gating friction
@@ -74,24 +76,53 @@ class TopicGate:
         return [r["anchor_text"] for r in rows]
 
     def check_query(self, query: str, active_targets: List[Dict], is_session_active: bool = True) -> Dict:
-        """Adjudicates whether a query or prompt aligns with today's targets."""
+        """Adjudicates whether a query or prompt aligns with today's targets and safety constraints."""
         query_clean = query.strip()
         if not query_clean or not is_session_active:
-            return {"allowed": True, "score": 1.0, "reason": "pass_inactive_or_empty", "targets": []}
+            return {
+                "allowed": True,
+                "is_adult": False,
+                "suppress_image_grid": False,
+                "max_thumbnails": 16,
+                "score": 1.0,
+                "reason": "pass_inactive_or_empty",
+                "targets": []
+            }
+
+        # 0. Visual Axis Adult / 18+ Intent Adjudication (§26.1 / Safe Guard)
+        intent = classify_query_intent(query_clean)
+        target_texts = [t.get("target", "") for t in active_targets if t.get("target")]
+
+        if intent["is_adult"]:
+            self._log_eval(query_clean, False, 0.0, "adult_content_detected")
+            return {
+                "allowed": False,
+                "is_adult": True,
+                "suppress_image_grid": True,
+                "max_thumbnails": 0,
+                "score": 0.0,
+                "reason": "adult_content_detected",
+                "matched_tokens": intent.get("matched_tokens", []),
+                "action": "suppress_grid",
+                "targets": target_texts
+            }
 
         q_lower = query_clean.lower()
         q_tokens = set(re.findall(r"[a-z0-9+#]+", q_lower))
 
-        # 1. Sovereign Study Token Match
+        # 1. Sovereign Study Token Match (Guaranteed Allow)
         common_study = q_tokens.intersection(SOVEREIGN_STUDY_TOKENS)
         if len(common_study) >= 1:
             self._log_eval(query_clean, True, 0.95, "sovereign_study_token")
             return {
                 "allowed": True,
+                "is_adult": False,
+                "suppress_image_grid": False,
+                "max_thumbnails": 16,
                 "score": 0.95,
                 "reason": "sovereign_study_token",
                 "matched_tokens": list(common_study),
-                "targets": [t.get("target", "") for t in active_targets]
+                "targets": target_texts
             }
 
         # 2. Check Saved Safe Anchors
@@ -101,18 +132,28 @@ class TopicGate:
                 self._log_eval(query_clean, True, 0.99, "learned_safe_anchor")
                 return {
                     "allowed": True,
+                    "is_adult": False,
+                    "suppress_image_grid": False,
+                    "max_thumbnails": 16,
                     "score": 0.99,
                     "reason": "learned_safe_anchor",
                     "matched_anchor": anchor,
-                    "targets": [t.get("target", "") for t in active_targets]
+                    "targets": target_texts
                 }
 
         # 3. If no active targets defined, allow by default
         if not active_targets:
-            return {"allowed": True, "score": 0.8, "reason": "no_targets_declared", "targets": []}
+            return {
+                "allowed": True,
+                "is_adult": False,
+                "suppress_image_grid": False,
+                "max_thumbnails": 16,
+                "score": 0.8,
+                "reason": "no_targets_declared",
+                "targets": []
+            }
 
         # 4. Target Semantic Overlap / TF-IDF Similarity
-        target_texts = [t.get("target", "") for t in active_targets if t.get("target")]
         target_tokens = set()
         for t in target_texts:
             target_tokens.update(re.findall(r"[a-z0-9+#]+", t.lower()))
@@ -123,6 +164,9 @@ class TopicGate:
             self._log_eval(query_clean, True, 0.90, "target_token_overlap")
             return {
                 "allowed": True,
+                "is_adult": False,
+                "suppress_image_grid": False,
+                "max_thumbnails": 16,
                 "score": 0.90,
                 "reason": "target_token_overlap",
                 "matched_tokens": list(overlap),
@@ -143,6 +187,9 @@ class TopicGate:
                 self._log_eval(query_clean, True, max_sim, "semantic_tfidf_match")
                 return {
                     "allowed": True,
+                    "is_adult": False,
+                    "suppress_image_grid": False,
+                    "max_thumbnails": 16,
                     "score": round(max_sim, 3),
                     "reason": "semantic_tfidf_match",
                     "targets": target_texts
@@ -151,10 +198,13 @@ class TopicGate:
             logger.debug("TF-IDF fallback exception: %s", e)
             max_sim = 0.0
 
-        # Off-topic drift detected
+        # Off-topic drift detected (non-adult, non-study)
         self._log_eval(query_clean, False, max_sim, "off_topic_drift")
         return {
             "allowed": False,
+            "is_adult": False,
+            "suppress_image_grid": False,
+            "max_thumbnails": 8,
             "score": round(max_sim, 3),
             "reason": "off_topic_drift",
             "query": query_clean,

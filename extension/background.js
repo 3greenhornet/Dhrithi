@@ -271,6 +271,61 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true; // async response
   }
+  if (msg && msg.type === "check_query") {
+    (async () => {
+      const cfg = self.DHRITI_CONFIG || {};
+      const token = await getEffectiveToken();
+      try {
+        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/api/check_query`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Dhriti-Token": token
+          },
+          body: JSON.stringify({ query: msg.query || "", url: msg.url || "" })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          sendResponse(data);
+        } else {
+          // Graceful fail-open on transient network error for safe browsing
+          sendResponse({ allowed: true, is_adult: false, suppress_image_grid: false, max_thumbnails: 16 });
+        }
+      } catch (err) {
+        sendResponse({ allowed: true, is_adult: false, suppress_image_grid: false, max_thumbnails: 16 });
+      }
+    })();
+    return true; // async response
+  }
+  if (msg && msg.type === "classify_image") {
+    (async () => {
+      const cfg = self.DHRITI_CONFIG || {};
+      const token = await getEffectiveToken();
+      try {
+        const resp = await fetch(`${cfg.bridgeUrl || 'http://127.0.0.1:7311'}/api/vision/classify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Dhriti-Token": token
+          },
+          body: JSON.stringify({
+            image_b64: msg.image_b64 || "",
+            host: msg.host || "",
+            metadata: msg.metadata || {}
+          })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          sendResponse(data);
+        } else {
+          sendResponse({ action: "allow", is_safe: true, is_explicit: False });
+        }
+      } catch (err) {
+        sendResponse({ action: "allow", is_safe: true, is_explicit: false });
+      }
+    })();
+    return true; // async response
+  }
   if (msg && msg.type === "get_targets") {
     (async () => {
       const cfg = self.DHRITI_CONFIG || {};

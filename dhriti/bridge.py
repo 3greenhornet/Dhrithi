@@ -120,7 +120,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 or path.startswith("/api/vidura/") or path.startswith("/ledger/") or path.startswith("/stats/")
                 or path.startswith("/api/defense/") or path.startswith("/api/oa/") or path.startswith("/api/capability/")
                 or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/targets/verify_recall",
-                            "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm", "/lockdown/engage", "/api/task/poison")):
+                            "/api/check_query", "/api/safe_anchor", "/api/vision/classify", "/pivot/declare", "/pivot/confirm", "/lockdown/engage", "/api/task/poison")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -655,6 +655,31 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 source = payload.get("source", "user_pivot")
                 ok = gate.add_safe_anchor(anchor, source=source)
                 self._send(200, {"ok": ok, "anchor": anchor})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/vision/classify":
+            try:
+                from .classifier_sidecar.vision_axis import VisionClassifier
+                classifier = VisionClassifier()
+                img_b64 = payload.get("image_b64", "")
+                host = payload.get("host", "")
+                metadata = payload.get("metadata", {})
+                
+                # Zero-retention: classify and decode in-memory, bytes discarded immediately (§26.1)
+                img_bytes = base64.b64decode(img_b64) if img_b64 else b""
+                verdict = classifier.classify_image(img_bytes, host=host, metadata=metadata)
+                
+                if self.ledger:
+                    self.ledger.record("vision_adjudicated", observed={
+                        "host": host,
+                        "sha256": verdict.get("sha256"),
+                        "label": verdict.get("label"),
+                        "score": verdict.get("score"),
+                        "action": verdict.get("action")
+                    })
+                self._send(200, verdict)
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return
