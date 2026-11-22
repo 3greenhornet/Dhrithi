@@ -35,7 +35,7 @@ async function getEffectiveToken() {
   try {
     const stored = await chrome.storage.local.get("token");
     if (stored && stored.token) return stored.token;
-  } catch (e) {}
+  } catch (e) { }
   return (cfg.bridgeToken && cfg.bridgeToken !== "PASTE_BRIDGE_TOKEN_HERE") ? cfg.bridgeToken : "";
 }
 
@@ -245,7 +245,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // async response
   }
   if (msg && (msg.type === "surface_suppressed"
-             || msg.type === "surface_rule_stale")) {
+    || msg.type === "surface_rule_stale")) {
     postTypedEvent(msg);
     sendResponse({ ok: true });
     return false;
@@ -371,7 +371,7 @@ if (chrome.omnibox) {
         });
         suggest(suggestions);
       }
-    } catch (e) {}
+    } catch (e) { }
   });
 
   chrome.omnibox.onInputEntered.addListener((text, disposition) => {

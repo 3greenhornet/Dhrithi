@@ -1,0 +1,50 @@
+[
+  {
+    "title": "Where the Mind is Without Fear",
+    "author": "Rabindranath Tagore",
+    "stanzas": [
+      ["Where the mind is without fear", "and the head is held high;", "Where knowledge is free;"],
+      ["Where the world has not been", "broken up into fragments", "By narrow domestic walls;"],
+      ["Where words come out from", "the depth of truth;", "Where tireless striving"],
+      ["stretches its arms towards", "perfection;", "Where the clear stream of reason"],
+      ["has not lost its way into", "the dreary desert sand", "of dead habit;"],
+      ["Into that heaven of freedom,", "my Father, let my", "country awake."]
+    ]
+  },
+  {
+    "title": "Hope is the Thing with Feathers",
+    "author": "Emily Dickinson",
+    "stanzas": [
+      ["'Hope' is the thing with feathers -", "That perches in the soul -", "And sings the tune without the words -"],
+      ["And never stops - at all -", "And sweetest - in the Gale - is heard -", "And sore must be the storm -"],
+      ["That could abash the little Bird", "That kept so many warm -", "I've heard it in the chillest land -"],
+      ["And on the strangest Sea -", "Yet - never - in Extremity,", "It asked a crumb - of me."],
+      ["Through quiet persistence,", "the sovereign heart creates,", "guarded against decay."],
+      ["Silence returns to strength,", "in unyielding morning light,", "peace is restored."]
+    ]
+  },
+  {
+    "title": "The Road Not Taken",
+    "author": "Robert Frost",
+    "stanzas": [
+      ["Two roads diverged in a yellow wood,", "And sorry I could not travel both", "And be one traveler, long I stood"],
+      ["And looked down one as far as I could", "To where it bent in the undergrowth;", "Then took the other, as just as fair,"],
+      ["And having perhaps the better claim,", "Because it was grassy and wanted wear;", "Though as for that the passing there"],
+      ["Had worn them really about the same,", "And both that morning equally lay", "In leaves no step had trodden black."],
+      ["Oh, I kept the first for another day!", "Yet knowing how way leads on to way,", "I doubted if I should ever come back."],
+      ["I shall be telling this with a sigh", "Somewhere ages and ages hence:", "Two roads diverged, and I took the one less traveled."]
+    ]
+  },
+  {
+    "title": "A Thing of Beauty",
+    "author": "John Keats",
+    "stanzas": [
+      ["A thing of beauty is a joy for ever:", "Its loveliness increases; it will never", "Pass into nothingness; but still will keep"],
+      ["A bower quiet for us, and a sleep", "Full of sweet dreams, and health, and quiet breathing.", "Therefore, on every morrow, are we wreathing"],
+      ["A flowery band to bind us to the earth,", "Spite of despondence, of the inhuman dearth", "Of noble natures, of the gloomy days,"],
+      ["Of all the unhealthy and o'er-darkened ways", "Made for our searching: yes, in spite of all,", "Some shape of beauty moves away the pall"],
+      ["From our dark spirits. Such the sun, the moon,", "Trees old, and young, sprouting a shady boon", "For simple sheep; and such are daffodils"],
+      ["With the green world they live in; and clear rills", "That for themselves a cooling covert make", "Gainst the hot season; the mid forest brake."]
+    ]
+  }
+]

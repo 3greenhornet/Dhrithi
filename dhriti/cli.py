@@ -1830,6 +1830,53 @@ def cmd_feed(args, ctx):
             print(f"    URL: {it['url']} [ID: {it['id']}]")
 
 
+def cmd_capability(args, ctx):
+    """Agent-Free Capability Block & Placement Drill Runner."""
+    from .capability import CapabilityService
+    svc = CapabilityService(ctx.db, ledger=ctx.ledger, home=ctx.home)
+    action = getattr(args, "action", "list")
+    if action == "list":
+        drills = svc.list_drills()
+        print("\n============================================================")
+        print("   DHRITI AGENT-FREE CAPABILITY DRILLS (Closed-World Practice) ")
+        print("============================================================")
+        for d in drills:
+            print(f"\n* ID: {d['id']} [{d['category']}]")
+            print(f"  Title: {d['title']}")
+            print(f"  Problem: {d['problem_statement']}")
+            print(f"  Entry Point: def {d['entry_point']}(...)")
+        print("\n[Start Drill]: dhriti capability start <drill_id>")
+    elif action == "start":
+        drill_id = getattr(args, "drill_id", None)
+        if not drill_id:
+            print("Error: Specify drill_id (e.g. dhriti capability start palindrome)")
+            return
+        res = svc.start_drill(drill_id, duration_min=getattr(args, "duration", 25))
+        print(f"\n[+] Capability Block Activated: {res['title']}")
+        print(f"    File: {res['file_path']}")
+        print(f"    {res['instructions']}\n")
+    elif action == "check":
+        drill_id = getattr(args, "drill_id", None)
+        if not drill_id:
+            print("Error: Specify drill_id (e.g. dhriti capability check palindrome)")
+            return
+        file_arg = getattr(args, "file", None)
+        if not file_arg:
+            file_arg = str(ctx.home / "capability_drills" / f"{drill_id}.py")
+        res = svc.verify_drill(drill_id, file_arg)
+        print("\n============================================================")
+        print(f"  DRILL VERIFICATION RESULT: {'[PASSED]' if res['verified'] else '[ATTEMPTED]'}")
+        print("============================================================")
+        print(f"  Drill: {drill_id}")
+        print(f"  Test Cases: {res['passed_tests']} / {res['total_tests']} passed")
+        print(f"  Message: {res['message']}")
+        if res.get("failures"):
+            print("\n  Failures:")
+            for f in res["failures"][:3]:
+                print(f"    - Input: {f.get('input')} | Expected: {f.get('expected')} | Actual/Error: {f.get('actual') or f.get('error')}")
+        print()
+
+
 # ---------------------------------------------------------------- plumbing
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -2266,6 +2313,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("feed", help="view categorized sovereign placement learning streams")
     p.add_argument("--limit", type=int, default=5, help="items per category")
     p.set_defaults(func=cmd_feed)
+
+    p = sub.add_parser("capability", help="agent-free capability block & placement drill runner")
+    p.add_argument("action", nargs="?", default="list", choices=["list", "start", "check"],
+                   help="list, start, or check capability drill")
+    p.add_argument("drill_id", nargs="?", default=None, help="drill identifier (palindrome, time_and_work, two_sum, speed_distance)")
+    p.add_argument("file", nargs="?", default=None, help="solution python file (optional)")
+    p.add_argument("--duration", type=int, default=25, help="capability block duration in minutes (default 25)")
+    p.set_defaults(func=cmd_capability)
 
     return parser
 

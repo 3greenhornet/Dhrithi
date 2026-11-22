@@ -98,6 +98,11 @@
   try { initialLifeAlts = JSON.parse(localStorage.getItem('dhriti_life_alts') || '[]'); } catch (_) {}
   let initialBacklog = [];
   try { initialBacklog = JSON.parse(localStorage.getItem('dhriti_backlog') || '[]'); } catch (_) {}
+  let initialQuotes = DEFAULT_QUOTES;
+  try {
+    const savedQuotes = JSON.parse(localStorage.getItem('dhriti_quotes') || 'null');
+    if (Array.isArray(savedQuotes) && savedQuotes.length > 0) initialQuotes = savedQuotes;
+  } catch (_) {}
 
   // --- App State ---
   const state = {
@@ -118,7 +123,7 @@
     inspectedSetId: null,
     pendingUploadFiles: [],
     cycleUserUploads: localStorage.getItem('dhriti_cycle_user_uploads') === 'true',
-    quotes: DEFAULT_QUOTES,
+    quotes: initialQuotes,
     currentQuoteIndex: 0,
     lifeAlts: initialLifeAlts,
     backlog: initialBacklog,
@@ -151,6 +156,17 @@
     bubbleTimerId: null
   };
 
+  // --- HTML Entity Sanitizer (D-A5 / Anti-XSS) ---
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // --- DOM Elements Cache ---
   const DOM = {};
 
@@ -160,6 +176,7 @@
     DOM.appShell = document.getElementById('app-shell');
     DOM.gridBoard = document.getElementById('grid-board');
     DOM.tiles = Array.from(document.querySelectorAll('.tactile-tile'));
+    DOM.paintingUnderlay = document.getElementById('painting-underlay');
     DOM.floatingQuote = document.getElementById('floating-quote');
     DOM.quoteText = document.getElementById('quote-text');
     DOM.quoteAuthor = document.getElementById('quote-author');
@@ -168,6 +185,8 @@
     DOM.btnToggleMode = document.getElementById('btn-toggle-dashboard-mode');
     DOM.btnToggleText = document.getElementById('btn-toggle-text');
     DOM.btnNavArtMode = document.getElementById('btn-nav-art-mode');
+    DOM.btnEnterWorkspace = document.getElementById('btn-enter-workspace');
+    DOM.btnNavReturnArt = document.getElementById('btn-nav-return-art');
     DOM.sidebarBrand = document.querySelector('.sidebar-brand');
     DOM.btnThemeToggle = document.getElementById('btn-theme-toggle');
     DOM.themeIconDark = document.getElementById('theme-icon-dark');
@@ -207,6 +226,7 @@
     // Tasks elements
     DOM.contractTaskList = document.getElementById('contract-task-list');
     DOM.completedTaskList = document.getElementById('completed-task-list');
+    DOM.btnClearCompleted = document.getElementById('btn-clear-completed');
     DOM.btnOpenPoisonModal = document.getElementById('btn-open-poison-modal');
     DOM.poisonModal = document.getElementById('poison-modal-overlay');
     DOM.btnClosePoison = document.getElementById('btn-close-poison');
@@ -233,6 +253,10 @@
 
     // Backlog & Guard
     DOM.backlogTableContainer = document.getElementById('backlog-table-container');
+    DOM.backlogCountBadge = document.getElementById('backlog-count-badge');
+    DOM.btnAddBacklog = document.getElementById('btn-add-backlog');
+    DOM.newBacklogTitle = document.getElementById('new-backlog-title');
+    DOM.newBacklogTier = document.getElementById('new-backlog-tier');
     DOM.btnEvalAutofill = document.getElementById('btn-eval-autofill');
     DOM.guardTestPrompt = document.getElementById('guard-test-prompt');
     DOM.btnEvalPrompt = document.getElementById('btn-eval-prompt');
@@ -269,6 +293,14 @@
     DOM.btnResetUnderlayModal = document.getElementById('btn-reset-underlay-modal');
     DOM.artPresetGrid = document.getElementById('art-preset-grid');
     DOM.quotesManagerList = document.getElementById('quotes-manager-list');
+    DOM.btnAddQuote = document.getElementById('btn-add-quote');
+    DOM.newQuoteText = document.getElementById('new-quote-text');
+    DOM.newQuoteAuthor = document.getElementById('new-quote-author');
+    DOM.btnFetchPoetryQuick = document.getElementById('btn-fetch-poetrydb-quick');
+    DOM.btnFetchPoetryModal = document.getElementById('btn-fetch-poetrydb-modal');
+    DOM.poetryStatusPill = document.getElementById('poetrydb-status-pill');
+    DOM.poetryStatusModal = document.getElementById('poetrydb-status-modal');
+    DOM.authorChips = Array.from(document.querySelectorAll('.author-chip'));
     DOM.streakRibbon = document.getElementById('stats-streak-ribbon');
     DOM.ledgerContainer = document.getElementById('ledger-events-container');
     DOM.topicsBreakdownContainer = document.getElementById('topics-breakdown-container');
@@ -620,12 +652,15 @@
     state.completedTasks.forEach(task => {
       const row = document.createElement('div');
       row.className = 'task-item-row';
+      const safeTitle = escapeHtml(task.title);
+      const safeProof = escapeHtml(task.proof || 'verified');
+      const safeTs = escapeHtml(task.timestamp || 'Today');
       row.innerHTML = `
         <div>
-          <span class="task-name">${task.title}</span>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Verified at ${task.timestamp}</div>
+          <span class="task-name">${safeTitle}</span>
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Verified at ${safeTs}</div>
         </div>
-        <span class="card-badge success">${task.proof}</span>
+        <span class="card-badge success">${safeProof}</span>
       `;
       DOM.completedTaskList.appendChild(row);
     });
@@ -933,6 +968,9 @@
 
   // --- Dynamic Backlog View ---
   function renderBacklogTable() {
+    if (DOM.backlogCountBadge) {
+      DOM.backlogCountBadge.textContent = `${state.backlog.length} Item${state.backlog.length === 1 ? '' : 's'}`;
+    }
     if (!DOM.backlogTableContainer) return;
     DOM.backlogTableContainer.innerHTML = '';
 
@@ -951,11 +989,15 @@
     state.backlog.forEach((item, idx) => {
       const row = document.createElement('div');
       row.className = 'task-item-row';
+      const safeTitle = escapeHtml(item.title);
+      const safeTier = escapeHtml(item.tier || 'medium');
+      const units = item.units !== undefined ? item.units : 1.0;
       row.innerHTML = `
-        <span class="task-name">${item.title}</span>
+        <span class="task-name">${safeTitle}</span>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="task-units-badge">${item.units}u (${item.tier})</span>
-          <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" data-backlog-add="${idx}">Add to Day</button>
+          <span class="task-units-badge">${units}u (${safeTier})</span>
+          <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" data-backlog-add="${idx}" title="Promote to active targets for today">Add to Day</button>
+          <button class="btn-remove-item" data-backlog-delete="${idx}" title="Delete task from backlog" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; font-size: 11px; padding: 5px 9px; border-radius: 4px; transition: all 0.15s ease;">✕</button>
         </div>
       `;
       DOM.backlogTableContainer.appendChild(row);
@@ -963,17 +1005,80 @@
 
     DOM.backlogTableContainer.querySelectorAll('button[data-backlog-add]').forEach(btn => {
       btn.addEventListener('click', e => {
-        const i = parseInt(e.target.dataset.backlogAdd, 10);
+        const i = parseInt(e.currentTarget.dataset.backlogAdd, 10);
         const item = state.backlog[i];
+        if (!item) return;
         state.activeTasks.push({
-          id: item.id,
+          id: item.id || `task-${Date.now()}`,
           title: item.title,
-          units: item.units,
+          units: item.units !== undefined ? item.units : 1.0,
           proof: 'evidence_check',
           done: false
         });
         state.backlog.splice(i, 1);
+        try { localStorage.setItem('dhriti_backlog', JSON.stringify(state.backlog)); } catch (_) {}
+        renderContractTasks();
         renderBacklogTable();
+        if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+          window.DhritiAudio.playPebble(1.0);
+        }
+      });
+    });
+
+    DOM.backlogTableContainer.querySelectorAll('button[data-backlog-delete]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const i = parseInt(e.currentTarget.dataset.backlogDelete, 10);
+        state.backlog.splice(i, 1);
+        try { localStorage.setItem('dhriti_backlog', JSON.stringify(state.backlog)); } catch (_) {}
+        renderBacklogTable();
+        if (window.DhritiAudio && typeof window.DhritiAudio.playClick === 'function') {
+          window.DhritiAudio.playClick(0.7);
+        }
+      });
+    });
+  }
+
+  // --- Quotes Management in Settings ---
+  function renderQuotesManager() {
+    if (!DOM.quotesManagerList) return;
+    DOM.quotesManagerList.innerHTML = '';
+
+    if (!state.quotes || state.quotes.length === 0) {
+      DOM.quotesManagerList.innerHTML = `
+        <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">
+          No custom quotes added. Using default philosophical set.
+        </div>
+      `;
+      return;
+    }
+
+    state.quotes.forEach((q, idx) => {
+      const row = document.createElement('div');
+      row.className = 'task-item-row';
+      row.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px;';
+      row.innerHTML = `
+        <div style="flex: 1;">
+          <div style="font-size: 13px; color: var(--text-main); font-style: italic;">"${escapeHtml(q.text)}"</div>
+          <div style="font-size: 11px; color: var(--accent-light); margin-top: 4px;">— ${escapeHtml(q.author || 'Anonymous')}</div>
+        </div>
+        <button class="btn-remove-item" data-quote-delete="${idx}" title="Remove quote" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 4px;">✕</button>
+      `;
+      DOM.quotesManagerList.appendChild(row);
+    });
+
+    DOM.quotesManagerList.querySelectorAll('button[data-quote-delete]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const i = parseInt(e.currentTarget.dataset.quoteDelete, 10);
+        state.quotes.splice(i, 1);
+        if (state.quotes.length === 0) {
+          state.quotes = [...DEFAULT_QUOTES];
+        }
+        try { localStorage.setItem('dhriti_quotes', JSON.stringify(state.quotes)); } catch (_) {}
+        renderQuotesManager();
+        cycleQuote();
+        if (window.DhritiAudio && typeof window.DhritiAudio.playClick === 'function') {
+          window.DhritiAudio.playClick(0.7);
+        }
       });
     });
   }
@@ -1108,6 +1213,9 @@
         const targetId = tabBtn.dataset.tab;
         const targetPane = document.getElementById(targetId);
         if (targetPane) targetPane.classList.add('active');
+        if (targetId === 'tab-quotes') {
+          renderQuotesManager();
+        }
       });
     });
   }
@@ -1717,6 +1825,136 @@
     if (DOM.quoteAuthor) DOM.quoteAuthor.textContent = `— ${q.author}`;
   }
 
+  // --- PoetryDB API & Offline Fallback Manifest Loader (D-20.8) ---
+  async function fetchAndSetPoem(author) {
+    const statusMsg = author ? `PoetryDB: Querying ${author}...` : 'PoetryDB: Querying random poem...';
+    if (DOM.poetryStatusPill) DOM.poetryStatusPill.textContent = statusMsg;
+    if (DOM.poetryStatusModal) DOM.poetryStatusModal.textContent = statusMsg;
+
+    let targetPoem = null;
+
+    // 1. Try live PoetryDB API with 3.5s timeout
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3500);
+      const url = author 
+        ? `https://poetrydb.org/author/${encodeURIComponent(author)}`
+        : 'https://poetrydb.org/random/1';
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[Math.floor(Math.random() * data.length)];
+          if (item && item.lines) {
+            const stanzas = [];
+            let currentStanza = [];
+            item.lines.forEach(line => {
+              const clean = (line || '').trim();
+              if (!clean) {
+                if (currentStanza.length > 0) {
+                  stanzas.push(currentStanza);
+                  currentStanza = [];
+                }
+              } else {
+                currentStanza.push(clean);
+                if (currentStanza.length >= 4) {
+                  stanzas.push(currentStanza);
+                  currentStanza = [];
+                }
+              }
+            });
+            if (currentStanza.length > 0) stanzas.push(currentStanza);
+
+            if (stanzas.length > 0) {
+              targetPoem = {
+                title: item.title || 'Untitled',
+                author: item.author || (author || 'PoetryDB'),
+                stanzas: stanzas.slice(0, 8)
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.info('PoetryDB live query failed or timed out, loading local curated poems:', e.message);
+    }
+
+    // 2. Offline fallback: local dashboard/poems.json manifest
+    if (!targetPoem) {
+      try {
+        const resp = await fetch('poems.json');
+        if (resp.ok) {
+          const list = await resp.json();
+          if (Array.isArray(list) && list.length > 0) {
+            if (author) {
+              const matches = list.filter(p => p.author && p.author.toLowerCase().includes(author.toLowerCase()));
+              targetPoem = matches.length > 0 ? matches[Math.floor(Math.random() * matches.length)] : list[Math.floor(Math.random() * list.length)];
+            } else {
+              targetPoem = list[Math.floor(Math.random() * list.length)];
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load local poems.json:', err);
+      }
+    }
+
+    // 3. Apply poem if found
+    if (targetPoem && window.DhritiChimes && typeof window.DhritiChimes.setPoem === 'function') {
+      window.DhritiChimes.setPoem(targetPoem);
+      const label = `${targetPoem.author} — ${targetPoem.title}`;
+      if (DOM.poetryStatusPill) DOM.poetryStatusPill.textContent = `PoetryDB: ${label}`;
+      if (DOM.poetryStatusModal) DOM.poetryStatusModal.textContent = `Active Poem: ${label}`;
+      if (window.DhritiAudio && typeof window.DhritiAudio.playGong === 'function') {
+        window.DhritiAudio.playGong();
+      }
+    } else {
+      if (DOM.poetryStatusPill) DOM.poetryStatusPill.textContent = 'PoetryDB: Idle (Using default installation)';
+      if (DOM.poetryStatusModal) DOM.poetryStatusModal.textContent = 'Using default installation';
+    }
+  }
+
+  // --- Dynamic Auto-Fill Day from Backlog (§18.5) ---
+  function autoFillDayFromBacklog() {
+    const activeUnits = state.activeTasks.reduce((acc, t) => acc + (t.units !== undefined ? t.units : 1.0), 0);
+    const targetBudget = 2.5;
+    const deficit = Math.max(0, targetBudget - activeUnits);
+
+    if (deficit <= 0) {
+      alert(`Daily target budget already satisfied (${activeUnits.toFixed(1)}u active).`);
+      return;
+    }
+
+    if (!state.backlog || state.backlog.length === 0) {
+      alert('Backlog is currently empty. Add tasks to your backlog repository first.');
+      return;
+    }
+
+    let filledUnits = 0;
+    const moved = [];
+    while (state.backlog.length > 0 && (filledUnits < deficit || moved.length === 0)) {
+      const item = state.backlog.shift();
+      state.activeTasks.push({
+        id: item.id || `task-${Date.now()}`,
+        title: item.title,
+        units: item.units !== undefined ? item.units : 1.0,
+        proof: 'evidence_check',
+        done: false
+      });
+      filledUnits += (item.units !== undefined ? item.units : 1.0);
+      moved.push(item);
+    }
+
+    try { localStorage.setItem('dhriti_backlog', JSON.stringify(state.backlog)); } catch (_) {}
+    renderContractTasks();
+    renderBacklogTable();
+
+    if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+      window.DhritiAudio.playPebble(1.2);
+    }
+  }
+
   // --- Wire Event Listeners ---
   function wireEvents() {
     // Mode toggles
@@ -1727,12 +1965,20 @@
       });
     }
 
+    if (DOM.btnEnterWorkspace) {
+      DOM.btnEnterWorkspace.addEventListener('click', flipToDashboard);
+    }
+
     if (DOM.btnReturnArt) {
       DOM.btnReturnArt.addEventListener('click', returnToArt);
     }
 
     if (DOM.btnNavArtMode) {
       DOM.btnNavArtMode.addEventListener('click', returnToArt);
+    }
+
+    if (DOM.btnNavReturnArt) {
+      DOM.btnNavReturnArt.addEventListener('click', returnToArt);
     }
 
     if (DOM.sidebarBrand) {
@@ -2034,7 +2280,12 @@
     if (DOM.btnEvalPrompt) DOM.btnEvalPrompt.addEventListener('click', evaluatePromptAlignment);
 
     // Settings overlay
-    if (DOM.btnSettings) DOM.btnSettings.addEventListener('click', () => DOM.settingsOverlay.classList.add('active'));
+    if (DOM.btnSettings) {
+      DOM.btnSettings.addEventListener('click', () => {
+        DOM.settingsOverlay.classList.add('active');
+        renderQuotesManager();
+      });
+    }
     if (DOM.btnCloseSettings) DOM.btnCloseSettings.addEventListener('click', () => DOM.settingsOverlay.classList.remove('active'));
 
     // Settings Dials (Shell View) - Real-time synchronization
@@ -2087,16 +2338,120 @@
     if (DOM.btnResetUnderlayShell) DOM.btnResetUnderlayShell.addEventListener('click', resetUnderlayDefaults);
     if (DOM.btnResetUnderlayModal) DOM.btnResetUnderlayModal.addEventListener('click', resetUnderlayDefaults);
 
-    // Triple-click gesture
-    let clickCount = 0;
-    let clickTimer = null;
-    document.addEventListener('click', () => {
-      clickCount++;
-      if (clickCount === 1) {
-        clickTimer = setTimeout(() => { clickCount = 0; }, 400);
-      } else if (clickCount === 3) {
-        clearTimeout(clickTimer);
-        clickCount = 0;
+    // Backlog inline task creation
+    function handleAddBacklog() {
+      if (!DOM.newBacklogTitle) return;
+      const title = DOM.newBacklogTitle.value.trim();
+      if (!title) return;
+      const tier = (DOM.newBacklogTier ? DOM.newBacklogTier.value : 'medium') || 'medium';
+      const tierUnitMap = { light: 0.5, medium: 1.0, hard: 2.0, challenging: 3.0 };
+      const units = tierUnitMap[tier] || 1.0;
+
+      state.backlog.push({
+        id: `task-${Date.now()}`,
+        title: title,
+        units: units,
+        tier: tier
+      });
+
+      DOM.newBacklogTitle.value = '';
+      try { localStorage.setItem('dhriti_backlog', JSON.stringify(state.backlog)); } catch (_) {}
+      renderBacklogTable();
+      if (window.DhritiAudio && typeof window.DhritiAudio.playClick === 'function') {
+        window.DhritiAudio.playClick(0.9);
+      }
+    }
+
+    if (DOM.btnAddBacklog) {
+      DOM.btnAddBacklog.addEventListener('click', handleAddBacklog);
+    }
+    if (DOM.newBacklogTitle) {
+      DOM.newBacklogTitle.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAddBacklog();
+        }
+      });
+    }
+
+    // Auto-fill day from backlog
+    if (DOM.btnEvalAutofill) {
+      DOM.btnEvalAutofill.addEventListener('click', autoFillDayFromBacklog);
+    }
+
+    // Clear completed tasks
+    if (DOM.btnClearCompleted) {
+      DOM.btnClearCompleted.addEventListener('click', () => {
+        state.completedTasks = [];
+        renderCompletedTasks();
+        const subnoteEl = document.getElementById('desk-contract-subnote');
+        if (subnoteEl) subnoteEl.textContent = '0 verified with machine proof';
+        if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+          window.DhritiAudio.playPebble(0.8);
+        }
+      });
+    }
+
+    // Quotes manager in Settings
+    if (DOM.btnAddQuote) {
+      DOM.btnAddQuote.addEventListener('click', () => {
+        if (!DOM.newQuoteText) return;
+        const text = DOM.newQuoteText.value.trim();
+        if (!text) return;
+        const author = (DOM.newQuoteAuthor ? DOM.newQuoteAuthor.value.trim() : '') || 'Anonymous';
+        state.quotes.push({ text, author });
+        try { localStorage.setItem('dhriti_quotes', JSON.stringify(state.quotes)); } catch (_) {}
+        DOM.newQuoteText.value = '';
+        if (DOM.newQuoteAuthor) DOM.newQuoteAuthor.value = '';
+        renderQuotesManager();
+        cycleQuote();
+        if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+          window.DhritiAudio.playPebble(1.0);
+        }
+      });
+    }
+
+    // PoetryDB fetching buttons & author chips
+    if (DOM.btnFetchPoetryQuick) {
+      DOM.btnFetchPoetryQuick.addEventListener('click', () => fetchAndSetPoem());
+    }
+    if (DOM.btnFetchPoetryModal) {
+      DOM.btnFetchPoetryModal.addEventListener('click', () => fetchAndSetPoem());
+    }
+    if (DOM.authorChips && DOM.authorChips.length > 0) {
+      DOM.authorChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          const author = chip.dataset.author || chip.textContent.trim();
+          fetchAndSetPoem(author);
+        });
+      });
+    }
+
+    // Global keyboard Escape toggle
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const activeModal = document.querySelector('.modal-overlay.active, .inspector-overlay.active');
+        if (activeModal) return;
+        if (state.mode === 'picture') flipToDashboard();
+        else returnToArt();
+      }
+    });
+
+    // Double-click on background underlay to toggle modes
+    if (DOM.paintingUnderlay) {
+      DOM.paintingUnderlay.addEventListener('dblclick', () => {
+        if (state.mode === 'picture') flipToDashboard();
+        else returnToArt();
+      });
+    }
+
+    // Triple-click gesture (Monotonic timeStamp window without wall-clock jitter - §16.4)
+    let stamps = [];
+    document.addEventListener('click', e => {
+      stamps.push(e.timeStamp);
+      stamps = stamps.filter(t => e.timeStamp - t <= 400);
+      if (stamps.length >= 3) {
+        stamps = [];
         if (state.mode === 'picture') {
           cycleArtwork();
           cycleQuote();
@@ -2240,16 +2595,6 @@
 
   // --- Vidura Surfacing & Recall-Before-Reveal Protocol ---
   let currentRecallItem = null;
-
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
 
   async function loadDailySurfacingCard() {
     try {

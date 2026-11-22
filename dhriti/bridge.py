@@ -118,7 +118,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if (ok or self.path.startswith("/healthz") or path in dashboard_paths
                 or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")
                 or path.startswith("/api/vidura/") or path.startswith("/ledger/") or path.startswith("/stats/")
-                or path.startswith("/api/defense/") or path.startswith("/api/oa/")
+                or path.startswith("/api/defense/") or path.startswith("/api/oa/") or path.startswith("/api/capability/")
                 or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/targets/verify_recall",
                             "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm", "/lockdown/engage", "/api/task/poison")):
             return True
@@ -474,6 +474,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return
+        elif path == "/api/capability/drills":
+            try:
+                from .capability import CapabilityService
+                from .constants import DB_PATH, DEFAULT_HOME
+                from .db import Database
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                svc = CapabilityService(db, ledger=self.ledger, home=DEFAULT_HOME)
+                self._send(200, {"ok": True, "drills": svc.list_drills()})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
         elif path == "/api/defense/cards":
             try:
                 import sqlite3
@@ -822,6 +833,39 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 sim = OASimulator(db, ledger=self.ledger)
                 answers = payload.get("answers", {})
                 res = sim.submit_drill(answers)
+                self._send(200, res)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/capability/start":
+            try:
+                from .capability import CapabilityService
+                from .constants import DB_PATH, DEFAULT_HOME
+                from .db import Database
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                svc = CapabilityService(db, ledger=self.ledger, home=DEFAULT_HOME)
+                drill_id = payload.get("drill_id", "palindrome")
+                duration = int(payload.get("duration", 25))
+                res = svc.start_drill(drill_id, duration_min=duration)
+                self._send(200, res)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/capability/verify":
+            try:
+                from .capability import CapabilityService
+                from .constants import DB_PATH, DEFAULT_HOME
+                from .db import Database
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                svc = CapabilityService(db, ledger=self.ledger, home=DEFAULT_HOME)
+                drill_id = payload.get("drill_id")
+                code = payload.get("code") or payload.get("file_path")
+                if not drill_id or not code:
+                    self._send(400, {"error": "drill_id and code/file_path are required"})
+                    return
+                res = svc.verify_drill(drill_id, code)
                 self._send(200, res)
             except Exception as e:
                 self._send(500, {"error": str(e)})
