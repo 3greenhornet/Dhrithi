@@ -1,0 +1,50 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": "dhrithi-repomix.md",
+    "style": "markdown",
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 10,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDotIgnore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "*repomix*",
+      "dhrithi-repomix.md",
+      "repomix-output.*",
+      "repomix.ignore",
+      ".repomixignore",
+      "repomix.config.json",
+      "*cookie*.txt",
+      "*.token",
+      "bridge_token*",
+      ".env*",
+      "watch_later.json",
+      "liked_videos.json",
+      "bookmarks_corpus.json",
+      "*playlist*.json",
+      "*.sqlite3*",
+      "*.sqlite",
+      "*.db",
+      "*.onnx",
+      "dashboard/gallery/**",
+      "dashboard/fonts/**",
+      "docs/*.png",
+      "docs/*.jpg",
+      "*.png",
+      "*.jpg",
+      "*.jpeg",
+      "*.webp",
+      "*.gif",
+      "*.ico",
+      "*.ttf",
+      "*.woff",
+      "*.woff2",
+      "*.lnk"
+    ]
+  }
+}

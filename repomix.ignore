@@ -1,0 +1,70 @@
+# ==============================================================================
+# Dhriti Repomix Ignore — Excludes Snapshots, Secrets, Dumps, Binaries & Caches
+# ==============================================================================
+
+# 1. Repomix Snapshots & Outputs (Prevent recursive duplicate copies)
+*repomix*
+dhrithi-repomix.md
+repomix-output.*
+repomix.config.json
+
+# 2. Personal & Sensitive Files (Never bundle into prompts)
+*cookie*.txt
+www.youtube.com_cookies.txt
+brave_cookies_temp*
+bridge_token*
+*.token
+.env*
+daemon.lock
+
+# 3. Large Raw Data Dumps & Databases
+watch_later.json
+liked_videos.json
+bookmarks_corpus.json
+*playlist*.json
+*.sqlite3*
+*.sqlite
+*.db
+
+# 4. Media & Binary Assets
+dashboard/gallery/
+dashboard/fonts/
+docs/*.png
+docs/*.jpg
+docs/*.jpeg
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.ico
+*.ttf
+*.woff
+*.woff2
+*.onnx
+
+# 5. Git, Caches & Dependencies
+.git/
+.github/
+.cache/
+models/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+node_modules/
+venv/
+.venv/
+env/
+
+# 6. Windows & OS Noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
