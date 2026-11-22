@@ -117,7 +117,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         )
         if (ok or self.path.startswith("/healthz") or path in dashboard_paths
                 or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")
-                or path.startswith("/api/vidura/")):
+                or path.startswith("/api/vidura/")
+                or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/api/check_query", "/api/safe_anchor")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -307,6 +308,72 @@ class BridgeHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return
+        elif path == "/targets":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                import datetime as _dt
+                today = _dt.date.today().isoformat()
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                row = db.query_one(
+                    "SELECT payload_json FROM contract WHERE kind='daily' AND scope_date=? AND state='SEALED'",
+                    (today,)
+                )
+                if not row:
+                    self._send(200, {"ok": True, "sealed": False, "targets": [], "contract_line": "No contract sealed for today."})
+                    return
+                payload = json.loads(row["payload_json"])
+                targets = payload.get("targets", [])
+                self._send(200, {
+                    "ok": True,
+                    "sealed": True,
+                    "contract_line": payload.get("contract_line", ""),
+                    "targets": targets
+                })
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/ritual/state":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                import datetime as _dt
+                today = _dt.date.today().isoformat()
+                yesterday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                row_today = db.query_one(
+                    "SELECT payload_json FROM contract WHERE kind='daily' AND scope_date=? AND state='SEALED'",
+                    (today,)
+                )
+                row_yest = db.query_one(
+                    "SELECT payload_json FROM contract WHERE kind='daily' AND scope_date=? AND state='SEALED'",
+                    (yesterday,)
+                )
+                yest_payload = json.loads(row_yest["payload_json"]) if row_yest else None
+                if row_today:
+                    payload = json.loads(row_today["payload_json"])
+                    self._send(200, {
+                        "ok": True,
+                        "date": today,
+                        "local_date": today,
+                        "sealed": True,
+                        "contract_line": payload.get("contract_line", ""),
+                        "targets": payload.get("targets", []),
+                        "yesterday": yest_payload
+                    })
+                else:
+                    self._send(200, {
+                        "ok": True,
+                        "date": today,
+                        "local_date": today,
+                        "sealed": False,
+                        "contract_line": "",
+                        "targets": [],
+                        "yesterday": yest_payload
+                    })
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
         elif GuardRoutes.dispatch(self, "GET", path, None):
             return
         else:
@@ -330,7 +397,105 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._send(400, {"error": "invalid JSON"})
                 return
 
-        if path == "/api/vidura/sync":
+        if path == "/ritual/seal":
+            try:
+                from .constants import DB_PATH, DEFAULT_HOME
+                from .db import Database
+                from .contract import ContractService
+                from .timeutil import RealClock
+                import datetime as _dt
+                today = _dt.date.today().isoformat()
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                contracts = ContractService(db, RealClock())
+                
+                contract_line = payload.get("contract_line", "").strip()
+                if not contract_line:
+                    self._send(400, {"error": "contract_line required"})
+                    return
+                raw_targets = payload.get("targets", [])
+                if not raw_targets:
+                    raw_targets = [{"label": contract_line, "kind": "learning", "evidence": {"class": "learning"}}]
+                
+                targets = []
+                for t in raw_targets:
+                    if isinstance(t, str):
+                        targets.append({"label": t, "kind": "learning", "evidence": {"class": "learning"}})
+                    elif isinstance(t, dict):
+                        if "evidence" not in t:
+                            t["evidence"] = {"class": "learning"}
+                        targets.append(t)
+
+                full_payload = {
+                    "identity_statement": payload.get("identity_statement", "I am a sovereign engineer focused on learning and shipping."),
+                    "contract_line": contract_line,
+                    "targets": targets,
+                    "profile": payload.get("profile", "study"),
+                    "main_belief": {"label": payload.get("main_belief_label", "Consistent deliberate study clears assessments.")},
+                    "main_belief_metric": payload.get("main_belief_metric", "DSA problems solved & interview readiness"),
+                    "main_belief_current_state": payload.get("main_belief_current_state", "Active preparation"),
+                    "substitute_activities": payload.get("substitute_activities", "Passive browsing"),
+                    "substitute_budget": payload.get("substitute_budget", 0)
+                }
+
+                sealed = contracts.seal(today, full_payload, user_override_path=(DEFAULT_HOME / f"contract-{today}.json"))
+                if self.ledger:
+                    self.ledger.record("contract_sealed", observed={"date": today, "targets": len(targets)}, action_taken="contract sealed via UI ritual")
+                self._send(200, {"ok": True, "sealed": True, "date": today, "targets": targets, "contract_line": contract_line})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/targets/claim":
+            target_id = payload.get("target_id")
+            self._send(200, {"ok": True, "claimed": True, "target_id": target_id})
+            return
+
+        elif path == "/api/check_query":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .topic_gate import TopicGate
+                import datetime as _dt
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                gate = TopicGate(db)
+                query = payload.get("query", "")
+                url = payload.get("url", "")
+                
+                today = _dt.date.today().isoformat()
+                row = db.query_one(
+                    "SELECT payload_json FROM contract WHERE kind='daily' AND scope_date=? AND state='SEALED'",
+                    (today,)
+                )
+                targets = []
+                if row:
+                    p_json = json.loads(row["payload_json"])
+                    targets = p_json.get("targets", [])
+                
+                snap = self.state.snapshot()
+                is_active = snap["policy"].get("enforce", False) if snap.get("policy") else True
+                
+                result = gate.check_query(query, targets, is_session_active=is_active)
+                self._send(200, result)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/safe_anchor":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .topic_gate import TopicGate
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                gate = TopicGate(db)
+                anchor = payload.get("anchor", "")
+                source = payload.get("source", "user_pivot")
+                ok = gate.add_safe_anchor(anchor, source=source)
+                self._send(200, {"ok": ok, "anchor": anchor})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/vidura/sync":
             repo_dir = Path(__file__).parent.parent
             sync_script = repo_dir / "sync_playlist.py"
             def run_sync():

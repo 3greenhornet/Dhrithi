@@ -1740,6 +1740,19 @@ def cmd_app(args, ctx):
     launch_desktop_app()
 
 
+def cmd_autostart(args, ctx):
+    """Manage Windows boot autostart and desktop shortcut."""
+    import subprocess
+    action = getattr(args, "action", "status")
+    script = ctx.home.parent / "launcher" / "autostart.ps1"
+    if not script.exists():
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "launcher" / "autostart.ps1"
+    
+    cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script), "-Action", action.capitalize()]
+    subprocess.run(cmd)
+
+
 def cmd_sidecar(args, ctx):
     """Run loopback classifier sidecar (escalate-only sensor)."""
     from .bridge import ensure_token
@@ -2161,6 +2174,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("sidecar", help="run loopback classifier sidecar (escalate-only sensor)")
     p.add_argument("--port", type=int, default=8765, help="port to bind (default: 8765)")
     p.set_defaults(func=cmd_sidecar)
+
+    p = sub.add_parser("autostart", help="manage Windows logon autostart and desktop shortcut")
+    p.add_argument("action", nargs="?", default="status", choices=["install", "status", "remove"],
+                   help="install, status, or remove logon task")
+    p.set_defaults(func=cmd_autostart)
 
     return parser
 

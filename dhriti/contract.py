@@ -120,10 +120,10 @@ def validate(payload: dict) -> None:
                 problems.append(f"targets[{i}] needs a label")
             ev = target.get("evidence")
             if not isinstance(ev, dict) \
-                    or ev.get("class") not in ("machine", "file", "manual"):
+                    or ev.get("class") not in ("machine", "file", "manual", "observed", "learning"):
                 problems.append(
                     f"targets[{i}].evidence needs a class of "
-                    "machine|file|manual")
+                    "machine|file|manual|observed|learning")
 
     # Bug D (v0.6.0 Part 1 §4.1): workspace_dir is optional; when
     # present it must be an absolute path to a directory that exists

@@ -22,6 +22,14 @@ refusals ("Your mind is incredibly artistic...") were consumed as
 content; even a moralistic refusal is an affordance. **No Dhriti
 surface may end an interaction by proposing the next one.**
 
+*§1.3 Sovereign Interstitial & Bounded Alerts Amendment (v0.7.0+):*
+A surface, interstitial, or sticky overlay may state neutral factual context
+regarding today's declared targets, relevance score, or a held attempt, offering
+bounded sovereign actions: [Back to Target], [Add as Today's Topic / Pivot], or
+[Park for 20:00]. It never lectures, shames, or congratulates. Bounded desktop
+notifications (maximum 3/day) are permitted strictly for: day-open ritual reminders,
+overdue commitments, or daemon health alerts.
+
 *Tests:* `tests/test_design_laws.py` — the wall page carries no links,
 no buttons, no forms; no surface text contains engagement phrases.
 
@@ -67,23 +75,22 @@ the record is the countermeasure.
 
 *Tests:* `tests/test_design_laws.py::TestConfigImmutability`.
 
-## L-4. Structure-aware, content-blind & privacy-local (D-014, absolute)
+## L-4r. Semantic Intelligence & Relational Input Inspection (v0.7.0+ Revision)
 
-Nothing in the ambient enforcement or background observation path reads
-page content, chat text, or window titles as semantic input. All ambient
-signals are deterministic structural counts (domains, categories, event
-types). The behavioral pattern taxonomy (P-01..P-10) is reference
-vocabulary for cold-state coding — naming a pattern hot is itself P-02,
-and the software never does it. No classifier, no model, no prediction.
+Dhriti rejects blind decision-making. Ambient background observation remains
+structural and non-invasive, but **declared-input inspection** (search query parameters,
+AI chat prompts, address-bar text, and rendered visual media) is explicitly permitted
+and actively performed on-device.
 
-Where explicit content analysis is enabled by narrow exception (L-9
-semantic topic-lock or search query springboard inspection), processing
-is **100% local**: no remote telemetry of prompts, search queries, or
-reading history.
+The decision engine is **content-aware and relational**: it computes semantic similarity
+between what the operator types and what the operator promised to study today. A query
+is never blocked based on dumb keyword absence; it is judged by whether it serves
+the active target. All semantic processing is strictly local (vector embeddings via
+FastEmbed / ONNX and local LLM reasoning via Ollama) with zero remote transmission.
+Raw text resides exclusively in a temporary 14-day local TTL store; the permanent
+audit ledger records only hashes, scores, and timestamps.
 
-*Tests:* the policy engine and all adapters are deterministic by
-construction; `analysis/labels/BEHAVIORAL_PATTERNS.md` carries the
-cold-only rule.
+*Tests:* `tests/test_v070_additions.py`, `tests/test_topic_gate.py`.
 
 ## L-5. Bounded release (D-018)
 
@@ -108,6 +115,12 @@ unbounded lock is a bug, not a feature.
    guard, or tightening allowlists). This is framed calmly and
    authoritatively as an ordinary daily operational act — never as a
    panicky, shameful, or crisis-driven "SOS" button.
+3. **§6.3 Declared Pivot (Hot Bounded Pivot):** Hot weakening is permitted
+   strictly as a declared pivot when priorities shift (e.g. pivoting to an
+   urgent aptitude drill). The operator enters a brief reason (≥15 chars);
+   the system enforces a 30-second deliberate pause (capped at 3 pivots/day),
+   unlocking the new target in the sticky overlay without breaking the contract.
+   Never permitted for adult or entertainment categories.
 
 **Interaction with the allowlist (Phase 0, Bug 7):** the builder
 clause never overrides the profile allowlist. If a domain is an
@@ -145,34 +158,25 @@ mirror surfaces carry no affordances.
 
 ---
 
-## L-9. The explicit-content exception: Topic-Lock & Search Springboard (v0.7.0+)
+## L-9r. Local On-Device Input Analysis & Continuous Learning (v0.7.0+ Revision)
 
-L-4 (structure-aware, content-blind) governs ambient observation
-absolutely. The topic-lock and search springboard checks are **narrow,
-explicit exceptions**: the operator consents to the system reading ONLY
-the prompts they submit to AI chat surfaces and URL search parameters
-(`?q=`, titles) during an ACTIVE session or decompression zone,
-comparing them semantically to the active topic.
+All text the operator inputs into a browser (search queries, address-bar
+navigations, AI chat prompts) and non-allowlisted rendered visual media
+may be inspected and classified on-device.
 
-The exception's own bounds (each is tested):
+1. **Active by default during study:** When a contract is active, semantic
+   inspection is armed so the operator is never blocked blindly by dumb
+   heuristics.
+2. **Local vector reasoning:** FastEmbed embeddings (~15ms) and local
+   Ollama LLM adjudication evaluate semantic relevance against today's
+   declared targets.
+3. **Continuous self-learning loop:** Clicking "This was actually study"
+   absorbs the vector into `vec_safe_anchors` in `guard_content.sqlite3`.
+   The system permanently learns without the operator maintaining keyword lists.
+4. **Zero external transmission:** Processing is strictly on-device. Raw
+   queries are purged after 14 days (TTL store).
 
-1. **Off by default.** `topic_lock.semantic_mode_enabled = False`;
-   enabling it is a cold-state act recorded as `topic_lock_enabled`
-   (L-6 applies to the exception itself).
-2. **Session- or Zone-bound.** The lock binds to the declared session
-   topic; outside an ACTIVE session or decompression zone nothing is read.
-3. **Local processing only.** Stems, embeddings, and token counts are
-   computed strictly locally on-device. Prompts and queries are never
-   transmitted.
-4. **Prompts and query strings only.** The submitted query text — never
-   the page body, user credentials, private document contents, or history.
-5. **Bounded, not optimized** (L-8 inherits): the lock bounds the
-   investigation; it never ranks, paces, or "improves" it.
-6. **The hash, not the vector.** The topic embedding is stored as a
-   hash — reproducibility, not surveillance.
-
-*Tests:* `tests/test_v070_part3b.py::TestTopicLockLedger`,
-`TestSemanticTopicLock`.
+*Tests:* `tests/test_v070_additions.py`, `tests/test_vidura_mechanisms.py`.
 
 ---
 
@@ -184,6 +188,12 @@ entertainment scrolling, producing meaningless guilt. Dhriti decomposes
 time into domain and topic segments (Stage vs Audience, core topic vs
 drift). Time is displayed as honest, neutral topic-segment distributions
 (hours per domain, topic clusters), never moralized totals.
+
+*§11.2 Declared Learning as Stage Work:*
+Any video, playlist, or document declared as an active learning target
+in today's contract (with accepted completion recall) is formally classified
+as **Stage (Active Output/Productive Work)** rather than passive "Audience"
+consumption. Undeclared video remains Audience.
 
 *Tests:* `tests/test_dashboard_bridge.py` (topic time histogram facts).
 
@@ -197,7 +207,7 @@ against it:
 
 1. Does it speak in anything but the user's own words? (L-1)
 2. Does it praise, shame, or compare? (L-2)
-3. Does it read content rather than count structure? (L-4)
+3. Does it make blind, crude decisions instead of on-device semantic relevance? (L-4r)
 4. Can it lock or watch beyond its declared bound? (L-5)
 5. Did changing it require a hot reload? (L-3)
 6. Is it on by default when it widens scope? (L-6)

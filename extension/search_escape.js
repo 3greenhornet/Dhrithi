@@ -21,8 +21,22 @@
   // Let background service worker perform the search over bridge
   try {
     chrome.runtime.sendMessage({ type: "vidura_search", query: query.trim() }, response => {
-      if (!response || !response.items || response.items.length === 0) return;
-      showEscapeBanner(response.items, query.trim());
+      if (response && response.items && response.items.length > 0) {
+        showEscapeBanner(response.items, query.trim());
+        return;
+      }
+      // If not in saved library, check semantic alignment with active targets (L-4r / L-9r)
+      chrome.runtime.sendMessage({ type: "check_query", query: query.trim(), url: url }, checkResp => {
+        if (checkResp && checkResp.allowed === false) {
+          const targetStr = (checkResp.targets && checkResp.targets.length > 0) ? checkResp.targets[0] : "";
+          const interstitialUrl = chrome.runtime.getURL("interstitial.html") +
+            "?query=" + encodeURIComponent(query.trim()) +
+            "&target=" + encodeURIComponent(targetStr) +
+            "&score=" + encodeURIComponent(checkResp.score || 0) +
+            "&orig_url=" + encodeURIComponent(window.location.href);
+          window.location.href = interstitialUrl;
+        }
+      });
     });
   } catch (e) {
     // Isolated extension context

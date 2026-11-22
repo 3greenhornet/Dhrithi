@@ -2349,12 +2349,164 @@
     });
   }
 
+  let cachedYesterdayContract = null;
+
+  function createRitualTargetRow(label = '', kind = 'learning') {
+    const row = document.createElement('div');
+    row.className = 'ritual-target-row';
+    row.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+    row.innerHTML = `
+      <select class="styled-input ritual-row-kind" style="width: 110px; padding: 8px; font-size: 13px;">
+        <option value="code"${kind === 'code' ? ' selected' : ''}>Code (DSA)</option>
+        <option value="learning"${kind === 'learning' ? ' selected' : ''}>Learning/Video</option>
+        <option value="aptitude"${kind === 'aptitude' ? ' selected' : ''}>Aptitude</option>
+      </select>
+      <input type="text" class="styled-input ritual-row-label" placeholder="Target description or video URL" value="${label.replace(/"/g, '&quot;')}" style="flex: 1; padding: 8px 10px; font-size: 13px;">
+      <button type="button" class="icon-btn btn-remove-row" style="color: var(--text-muted); font-size: 14px; padding: 4px 8px;" title="Remove row">✕</button>
+    `;
+    row.querySelector('.btn-remove-row').addEventListener('click', () => row.remove());
+    return row;
+  }
+
+  async function checkRitualState() {
+    try {
+      const resp = await fetch('/ritual/state');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data.ok) return;
+
+      const dateEl = document.getElementById('ritual-modal-date');
+      if (dateEl) dateEl.textContent = data.date || data.local_date;
+      cachedYesterdayContract = data.yesterday;
+
+      const overlay = document.getElementById('ritual-modal-overlay');
+      const container = document.getElementById('ritual-targets-container');
+
+      if (!data.sealed) {
+        if (overlay) overlay.style.display = 'flex';
+        if (container && container.children.length === 0) {
+          container.appendChild(createRitualTargetRow('LeetCode Binary Tree Traversals (3 problems)', 'code'));
+          container.appendChild(createRitualTargetRow('Kunal Kushwaha Java OOPs Tutorial Lecture 4', 'learning'));
+          container.appendChild(createRitualTargetRow('Quantitative Aptitude: Probability & P&C', 'aptitude'));
+        }
+      } else {
+        if (overlay) overlay.style.display = 'none';
+        const anchorEl = document.getElementById('tile-anchor-next');
+        if (anchorEl && data.contract_line) {
+          anchorEl.textContent = data.contract_line;
+        }
+      }
+    } catch (e) {
+      console.warn('Ritual check notice:', e);
+    }
+  }
+
+  function wireMorningRitual() {
+    const overlay = document.getElementById('ritual-modal-overlay');
+    const closeBtn = document.getElementById('btn-close-ritual');
+    if (closeBtn && overlay) {
+      closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
+    }
+
+    const addRowBtn = document.getElementById('btn-ritual-add-row');
+    const container = document.getElementById('ritual-targets-container');
+    if (addRowBtn && container) {
+      addRowBtn.addEventListener('click', () => {
+        container.appendChild(createRitualTargetRow('', 'learning'));
+      });
+    }
+
+    const prefillBtn = document.getElementById('btn-prefill-yesterday');
+    if (prefillBtn) {
+      prefillBtn.addEventListener('click', () => {
+        if (!cachedYesterdayContract) {
+          alert('No previous contract found in history.');
+          return;
+        }
+        const lineInput = document.getElementById('ritual-input-line');
+        if (lineInput && cachedYesterdayContract.contract_line) {
+          lineInput.value = cachedYesterdayContract.contract_line;
+        }
+        if (container && cachedYesterdayContract.targets) {
+          container.innerHTML = '';
+          cachedYesterdayContract.targets.forEach(t => {
+            const lbl = typeof t === 'string' ? t : (t.label || t.target || '');
+            const knd = typeof t === 'object' ? (t.kind || 'learning') : 'learning';
+            container.appendChild(createRitualTargetRow(lbl, knd));
+          });
+        }
+      });
+    }
+
+    const sealBtn = document.getElementById('btn-seal-contract');
+    const statusEl = document.getElementById('ritual-seal-status');
+    if (sealBtn) {
+      sealBtn.addEventListener('click', async () => {
+        const lineInput = document.getElementById('ritual-input-line');
+        const contractLine = (lineInput ? lineInput.value : '').trim();
+        if (!contractLine) {
+          alert('Please enter a one-line focus contract before sealing.');
+          return;
+        }
+
+        const rows = container ? container.querySelectorAll('.ritual-target-row') : [];
+        const targets = [];
+        rows.forEach(r => {
+          const k = r.querySelector('.ritual-row-kind').value;
+          const l = r.querySelector('.ritual-row-label').value.trim();
+          if (l) {
+            targets.push({ label: l, kind: k, evidence: { class: 'learning' } });
+          }
+        });
+
+        if (targets.length === 0) {
+          targets.push({ label: contractLine, kind: 'learning', evidence: { class: 'learning' } });
+        }
+
+        sealBtn.disabled = true;
+        sealBtn.textContent = 'Sealing Cold...';
+
+        try {
+          const resp = await fetch('/ritual/seal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contract_line: contractLine,
+              targets: targets
+            })
+          });
+          const res = await resp.json();
+          if (res.ok) {
+            if (statusEl) {
+              statusEl.style.display = 'block';
+              statusEl.textContent = '✓ Contract sealed cold. Sovereign day armed.';
+            }
+            setTimeout(() => {
+              if (overlay) overlay.style.display = 'none';
+              const anchorEl = document.getElementById('tile-anchor-next');
+              if (anchorEl) anchorEl.textContent = contractLine;
+            }, 1200);
+          } else {
+            alert('Failed to seal contract: ' + (res.error || 'unknown'));
+            sealBtn.disabled = false;
+            sealBtn.textContent = 'Seal Today\'s Contract';
+          }
+        } catch (err) {
+          alert('Network error sealing contract: ' + err);
+          sealBtn.disabled = false;
+          sealBtn.textContent = 'Seal Today\'s Contract';
+        }
+      });
+    }
+  }
+
   // --- Initialization ---
   function init() {
     window.DhritiState = state;
     initDOM();
     wireEvents();
     wireViduraControls();
+    wireMorningRitual();
     updateTimerDisplay();
     updateUnderlayStyles();
     loadGallery();
@@ -2363,6 +2515,7 @@
     renderLifeAlts();
     loadDailySurfacingCard();
     loadLifeInstruments();
+    checkRitualState();
   }
 
   if (document.readyState === 'loading') {
