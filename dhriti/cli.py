@@ -985,6 +985,39 @@ def cmd_vidura_review(args, ctx):
           f"EF {row['ease_factor']})")
 
 
+def cmd_vidura_watch(args, ctx):
+    """Monitor browser Bookmarks for modifications and auto-ingest into Vidura (§6.6.3)."""
+    from .constants import DB_VIDURA_PATH
+    from .vidura_corpus import ViduraCorpus
+    from .vidura_watcher import BookmarksWatcher, find_platform_bookmark_paths
+
+    corpus = ViduraCorpus(DB_VIDURA_PATH)
+    discovered = find_platform_bookmark_paths()
+    print(f"[*] Found {len(discovered)} browser Bookmarks file(s):")
+    for p in discovered:
+        print(f"    - {p}")
+
+    def on_ingested(path, count):
+        print(f"[+] Re-ingested {count} bookmarks from {path.name}")
+
+    watcher = BookmarksWatcher(
+        corpus=corpus,
+        bookmark_paths=discovered,
+        debounce_seconds=getattr(args, "debounce", 2.0),
+        on_ingest_callback=on_ingested,
+    )
+
+    if getattr(args, "once", False):
+        print("[*] Running one-shot bookmark ingestion...")
+        results = watcher.ingest_all_now()
+        total = sum(results.values())
+        print(f"[+] One-shot ingestion complete: {total} items ingested/updated.")
+        return
+
+    print("[*] Starting live bookmarks watcher daemon (Ctrl+C to stop)...")
+    watcher.start(blocking=True)
+
+
 def cmd_health(args, ctx):
     """Operational state, one screen, facts only (toolkit #1)."""
     report = build_health(ctx.home, ctx.config, ctx.clock,
@@ -2086,6 +2119,10 @@ def build_parser() -> argparse.ArgumentParser:
     vr.add_argument("item")
     vr.add_argument("grade", choices=["again", "hard", "good", "easy"])
     vr.set_defaults(func=cmd_vidura_review)
+    vw = vsub.add_parser("watch", help="live watchdog monitor for Chrome/Edge/Brave bookmarks (§6.6.3)")
+    vw.add_argument("--once", action="store_true", help="run immediate one-shot ingestion and exit")
+    vw.add_argument("--debounce", type=float, default=2.0, help="debounce seconds (default 2.0)")
+    vw.set_defaults(func=cmd_vidura_watch)
 
     p = sub.add_parser("health", help="operational state, one screen")
     p.set_defaults(func=cmd_health)
