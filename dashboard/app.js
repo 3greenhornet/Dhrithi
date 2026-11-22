@@ -115,25 +115,12 @@
     currentQuoteIndex: 0,
     lifeAlts: DEFAULT_LIFE_ALTS,
     backlog: DEFAULT_BACKLOG,
-    activeTasks: [
-      { id: 'task-1', title: 'Complete tactile Lego projection & Solitaire flip', units: 1.0, proof: 'machine_check', done: true },
-      { id: 'task-2', title: 'Modernize App Shell & Executive dark theme', units: 2.0, proof: 'pytest_pass', done: true },
-      { id: 'task-3', title: 'Wire procedural alarms and Life Mirror thought bubbles', units: 1.0, proof: 'browser_verify', done: false }
-    ],
-    completedTasks: [
-      { id: 'task-0', title: 'Implement separate Vidura SQLite storage and topic tree', proof: 'sha256:4f8e...ba12', timestamp: '11:20' },
-      { id: 'task-prev', title: 'Commit and push prior state before major additions', proof: 'git:658420a', timestamp: '12:45' }
-    ],
-    parkingItems: [
-      { id: 'park-1', text: 'Consider PyTorch WASM inference for local text embeddings', age_days: 1, type: 'spark' },
-      { id: 'park-2', text: 'Explore Japanese Pythagorean scale frequencies for chimes', age_days: 0, type: 'spark' }
-    ],
-    topicTime: [
-      { domain: 'github.com', category: 'Stage (Code & Docs)', duration_min: 140, is_stage: true },
-      { domain: 'localhost:7311', category: 'Stage (Dashboard & Bridge)', duration_min: 80, is_stage: true },
-      { domain: 'google.com/search', category: 'Stage (Docs Query)', duration_min: 25, is_stage: true },
-      { domain: 'random-blog.org', category: 'Audience (Drift Attempt)', duration_min: 12, is_stage: false }
-    ],
+    activeTasks: [],
+    completedTasks: [],
+    parkingItems: [],
+    topicTime: [],
+    stageRatio: 0.0,
+    contractStreak: 0,
     decompression: {
       active: false,
       remaining_min: 90,
@@ -483,7 +470,7 @@
       const radius = Math.min(centerX, centerY) - 18;
       const thickness = 14;
 
-      const stagePct = 0.88;
+      const stagePct = state.stageRatio !== undefined ? state.stageRatio : 0.0;
       const startAngle = -Math.PI / 2;
       const stageAngle = startAngle + (Math.PI * 2 * stagePct);
 
@@ -494,24 +481,27 @@
       ctx.lineWidth = thickness;
       ctx.stroke();
 
-      // Stage Arc
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, startAngle, stageAngle);
-      ctx.strokeStyle = state.theme === 'dark' ? '#8b78f6' : '#00b894';
-      ctx.lineWidth = thickness;
-      ctx.lineCap = 'round';
-      ctx.stroke();
+      // Stage Arc (only if active work exists)
+      if (stagePct > 0) {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, stageAngle);
+        ctx.strokeStyle = state.theme === 'dark' ? '#8b78f6' : '#00b894';
+        ctx.lineWidth = thickness;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
 
       // Center text with Poiret One font
+      const pctText = stagePct > 0 ? `${Math.round(stagePct * 100)}%` : '0%';
       ctx.fillStyle = state.theme === 'dark' ? '#ffffff' : '#0f172a';
       ctx.font = '700 22px "Poiret One", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('88%', centerX, centerY - 2);
+      ctx.fillText(pctText, centerX, centerY - 2);
 
       ctx.fillStyle = state.theme === 'dark' ? '#a0a7c4' : '#64748b';
       ctx.font = 'italic 700 10px "Poiret One", sans-serif';
-      ctx.fillText('STAGE', centerX, centerY + 14);
+      ctx.fillText(stagePct > 0 ? 'STAGE' : 'STAGE (0m)', centerX, centerY + 14);
     });
   }
 
@@ -519,6 +509,11 @@
   function renderTopicBars() {
     if (!DOM.deskTopicBars) return;
     DOM.deskTopicBars.innerHTML = '';
+
+    if (state.topicTime.length === 0) {
+      DOM.deskTopicBars.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">No topic browsing recorded today.</div>';
+      return;
+    }
 
     const maxMinutes = Math.max(...state.topicTime.map(t => t.duration_min), 1);
 
@@ -560,6 +555,11 @@
   function renderContractTasks() {
     if (!DOM.contractTaskList) return;
     DOM.contractTaskList.innerHTML = '';
+
+    if (state.activeTasks.length === 0) {
+      DOM.contractTaskList.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">No active targets. Seal today\'s contract or add targets from Vidura feed.</div>';
+      return;
+    }
 
     state.activeTasks.forEach((task, idx) => {
       const row = document.createElement('div');
@@ -604,6 +604,12 @@
   function renderCompletedTasks() {
     if (!DOM.completedTaskList) return;
     DOM.completedTaskList.innerHTML = '';
+
+    if (state.completedTasks.length === 0) {
+      DOM.completedTaskList.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">No completed targets yet today.</div>';
+      return;
+    }
+
     state.completedTasks.forEach(task => {
       const row = document.createElement('div');
       row.className = 'task-item-row';
@@ -974,28 +980,38 @@
   }
 
   // --- Audit Ledger View ---
-  function renderLedgerTable() {
+  async function renderLedgerTable() {
     if (!DOM.ledgerContainer) return;
     DOM.ledgerContainer.innerHTML = '';
-    const events = [
-      { ts: '13:05:12', action: 'TOPIC_DAY_HISTOGRAM_COMPUTED', hash: 'e3b0c442...98fc' },
-      { ts: '12:48:30', action: 'CONTRACT_PROOF_SUBMITTED', hash: 'a1b2c3d4...ef56' },
-      { ts: '12:15:00', action: 'POMODORO_INTERVAL_STARTED', hash: 'f6e5d4c3...b2a1' },
-      { ts: '11:30:22', action: 'LIFE_ALTERNATIVE_DECLARED', hash: '98765432...10fe' },
-      { ts: '08:00:00', action: 'DAY_WINDOW_OPENED', hash: '12345678...90ab' }
-    ];
-    events.forEach(ev => {
-      const row = document.createElement('div');
-      row.className = 'task-item-row';
-      row.innerHTML = `
-        <div>
-          <span class="task-name">${ev.action}</span>
-          <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Timestamp: ${ev.ts}</div>
-        </div>
-        <span class="card-badge info">${ev.hash}</span>
-      `;
-      DOM.ledgerContainer.appendChild(row);
-    });
+    try {
+      const resp = await fetch('/ledger/recent?limit=50');
+      if (resp.ok) {
+        const data = await resp.json();
+        const events = data.events || [];
+        if (events.length === 0) {
+          DOM.ledgerContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px;">Audit ledger is empty for today. No events recorded yet.</div>';
+          return;
+        }
+        events.forEach(ev => {
+          const row = document.createElement('div');
+          row.className = 'task-item-row';
+          const ts = (ev.occurred_at_utc || '').slice(11, 19) || 'Just now';
+          const hashSnippet = (ev.row_hash || ev.prev_hash || 'verified').slice(0, 16) + '...';
+          row.innerHTML = `
+            <div>
+              <span class="task-name">${ev.event_type}</span>
+              <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Seq: ${ev.seq || '-'} | Time: ${ts} UTC</div>
+            </div>
+            <span class="card-badge info">${hashSnippet}</span>
+          `;
+          DOM.ledgerContainer.appendChild(row);
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch ledger:', e);
+    }
+    DOM.ledgerContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px;">Audit ledger empty or offline.</div>';
   }
 
   // --- Topics & Co-occurrence View ---
@@ -1937,9 +1953,21 @@
     if (DOM.btnCloseLockdown) DOM.btnCloseLockdown.addEventListener('click', () => DOM.lockdownModal.classList.remove('active'));
     if (DOM.btnCancelLockdown) DOM.btnCancelLockdown.addEventListener('click', () => DOM.lockdownModal.classList.remove('active'));
     if (DOM.btnConfirmLockdown) {
-      DOM.btnConfirmLockdown.addEventListener('click', () => {
-        DOM.lockdownModal.classList.remove('active');
-        alert('Daily Lockdown Engaged. Enforcement active until tomorrow morning.');
+      DOM.btnConfirmLockdown.addEventListener('click', async () => {
+        try {
+          const resp = await fetch('/lockdown/engage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Manual dashboard lockdown trigger' })
+          });
+          const data = await resp.json();
+          DOM.lockdownModal.classList.remove('active');
+          if (window.DhritiAudio) window.DhritiAudio.playGong();
+          alert(data.message || 'Daily Lockdown Engaged. Enforcement active until tomorrow morning.');
+        } catch (e) {
+          DOM.lockdownModal.classList.remove('active');
+          alert('Lockdown signal engaged locally.');
+        }
       });
     }
 
@@ -2500,6 +2528,81 @@
     }
   }
 
+  // --- Sovereign Dashboard Data Synchronization (Package M Truth) ---
+  async function syncDashboardTruth() {
+    // 1. Fetch real targets from contract
+    try {
+      const resp = await fetch('/targets');
+      if (resp.ok) {
+        const data = await resp.json();
+        const targets = data.targets || [];
+        state.activeTasks = targets.filter(t => !t.claimed).map(t => ({
+          id: t.id || `task-${Math.random()}`,
+          title: t.label,
+          units: t.units || 1.0,
+          proof: t.evidence ? t.evidence.class : 'learning',
+          done: false,
+          is_pivot: t.is_pivot
+        }));
+        state.completedTasks = targets.filter(t => t.claimed).map(t => ({
+          id: t.id,
+          title: t.label,
+          proof: t.proof || 'sha256:verified',
+          timestamp: (t.claimed_at || '').slice(11, 16) || 'Today'
+        }));
+        renderContractTasks();
+        renderCompletedTasks();
+
+        const countEl = document.getElementById('desk-contract-target');
+        const subnoteEl = document.getElementById('desk-contract-subnote');
+        if (countEl) countEl.textContent = `${targets.length} Target${targets.length === 1 ? '' : 's'}`;
+        if (subnoteEl) {
+          const verifiedCount = state.completedTasks.length;
+          subnoteEl.textContent = `${verifiedCount} verified with machine proof`;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not sync targets:', e);
+    }
+
+    // 2. Fetch honest stage ratio
+    try {
+      const resp = await fetch('/stats/stage_ratio');
+      if (resp.ok) {
+        const data = await resp.json();
+        state.stageRatio = data.stage_ratio || 0.0;
+        drawDonutChart();
+        const deskStageFig = document.getElementById('desk-stage-figure');
+        if (deskStageFig) {
+          deskStageFig.textContent = `${data.stage_pct || 0}%`;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not sync stage ratio:', e);
+    }
+
+    // 3. Fetch unbroken contract streak
+    try {
+      const resp = await fetch('/stats/streak');
+      if (resp.ok) {
+        const data = await resp.json();
+        const streak = data.streak || 0;
+        state.contractStreak = streak;
+        const deskStreakFig = document.getElementById('desk-streak-figure');
+        const tileStreakFig = document.getElementById('tile-streak-figure');
+        const tileStreakBadge = document.getElementById('tile-streak-badge');
+        if (deskStreakFig) deskStreakFig.textContent = streak;
+        if (tileStreakFig) tileStreakFig.textContent = streak;
+        if (tileStreakBadge) tileStreakBadge.textContent = `${streak} Day Streak`;
+      }
+    } catch (e) {
+      console.warn('Could not sync streak:', e);
+    }
+
+    // 4. Fetch ledger events
+    renderLedgerTable();
+  }
+
   // --- Initialization ---
   function init() {
     window.DhritiState = state;
@@ -2516,6 +2619,7 @@
     loadDailySurfacingCard();
     loadLifeInstruments();
     checkRitualState();
+    syncDashboardTruth();
   }
 
   if (document.readyState === 'loading') {

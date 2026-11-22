@@ -117,8 +117,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         )
         if (ok or self.path.startswith("/healthz") or path in dashboard_paths
                 or path.startswith("/gallery/") or path.startswith("/dashboard/gallery/")
-                or path.startswith("/api/vidura/")
-                or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm")):
+                or path.startswith("/api/vidura/") or path.startswith("/ledger/") or path.startswith("/stats/")
+                or path.startswith("/api/defense/") or path.startswith("/api/oa/")
+                or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/targets/verify_recall",
+                            "/api/check_query", "/api/safe_anchor", "/pivot/declare", "/pivot/confirm", "/lockdown/engage")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -328,6 +330,29 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     contract_line = payload.get("contract_line", "")
                     contract_targets = payload.get("targets", [])
 
+                    # Enrich with claims from event audit trail
+                    try:
+                        ev_rows = db.query(
+                            "SELECT observed_payload FROM event WHERE date(occurred_at_utc)=? AND event_type IN ('learning_proof_verified', 'target_claimed')",
+                            (today,)
+                        )
+                        claimed_map = {}
+                        for er in ev_rows:
+                            try:
+                                op = json.loads(er["observed_payload"])
+                                tid = str(op.get("target_id", ""))
+                                if tid:
+                                    claimed_map[tid] = op
+                            except Exception:
+                                pass
+                        for t in contract_targets:
+                            tid = str(t.get("id", ""))
+                            if tid in claimed_map:
+                                t["claimed"] = True
+                                t["proof"] = f"sha256:{claimed_map[tid].get('proof_hash', 'verified')[:16]}"
+                    except Exception:
+                        pass
+
                 # UNION active pivots from day_pivot (F1)
                 pivot_targets = []
                 remaining_pivots = 3
@@ -400,6 +425,82 @@ class BridgeHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return
+        elif path == "/ledger/recent":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                parsed_q = parse_qs(urlparse(self.path).query)
+                limit = int(parsed_q.get("limit", ["50"])[0])
+                rows = db.query(
+                    "SELECT seq, event_id, occurred_at_utc, event_type, observed_payload, action_taken, prev_hash, row_hash "
+                    "FROM event ORDER BY seq DESC LIMIT ?",
+                    (min(limit, 200),)
+                )
+                self._send(200, {"ok": True, "events": rows})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/stats/stage_ratio":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .stats import compute_today_stage_summary
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                summary = compute_today_stage_summary(db)
+                self._send(200, summary)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/stats/streak":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .stats import compute_streak
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                streak = compute_streak(db)
+                self._send(200, {"ok": True, "streak": streak})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/api/oa/drill":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .oa_simulator import OASimulator
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                sim = OASimulator(db, ledger=self.ledger)
+                self._send(200, {"ok": True, "drill": sim.get_daily_drill()})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/api/defense/cards":
+            try:
+                import sqlite3
+                from .constants import DB_VIDURA_PATH
+                if not DB_VIDURA_PATH.exists():
+                    self._send(200, {"ok": True, "cards": []})
+                    return
+                conn = sqlite3.connect(str(DB_VIDURA_PATH))
+                conn.row_factory = sqlite3.Row
+                cur = conn.execute(
+                    "SELECT id, title, description, url FROM content_item WHERE kind='defense' ORDER BY rowid DESC LIMIT 50"
+                )
+                rows = [dict(r) for r in cur.fetchall()]
+                conn.close()
+                self._send(200, {"ok": True, "cards": rows})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+        elif path == "/api/vidura/feed":
+            try:
+                from .vidura_feed import ViduraFeedService
+                svc = ViduraFeedService()
+                feed_data = svc.get_categorized_feed()
+                self._send(200, feed_data)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
         elif GuardRoutes.dispatch(self, "GET", path, None):
             return
         else:
@@ -459,8 +560,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "main_belief": {"label": payload.get("main_belief_label", "Consistent deliberate study clears assessments.")},
                     "main_belief_metric": payload.get("main_belief_metric", "DSA problems solved & interview readiness"),
                     "main_belief_current_state": payload.get("main_belief_current_state", "Active preparation"),
-                    "substitute_activities": payload.get("substitute_activities", "Passive browsing"),
-                    "substitute_budget": payload.get("substitute_budget", 0)
+                    "substitute_activities": payload.get("substitute_activities") if isinstance(payload.get("substitute_activities"), list) and payload.get("substitute_activities") else ["Passive browsing"],
+                    "substitute_budget": str(payload.get("substitute_budget") or "0 hours per week")
                 }
 
                 sealed = contracts.seal(today, full_payload, user_override_path=(DEFAULT_HOME / f"contract-{today}.json"))
@@ -633,6 +734,86 @@ class BridgeHandler(BaseHTTPRequestHandler):
         elif path == "/proof" and self.on_event is not None:
             self.on_event(self.ledger, {"type": "browser_proof", **payload})
             self._send(200, {"accepted": True})
+        elif path == "/lockdown/engage":
+            try:
+                if self.ledger:
+                    self.ledger.record("lockdown_engaged", observed={"reason": "Emergency dashboard lockdown"})
+                self._send(200, {
+                    "ok": True,
+                    "locked": True,
+                    "message": "Daily Lockdown Engaged. Enforcement active until tomorrow morning."
+                })
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/targets/verify_recall":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .learning_proof import LearningProofService, LearningProofError
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                svc = LearningProofService(db, ledger=self.ledger)
+                target_id = payload.get("target_id")
+                synthesis = payload.get("synthesis") or payload.get("text", "")
+                res = svc.claim_with_proof(target_id, synthesis)
+                self._send(200, res)
+            except LearningProofError as lpe:
+                self._send(400, {"error": str(lpe)})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/defense/generate":
+            try:
+                from .project_defense import ProjectDefenseService
+                from .constants import DB_VIDURA_PATH
+                from .vidura_corpus import ViduraCorpus
+                svc = ProjectDefenseService()
+                file_target = payload.get("file") or "dhriti/topic_gate.py"
+                res = svc.generate_defense_questions(file_target)
+                if payload.get("save_to_vidura", True) and DB_VIDURA_PATH.exists():
+                    try:
+                        corpus = ViduraCorpus(DB_VIDURA_PATH)
+                        svc.save_to_vidura(corpus, file_target, res["questions"])
+                    except Exception:
+                        pass
+                self._send(200, res)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/oa/submit":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .oa_simulator import OASimulator
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                sim = OASimulator(db, ledger=self.ledger)
+                answers = payload.get("answers", {})
+                res = sim.submit_drill(answers)
+                self._send(200, res)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
+        elif path == "/api/vidura/feed/add_target":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .vidura_feed import ViduraFeedService
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                item_id = payload.get("item_id")
+                if not item_id:
+                    self._send(400, {"error": "item_id is required"})
+                    return
+                svc = ViduraFeedService()
+                res = svc.add_feed_item_as_target(db, item_id)
+                self._send(200, res)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+            return
+
         elif GuardRoutes.dispatch(self, "POST", path, payload):
             return
         else:

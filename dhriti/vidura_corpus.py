@@ -99,10 +99,25 @@ class ViduraCorpus:
         external_id: Optional[str] = None,
         topic_labels: Optional[List[str]] = None
     ) -> str:
-        """Add or update an item in the corpus."""
-        item_id = str(uuid.uuid4())
+        """Add or update an item in the corpus with deduplication."""
         saved_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         with self._get_conn() as conn:
+            # Check for existing duplicate by external_id or url (Package I deduplication)
+            if external_id:
+                cur = conn.execute(
+                    "SELECT id FROM content_item WHERE source=? AND external_id=?",
+                    (source, external_id)
+                )
+                existing = cur.fetchone()
+                if existing:
+                    return str(existing["id"])
+
+            cur = conn.execute("SELECT id FROM content_item WHERE url=?", (url,))
+            existing = cur.fetchone()
+            if existing:
+                return str(existing["id"])
+
+            item_id = str(uuid.uuid4())
             conn.execute(
                 """INSERT INTO content_item
                    (id, kind, source, external_id, url, title, description, duration_s, saved_at)

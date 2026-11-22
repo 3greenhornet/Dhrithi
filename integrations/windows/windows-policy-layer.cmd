@@ -23,6 +23,7 @@
 :: ---------- Google Chrome ----------
 REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome" /v IncognitoModeAvailability /t REG_DWORD /d 1 /f
 REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome" /v DnsOverHttpsMode /t REG_SZ /d off /f
+REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome" /v ForceSafeSearch /t REG_DWORD /d 1 /f
 REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome\URLBlocklist" /v 1 /t REG_SZ /d "images.google.com" /f
 REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome\URLBlocklist" /v 2 /t REG_SZ /d "lens.google.com" /f
 REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome\URLBlocklist" /v 3 /t REG_SZ /d "google.com/search?udm=2" /f
@@ -57,6 +58,8 @@ REG ADD "HKLM\SOFTWARE\Policies\Google\Chrome\URLBlocklist" /v 30 /t REG_SZ /d "
 :: ---------- Brave ----------
 REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave" /v IncognitoModeAvailability /t REG_DWORD /d 1 /f
 REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave" /v DnsOverHttpsMode /t REG_SZ /d off /f
+REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave" /v ForceSafeSearch /t REG_DWORD /d 1 /f
+REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave" /v TorDisabled /t REG_DWORD /d 1 /f
 REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave\URLBlocklist" /v 1 /t REG_SZ /d "images.google.com" /f
 REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave\URLBlocklist" /v 2 /t REG_SZ /d "lens.google.com" /f
 REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave\URLBlocklist" /v 3 /t REG_SZ /d "google.com/search?udm=2" /f
@@ -91,6 +94,7 @@ REG ADD "HKLM\SOFTWARE\Policies\BraveSoftware\Brave\URLBlocklist" /v 30 /t REG_S
 :: ---------- Microsoft Edge ----------
 REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v InPrivateModeAvailability /t REG_DWORD /d 1 /f
 REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v DnsOverHttpsMode /t REG_SZ /d off /f
+REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v ForceSafeSearch /t REG_DWORD /d 1 /f
 REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Edge\URLBlocklist" /v 1 /t REG_SZ /d "images.google.com" /f
 REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Edge\URLBlocklist" /v 2 /t REG_SZ /d "lens.google.com" /f
 REG ADD "HKLM\SOFTWARE\Policies\Microsoft\Edge\URLBlocklist" /v 3 /t REG_SZ /d "google.com/search?udm=2" /f

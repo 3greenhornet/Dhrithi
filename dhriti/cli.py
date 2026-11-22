@@ -1764,6 +1764,72 @@ def cmd_sidecar(args, ctx):
     serve(port=port, token=token)
 
 
+def cmd_defense(args, ctx):
+    """Generate placement interview defense questions from source files (L4)."""
+    from .project_defense import ProjectDefenseService
+    from .vidura_corpus import ViduraCorpus
+    from .constants import DB_VIDURA_PATH
+    svc = ProjectDefenseService()
+    target_file = args.file
+    res = svc.generate_defense_questions(target_file)
+    print(f"\n[+] Generated 5 Placement Defense Flashcards for: {target_file} (Engine: {res['source']})\n")
+    for i, q in enumerate(res["questions"], 1):
+        print(f"[{i}] {q['category']}")
+        print(f"    Q: {q['question']}")
+        print(f"    Expected Concepts: {', '.join(q.get('key_points', []))}")
+        print(f"    Sample Answer: {q.get('sample_answer')}\n")
+    if getattr(args, "save", False) and DB_VIDURA_PATH.exists():
+        try:
+            corpus = ViduraCorpus(DB_VIDURA_PATH)
+            ids = svc.save_to_vidura(corpus, target_file, res["questions"])
+            print(f"[+] Saved {len(ids)} cards to Vidura Spaced Repetition corpus.")
+        except Exception as e:
+            print(f"[-] Could not save to Vidura: {e}")
+
+
+def cmd_proof_recall(args, ctx):
+    """Enforce 50+ words recall proof for a learning target (L1)."""
+    from .learning_proof import LearningProofService, LearningProofError
+    svc = LearningProofService(ctx.db, ledger=ctx.ledger)
+    try:
+        res = svc.claim_with_proof(args.target_id, args.synthesis)
+        print(f"[+] Target '{res['target_label']}' verified and claimed.")
+        print(f"    Word count: {res['word_count']} words | Proof Hash: sha256:{res['proof_hash'][:16]}")
+    except LearningProofError as lpe:
+        print(f"[-] Verification refused: {lpe}")
+
+
+def cmd_oa(args, ctx):
+    """Placement Assessment Drill Simulator (L3)."""
+    from .oa_simulator import OASimulator
+    sim = OASimulator(ctx.db, ledger=ctx.ledger)
+    action = getattr(args, "action", "drill")
+    if action == "drill":
+        drill = sim.get_daily_drill()
+        print("\n============================================================")
+        print("  DHRITI PLACEMENT OA DRILL (10 Daily Assessment Questions)  ")
+        print("============================================================")
+        for i, q in enumerate(drill, 1):
+            print(f"\n[{i}] [{q['category']} - {q['subtopic']}]")
+            print(f"    {q['question']}")
+            for opt in q["options"]:
+                print(f"    {opt}")
+        print("\n[Tip] Submit answers via Dashboard or run drills on time.")
+
+
+def cmd_feed(args, ctx):
+    """List categorized sovereign learning streams from Vidura."""
+    from .vidura_feed import ViduraFeedService
+    svc = ViduraFeedService()
+    res = svc.get_categorized_feed(limit_per_category=getattr(args, "limit", 5))
+    print(f"\n=== Sovereign Placement Learning Feed ({res['total_items']} items) ===")
+    for cat in res["feed"]:
+        print(f"\n--- {cat['title']} ({cat['item_count']} items) ---")
+        for it in cat["items"]:
+            print(f"  * {it['title']} ({it['duration_min']}m)")
+            print(f"    URL: {it['url']} [ID: {it['id']}]")
+
+
 # ---------------------------------------------------------------- plumbing
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -2181,6 +2247,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", nargs="?", default="status", choices=["install", "status", "remove"],
                    help="install, status, or remove logon task")
     p.set_defaults(func=cmd_autostart)
+
+    p = sub.add_parser("defense", help="generate placement project defense flashcards (L4)")
+    p.add_argument("file", help="source code file to inspect and defend")
+    p.add_argument("--save", action="store_true", help="save generated cards to Vidura spaced repetition")
+    p.set_defaults(func=cmd_defense)
+
+    p = sub.add_parser("proof-recall", help="submit 50+ words recall proof for a learning target (L1)")
+    p.add_argument("target_id", help="target identifier in today's contract")
+    p.add_argument("synthesis", help="minimum 50-word synthesis of concepts learned")
+    p.set_defaults(func=cmd_proof_recall)
+
+    p = sub.add_parser("oa", help="placement online assessment aptitude & CS drill simulator (L3)")
+    p.add_argument("action", nargs="?", default="drill", choices=["drill", "status"],
+                   help="run daily 10-question placement drill")
+    p.set_defaults(func=cmd_oa)
+
+    p = sub.add_parser("feed", help="view categorized sovereign placement learning streams")
+    p.add_argument("--limit", type=int, default=5, help="items per category")
+    p.set_defaults(func=cmd_feed)
 
     return parser
 

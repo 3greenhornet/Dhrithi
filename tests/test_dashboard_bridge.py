@@ -1,13 +1,20 @@
+import os
 import tempfile
 import urllib.request
 from pathlib import Path
 from dhriti.bridge import BridgeServer, BridgeState
+from dhriti.db import Database
+from dhriti.ledger import Ledger
 
 
 def test_dashboard_static_routes():
     state = BridgeState()
     token = "test-token-12345"
-    server = BridgeServer("127.0.0.1", 0, token, state)
+    tmp = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+    tmp.close()
+    db = Database(Path(tmp.name))
+    ledger = Ledger(db)
+    server = BridgeServer("127.0.0.1", 0, token, state, ledger=ledger)
     server.start()
 
     try:
@@ -115,4 +122,8 @@ def test_dashboard_static_routes():
 
     finally:
         server.stop()
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
 
