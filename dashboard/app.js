@@ -128,6 +128,7 @@
     lifeAlts: initialLifeAlts,
     backlog: initialBacklog,
     activeTasks: [],
+    isCommandPaletteOpen: false,
     completedTasks: [],
     parkingItems: [],
     topicTime: [],
@@ -176,6 +177,82 @@
     }
     return headers;
   }
+
+  // --- Executive Toast Notification Engine (Zero-Alert Standard) ---
+  const DhritiToast = (function() {
+    let container = null;
+
+    function ensureContainer() {
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'dhriti-toast-container';
+        container.className = 'dhriti-toast-container';
+        document.body.appendChild(container);
+      }
+    }
+
+    function show({ title, message, type = 'info', duration = 3800, actionLabel, onAction }) {
+      ensureContainer();
+
+      const toast = document.createElement('div');
+      toast.className = `dhriti-toast toast-${type}`;
+
+      const iconMap = {
+        success: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+        info: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+        warning: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+        emergency: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`
+      };
+
+      toast.innerHTML = `
+        <div class="toast-indicator">${iconMap[type] || iconMap.info}</div>
+        <div class="toast-body">
+          ${title ? `<div class="toast-title">${escapeHtml(title)}</div>` : ''}
+          <div class="toast-msg">${escapeHtml(message)}</div>
+        </div>
+        ${actionLabel ? `<button type="button" class="toast-action-btn">${escapeHtml(actionLabel)}</button>` : ''}
+        <button type="button" class="toast-dismiss-btn" title="Dismiss">✕</button>
+      `;
+
+      if (actionLabel && onAction) {
+        toast.querySelector('.toast-action-btn').addEventListener('click', () => {
+          onAction();
+          dismiss(toast);
+        });
+      }
+
+      toast.querySelector('.toast-dismiss-btn').addEventListener('click', () => dismiss(toast));
+
+      container.appendChild(toast);
+
+      if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+        window.DhritiAudio.playPebble(1.1);
+      }
+
+      requestAnimationFrame(() => toast.classList.add('toast-visible'));
+
+      if (duration > 0) {
+        setTimeout(() => dismiss(toast), duration);
+      }
+    }
+
+    function dismiss(toast) {
+      if (!toast || toast.dataset.dismissing) return;
+      toast.dataset.dismissing = 'true';
+      toast.classList.remove('toast-visible');
+      toast.classList.add('toast-hiding');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 250);
+    }
+
+    return {
+      success: (msg, opts = {}) => show({ message: msg, type: 'success', ...opts }),
+      info: (msg, opts = {}) => show({ message: msg, type: 'info', ...opts }),
+      warn: (msg, opts = {}) => show({ message: msg, type: 'warning', ...opts }),
+      emergency: (msg, opts = {}) => show({ message: msg, type: 'emergency', duration: 7000, ...opts })
+    };
+  })();
 
   // --- DOM Elements Cache ---
   const DOM = {};
@@ -384,6 +461,32 @@
     DOM.btnSaveToken = document.getElementById('btn-save-token');
     DOM.saveTokenFeedback = document.getElementById('save-token-feedback');
     DOM.btnFactoryReset = document.getElementById('btn-factory-reset');
+
+    // Floating Command HUD elements
+    DOM.floatingHUD = document.getElementById('floating-command-hud');
+    DOM.hudElapsedTime = document.getElementById('hud-elapsed-time');
+    DOM.hudPomoClock = document.getElementById('hud-pomo-clock');
+    DOM.hudPomoPlay = document.getElementById('hud-pomo-play');
+    DOM.hudBtnQuickPark = document.getElementById('hud-btn-quick-park');
+    DOM.hudBtnEmergency = document.getElementById('hud-btn-emergency');
+    DOM.hudBtnPalette = document.getElementById('hud-btn-palette');
+    DOM.btnTopbarCommand = document.getElementById('btn-topbar-command');
+    DOM.recallProgressFill = document.getElementById('recall-progress-fill');
+
+    // Command Palette elements
+    DOM.commandPaletteOverlay = document.getElementById('command-palette-overlay');
+    DOM.paletteSearchInput = document.getElementById('palette-search-input');
+    DOM.paletteResultsList = document.getElementById('palette-results-list');
+    DOM.btnClosePaletteX = document.getElementById('btn-close-palette-x');
+
+    // Keyboard Shortcuts modal elements
+    DOM.shortcutsModalOverlay = document.getElementById('shortcuts-modal-overlay');
+    DOM.btnCloseShortcutsX = document.getElementById('btn-close-shortcuts-x');
+
+    // Decompression progressive UI elements
+    DOM.decompProgressContainer = document.getElementById('decomp-progress-container');
+    DOM.decompProgressBar = document.getElementById('decomp-progress-bar');
+    DOM.decompProgressText = document.getElementById('decomp-progress-text');
   }
 
   // --- Dual-Mode Router ---
@@ -638,7 +741,12 @@
     DOM.contractTaskList.innerHTML = '';
 
     if (state.activeTasks.length === 0) {
-      DOM.contractTaskList.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px;">No active targets. Seal today\'s contract or add targets from Vidura feed.</div>';
+      DOM.contractTaskList.innerHTML = `
+        <div style="padding: 28px; text-align: center; color: var(--text-dim); border: 1px dashed rgba(139, 120, 246, 0.2); border-radius: 12px; font-size: 13px;">
+          <div style="font-size: 18px; margin-bottom: 6px; opacity: 0.6;">◈</div>
+          Sovereign Horizon Clear. Seal today's daily contract or pull targets from Vidura feed.
+        </div>
+      `;
       return;
     }
 
@@ -647,16 +755,26 @@
       row.className = 'task-item-row';
       const safeTitle = escapeHtml(task.title);
       row.innerHTML = `
-        <div class="task-item-left">
+        <div class="task-item-left" style="flex: 1; min-width: 0;">
           <input type="checkbox" class="task-checkbox" data-index="${idx}" ${task.done ? 'checked' : ''}>
-          <span class="task-name" style="${task.done ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${safeTitle}</span>
+          <span class="task-name" data-task-id="${task.id}" style="${task.done ? 'text-decoration: line-through; opacity: 0.6;' : ''}; cursor: pointer;" title="Double-click to edit inline">${safeTitle}</span>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="task-units-badge">${task.units || 1.0}u</span>
           <span class="card-badge ${task.done ? 'success' : 'info'}">${task.proof || 'learning'}</span>
-          <button type="button" class="btn-verify-task" data-verify-task="${task.id}" data-task-title="${safeTitle}" title="Verify with 50-word synthesis">✍️ Verify Recall</button>
-          <button type="button" class="btn-edit-task" data-edit-task="${task.id}" title="Edit target">✏️</button>
-          <button type="button" class="btn-remove-item" data-remove-task="${task.id}" title="Remove target">✕</button>
+          <div class="task-hover-actions">
+            ${!task.done ? `
+            <button type="button" class="action-icon-btn btn-verify-icon" data-verify-task="${task.id}" data-task-title="${safeTitle}" title="Submit Recall Synthesis Proof (50+ words)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>Verify</span>
+            </button>` : ''}
+            <button type="button" class="action-icon-btn btn-edit-icon" data-edit-task="${task.id}" title="Edit Target">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button type="button" class="action-icon-btn btn-danger-icon" data-remove-task="${task.id}" title="Remove Target">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
         </div>
       `;
       DOM.contractTaskList.appendChild(row);
@@ -677,6 +795,7 @@
               headers: getAuthHeaders(),
               body: JSON.stringify({ target_id: task.id, label: task.title })
             });
+            DhritiToast.success(`Target claimed: ${task.title}`);
             syncDashboardTruth();
           } catch (err) {
             console.warn('Target claim error:', err);
@@ -696,18 +815,59 @@
       });
     });
 
-    // Wire Edit button
+    // Wire Edit button (Inline editing, zero layout shift, zero OS prompt)
+    function activateInlineEdit(tid, rowEl) {
+      const task = state.activeTasks.find(t => t.id === tid);
+      if (!task || !rowEl) return;
+      const nameSpan = rowEl.querySelector('.task-name');
+      if (!nameSpan || nameSpan.tagName === 'INPUT') return;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'inline-title-input';
+      input.value = task.title;
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
+
+      let committed = false;
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+        const val = input.value.trim();
+        if (val && val !== task.title) {
+          task.title = val;
+          DhritiToast.info('Target title updated');
+        }
+        renderContractTasks();
+      };
+
+      input.addEventListener('keydown', ke => {
+        if (ke.key === 'Enter') {
+          ke.preventDefault();
+          commit();
+        } else if (ke.key === 'Escape') {
+          ke.preventDefault();
+          committed = true;
+          renderContractTasks();
+        }
+      });
+      input.addEventListener('blur', commit);
+    }
+
     DOM.contractTaskList.querySelectorAll('[data-edit-task]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const tid = btn.getAttribute('data-edit-task');
-        const task = state.activeTasks.find(t => t.id === tid);
-        if (!task) return;
-        const newTitle = prompt('Edit target title:', task.title);
-        if (newTitle && newTitle.trim()) {
-          task.title = newTitle.trim();
-          renderContractTasks();
-        }
+        activateInlineEdit(tid, btn.closest('.task-item-row'));
+      });
+    });
+
+    DOM.contractTaskList.querySelectorAll('.task-name').forEach(span => {
+      span.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        const tid = span.getAttribute('data-task-id');
+        activateInlineEdit(tid, span.closest('.task-item-row'));
       });
     });
 
@@ -717,6 +877,7 @@
         e.stopPropagation();
         const tid = btn.getAttribute('data-remove-task');
         state.activeTasks = state.activeTasks.filter(t => t.id !== tid);
+        DhritiToast.info('Target removed from horizon');
         renderContractTasks();
       });
     });
@@ -730,6 +891,10 @@
     if (DOM.recallTargetLabel) DOM.recallTargetLabel.textContent = targetTitle;
     if (DOM.recallSynthesisInput) DOM.recallSynthesisInput.value = '';
     if (DOM.recallWordCount) DOM.recallWordCount.textContent = '0 / 50 words';
+    if (DOM.recallProgressFill) {
+      DOM.recallProgressFill.style.width = '0%';
+      DOM.recallProgressFill.style.background = 'linear-gradient(90deg, #f59e0b, #10b981)';
+    }
     if (DOM.recallStatusHint) {
       DOM.recallStatusHint.textContent = '50 words required';
       DOM.recallStatusHint.style.color = 'var(--accent-amber)';
@@ -752,6 +917,167 @@
 
   function closeEmergencyModal() {
     if (DOM.emergencyOverlay) DOM.emergencyOverlay.classList.remove('active');
+  }
+
+  // --- Executive Command Palette (Linear / Raycast Standard) ---
+  const PALETTE_COMMANDS = [
+    // Navigation
+    { id: 'view-desk', title: 'The Desk Overview', category: 'Navigation', icon: '🖥️', kbd: '1', action: () => { setMode('dashboard'); showView('desk'); } },
+    { id: 'view-tasks', title: 'Active Daily Contract Tasks', category: 'Navigation', icon: '📋', kbd: '2', action: () => { setMode('dashboard'); showView('tasks'); } },
+    { id: 'view-focus', title: 'Vidura Study Tube & Deep Focus', category: 'Navigation', icon: '📺', kbd: '3', action: () => { setMode('dashboard'); showView('focus'); } },
+    { id: 'view-settings', title: 'Soundscape & Chimes Studio', category: 'Navigation', icon: '🎵', kbd: '4', action: () => { setMode('dashboard'); showView('settings'); } },
+    { id: 'view-parking', title: 'Curiosity Parking Lot Timeline', category: 'Navigation', icon: '📬', kbd: '5', action: () => { setMode('dashboard'); showView('parking'); } },
+    { id: 'view-mirror', title: 'Life Mirror & Thought Bubbles', category: 'Navigation', icon: '🪞', kbd: '6', action: () => { setMode('dashboard'); showView('mirror'); } },
+    { id: 'view-completed', title: 'Completed Target Archive', category: 'Navigation', icon: '✅', kbd: '', action: () => { setMode('dashboard'); showView('completed'); } },
+    { id: 'view-topics', title: 'Topics & Embedding Axis', category: 'Navigation', icon: '🧭', kbd: '', action: () => { setMode('dashboard'); showView('topics'); } },
+    { id: 'view-ledger', title: 'Tamper-Evident Ledger', category: 'Navigation', icon: '⛓️', kbd: '', action: () => { setMode('dashboard'); showView('ledger'); } },
+    { id: 'view-stats', title: 'Honest Metrics & Streak', category: 'Navigation', icon: '📊', kbd: '', action: () => { setMode('dashboard'); showView('stats'); } },
+
+    // Actions
+    { id: 'act-park', title: 'Quick Park Curiosity Thought', category: 'Actions', icon: '💡', kbd: '⌘P', action: () => { setMode('dashboard'); showView('desk'); const qp = document.getElementById('quick-park-input'); if (qp) { qp.focus(); qp.select(); } } },
+    { id: 'act-pomo', title: 'Start / Pause Pomodoro Sprint', category: 'Actions', icon: '⏱️', kbd: 'Space', action: () => togglePomodoro() },
+    { id: 'act-decomp', title: 'Start Decompression Transition', category: 'Actions', icon: '🌅', kbd: '', action: () => { setMode('dashboard'); showView('desk'); const btn = document.getElementById('btn-start-decompression'); if (btn && btn.style.display !== 'none') btn.click(); } },
+    { id: 'act-emergency', title: 'Break-Glass Release Exception (D-019)', category: 'Actions', icon: '🚨', kbd: 'Esc', action: () => openEmergencyModal() },
+    { id: 'act-art', title: 'Return to Still Museum Art', category: 'Actions', icon: '🖼️', kbd: 'Esc', action: () => returnToArt() },
+    { id: 'act-shortcuts', title: 'Keyboard Shortcuts Cheatsheet', category: 'Actions', icon: '⌨️', kbd: '?', action: () => openShortcutsModal() },
+    { id: 'act-sync-yt', title: 'Sync YouTube Watch Later to Vidura', category: 'Actions', icon: '🔄', kbd: '', action: () => { const btn = document.getElementById('btn-sync-youtube-top'); if (btn) btn.click(); } }
+  ];
+
+  let activePaletteIndex = 0;
+  let filteredCommands = [];
+
+  function openCommandPalette() {
+    state.isCommandPaletteOpen = true;
+    if (DOM.commandPaletteOverlay) {
+      DOM.commandPaletteOverlay.classList.add('active');
+    }
+    if (DOM.paletteSearchInput) {
+      DOM.paletteSearchInput.value = '';
+      setTimeout(() => DOM.paletteSearchInput.focus(), 40);
+    }
+    renderPaletteResults('');
+    if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+      window.DhritiAudio.playPebble(1.1);
+    }
+  }
+
+  function closeCommandPalette() {
+    state.isCommandPaletteOpen = false;
+    if (DOM.commandPaletteOverlay) {
+      DOM.commandPaletteOverlay.classList.remove('active');
+    }
+    if (DOM.paletteSearchInput) {
+      DOM.paletteSearchInput.blur();
+    }
+  }
+
+  function renderPaletteResults(query) {
+    if (!DOM.paletteResultsList) return;
+    const cleanQuery = (query || '').toLowerCase().trim();
+    filteredCommands = PALETTE_COMMANDS.filter(cmd => {
+      if (!cleanQuery) return true;
+      return cmd.title.toLowerCase().includes(cleanQuery) ||
+             cmd.category.toLowerCase().includes(cleanQuery);
+    });
+
+    if (activePaletteIndex >= filteredCommands.length) {
+      activePaletteIndex = Math.max(0, filteredCommands.length - 1);
+    }
+
+    if (filteredCommands.length === 0) {
+      DOM.paletteResultsList.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">
+          No matching commands found.
+        </div>
+      `;
+      return;
+    }
+
+    const groups = {};
+    filteredCommands.forEach((cmd, idx) => {
+      if (!groups[cmd.category]) groups[cmd.category] = [];
+      groups[cmd.category].push({ ...cmd, globalIdx: idx });
+    });
+
+    let html = '';
+    Object.keys(groups).forEach(cat => {
+      html += `<div class="palette-group-header">${cat}</div>`;
+      groups[cat].forEach(item => {
+        const isSelected = item.globalIdx === activePaletteIndex;
+        html += `
+          <div class="palette-item ${isSelected ? 'active' : ''}" data-idx="${item.globalIdx}">
+            <div class="palette-item-icon">${item.icon}</div>
+            <div class="palette-item-details">
+              <span class="palette-item-title">${escapeHtml(item.title)}</span>
+              <span class="palette-item-subtitle">${cat}</span>
+            </div>
+            ${item.kbd ? `<div class="palette-item-kbd"><kbd>${item.kbd}</kbd></div>` : ''}
+          </div>
+        `;
+      });
+    });
+
+    DOM.paletteResultsList.innerHTML = html;
+
+    const itemEls = DOM.paletteResultsList.querySelectorAll('.palette-item');
+    itemEls.forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.idx, 10);
+        executePaletteCommand(idx);
+      });
+      el.addEventListener('mouseenter', () => {
+        const idx = parseInt(el.dataset.idx, 10);
+        if (activePaletteIndex !== idx) {
+          activePaletteIndex = idx;
+          itemEls.forEach(item => item.classList.remove('active'));
+          el.classList.add('active');
+        }
+      });
+    });
+  }
+
+  function navigatePalette(direction) {
+    if (filteredCommands.length === 0) return;
+    activePaletteIndex = (activePaletteIndex + direction + filteredCommands.length) % filteredCommands.length;
+    renderPaletteResults(DOM.paletteSearchInput ? DOM.paletteSearchInput.value : '');
+    const activeEl = DOM.paletteResultsList.querySelector('.palette-item.active');
+    if (activeEl) {
+      activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+      window.DhritiAudio.playPebble(0.6);
+    }
+  }
+
+  function executeActivePaletteCommand() {
+    executePaletteCommand(activePaletteIndex);
+  }
+
+  function executePaletteCommand(index) {
+    if (filteredCommands[index] && typeof filteredCommands[index].action === 'function') {
+      const cmd = filteredCommands[index];
+      closeCommandPalette();
+      cmd.action();
+      if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+        window.DhritiAudio.playPebble(1.3);
+      }
+    }
+  }
+
+  // --- Keyboard Shortcuts Cheatsheet Modal ---
+  function openShortcutsModal() {
+    if (DOM.shortcutsModalOverlay) {
+      DOM.shortcutsModalOverlay.classList.add('active');
+      if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+        window.DhritiAudio.playPebble(1.0);
+      }
+    }
+  }
+
+  function closeShortcutsModal() {
+    if (DOM.shortcutsModalOverlay) {
+      DOM.shortcutsModalOverlay.classList.remove('active');
+    }
   }
 
   function renderCompletedTasks() {
@@ -873,6 +1199,12 @@
     if (DOM.miniTimerDisplay) DOM.miniTimerDisplay.textContent = str;
     const tilePomo = document.getElementById('tile-pomo-time');
     if (tilePomo) tilePomo.textContent = str;
+    if (DOM.hudPomoClock) DOM.hudPomoClock.textContent = str;
+    if (DOM.hudPomoPlay) {
+      DOM.hudPomoPlay.innerHTML = state.pomodoro.isRunning
+        ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+        : `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    }
 
     // Persistent Header Pomodoro Timer Pill update
     if (DOM.headerPomoTime) DOM.headerPomoTime.textContent = str;
@@ -1706,7 +2038,7 @@
     if (!files || files.length === 0) return;
     const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
     if (validFiles.length === 0) {
-      alert('Please select valid image files (JPEG, PNG, WEBP, GIF, SVG).');
+      DhritiToast.warn('Please select valid image files (JPEG, PNG, WEBP, GIF, SVG).');
       return;
     }
 
@@ -2085,12 +2417,12 @@
     const deficit = Math.max(0, targetBudget - activeUnits);
 
     if (deficit <= 0) {
-      alert(`Daily target budget already satisfied (${activeUnits.toFixed(1)}u active).`);
+      DhritiToast.info(`Daily target budget already satisfied (${activeUnits.toFixed(1)}u active).`);
       return;
     }
 
     if (!state.backlog || state.backlog.length === 0) {
-      alert('Backlog is currently empty. Add tasks to your backlog repository first.');
+      DhritiToast.warn('Backlog is currently empty. Add tasks to your backlog repository first.');
       return;
     }
 
@@ -2455,10 +2787,10 @@
           const data = await resp.json();
           DOM.lockdownModal.classList.remove('active');
           if (window.DhritiAudio) window.DhritiAudio.playGong();
-          alert(data.message || 'Daily Lockdown Engaged. Enforcement active until tomorrow morning.');
+          DhritiToast.warn(data.message || 'Daily Lockdown Engaged. Enforcement active until tomorrow morning.');
         } catch (e) {
           DOM.lockdownModal.classList.remove('active');
-          alert('Lockdown signal engaged locally.');
+          DhritiToast.info('Lockdown signal engaged locally.');
         }
       });
     }
@@ -2474,6 +2806,7 @@
           });
           const data = await resp.json();
           updateDecompressionUI(data);
+          DhritiToast.info('Decompression window activated: 90m search release.');
         } catch (e) {
           console.warn('Decompression start error:', e);
         }
@@ -2490,6 +2823,7 @@
           });
           const data = await resp.json();
           updateDecompressionUI(data);
+          DhritiToast.info('Decompression concluded. Evening earned.');
         } catch (e) {
           console.warn('Decompression end error:', e);
         }
@@ -2527,15 +2861,15 @@
           const data = await resp.json();
           if (resp.ok && data.ok) {
             closeEmergencyModal();
-            alert('🚨 Emergency release active. Browser unblocked for 30 minutes. Event logged in audit ledger.');
+            DhritiToast.emergency('Emergency break-glass release active. Browser unblocked for 30 minutes.');
             syncDashboardTruth();
           } else {
-            alert('Failed to execute emergency release: ' + (data.error || 'Unknown error'));
+            DhritiToast.warn('Failed to execute emergency release: ' + (data.error || 'Unknown error'));
             DOM.btnConfirmEmergency.disabled = false;
             DOM.btnConfirmEmergency.textContent = 'Confirm Release';
           }
         } catch (err) {
-          alert('Network error connecting to bridge: ' + err);
+          DhritiToast.warn('Network error connecting to bridge: ' + err);
           DOM.btnConfirmEmergency.disabled = false;
           DOM.btnConfirmEmergency.textContent = 'Confirm Release';
         }
@@ -2551,6 +2885,13 @@
         const text = DOM.recallSynthesisInput.value || '';
         const words = text.trim().split(/\s+/).filter(Boolean).length;
         if (DOM.recallWordCount) DOM.recallWordCount.textContent = `${words} / 50 words`;
+        const pct = Math.min(100, Math.round((words / 50) * 100));
+        if (DOM.recallProgressFill) {
+          DOM.recallProgressFill.style.width = `${pct}%`;
+          DOM.recallProgressFill.style.background = words >= 50
+            ? '#10b981'
+            : 'linear-gradient(90deg, #f59e0b, #10b981)';
+        }
         if (words >= 50) {
           if (DOM.btnSubmitRecall) DOM.btnSubmitRecall.disabled = false;
           if (DOM.recallStatusHint) {
@@ -2589,14 +2930,15 @@
               window.DhritiAudio.playBell();
             }
             closeRecallModal();
+            DhritiToast.success('Recall verified with machine proof.');
             syncDashboardTruth();
           } else {
-            alert('Verification rejected: ' + (data.error || 'Unknown error'));
+            DhritiToast.warn('Verification rejected: ' + (data.error || 'Requires 50+ words of concrete synthesis'));
             DOM.btnSubmitRecall.disabled = false;
             DOM.btnSubmitRecall.textContent = 'Verify & Complete Target';
           }
         } catch (err) {
-          alert('Failed to connect to verification service: ' + err);
+          DhritiToast.warn('Failed to connect to verification service: ' + err);
           DOM.btnSubmitRecall.disabled = false;
           DOM.btnSubmitRecall.textContent = 'Verify & Complete Target';
         }
@@ -2611,10 +2953,7 @@
       DOM.btnSaveToken.addEventListener('click', () => {
         const token = (DOM.settingBridgeToken ? DOM.settingBridgeToken.value : '').trim();
         localStorage.setItem('dhriti_token', token);
-        if (DOM.saveTokenFeedback) {
-          DOM.saveTokenFeedback.style.display = 'block';
-          setTimeout(() => { if (DOM.saveTokenFeedback) DOM.saveTokenFeedback.style.display = 'none'; }, 3000);
-        }
+        DhritiToast.success('Bridge security token saved.');
       });
     }
     if (DOM.btnFactoryReset) {
@@ -2625,9 +2964,60 @@
         }
       });
     }
-          DOM.lockdownModal.classList.remove('active');
-          alert('Lockdown signal engaged locally.');
+
+    // Floating Executive Command HUD Wiring
+    if (DOM.hudBtnQuickPark) {
+      DOM.hudBtnQuickPark.addEventListener('click', () => {
+        setMode('dashboard');
+        showView('desk');
+        const qp = document.getElementById('quick-park-input');
+        if (qp) {
+          qp.focus();
+          qp.select();
         }
+      });
+    }
+
+    if (DOM.hudBtnEmergency) {
+      DOM.hudBtnEmergency.addEventListener('click', openEmergencyModal);
+    }
+
+    if (DOM.hudPomoPlay) {
+      DOM.hudPomoPlay.addEventListener('click', togglePomodoro);
+    }
+
+    if (DOM.hudBtnPalette) {
+      DOM.hudBtnPalette.addEventListener('click', openCommandPalette);
+    }
+
+    if (DOM.btnTopbarCommand) {
+      DOM.btnTopbarCommand.addEventListener('click', openCommandPalette);
+    }
+
+    if (DOM.btnClosePaletteX) {
+      DOM.btnClosePaletteX.addEventListener('click', closeCommandPalette);
+    }
+
+    if (DOM.paletteSearchInput) {
+      DOM.paletteSearchInput.addEventListener('input', e => {
+        activePaletteIndex = 0;
+        renderPaletteResults(e.target.value);
+      });
+    }
+
+    if (DOM.commandPaletteOverlay) {
+      DOM.commandPaletteOverlay.addEventListener('click', e => {
+        if (e.target === DOM.commandPaletteOverlay) closeCommandPalette();
+      });
+    }
+
+    if (DOM.btnCloseShortcutsX) {
+      DOM.btnCloseShortcutsX.addEventListener('click', closeShortcutsModal);
+    }
+
+    if (DOM.shortcutsModalOverlay) {
+      DOM.shortcutsModalOverlay.addEventListener('click', e => {
+        if (e.target === DOM.shortcutsModalOverlay) closeShortcutsModal();
       });
     }
 
@@ -2782,13 +3172,140 @@
       });
     }
 
-    // Global keyboard Escape toggle
+    // Global Workstation Keyboard Accelerators (Linear / Raycast / Cron Standard)
     window.addEventListener('keydown', e => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.isContentEditable ||
+        activeEl.classList.contains('form-input') ||
+        activeEl.classList.contains('form-textarea') ||
+        activeEl.classList.contains('inline-title-input')
+      );
+
+      // 1. Command Palette: Cmd+K / Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (state.isCommandPaletteOpen) {
+          closeCommandPalette();
+        } else {
+          openCommandPalette();
+        }
+        return;
+      }
+
+      // 2. Quick Curiosity Park: Cmd+P / Ctrl+P
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setMode('dashboard');
+        showView('desk');
+        const qp = document.getElementById('quick-park-input');
+        if (qp) {
+          qp.focus();
+          qp.select();
+        }
+        return;
+      }
+
+      // If Command Palette is open, handle palette keyboard navigation
+      if (state.isCommandPaletteOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCommandPalette();
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          navigatePalette(1);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          navigatePalette(-1);
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          executeActivePaletteCommand();
+          return;
+        }
+        return;
+      }
+
+      // 3. Escape key priority cascade
       if (e.key === 'Escape') {
-        const activeModal = document.querySelector('.modal-overlay.active, .inspector-overlay.active');
-        if (activeModal) return;
+        // Priority 3a: Close shortcuts modal if open
+        if (DOM.shortcutsModalOverlay && DOM.shortcutsModalOverlay.classList.contains('active')) {
+          closeShortcutsModal();
+          return;
+        }
+        // Priority 3b: Close emergency break-glass modal if open
+        if (DOM.emergencyOverlay && DOM.emergencyOverlay.classList.contains('active')) {
+          closeEmergencyModal();
+          return;
+        }
+        // Priority 3c: Close recall modal if open
+        if (DOM.recallOverlay && DOM.recallOverlay.classList.contains('active')) {
+          closeRecallModal();
+          return;
+        }
+        // Priority 3d: Close settings modal if open
+        if (DOM.settingsOverlay && DOM.settingsOverlay.classList.contains('active')) {
+          DOM.settingsOverlay.classList.remove('active');
+          return;
+        }
+        // Priority 3e: Close any generic modal overlay or inspector
+        const genericModal = document.querySelector('.modal-overlay.active, .inspector-overlay.active, .ritual-modal-overlay.active');
+        if (genericModal) {
+          genericModal.classList.remove('active');
+          return;
+        }
+        // Priority 3f: Blur input if input is currently focused
+        if (isInput) {
+          activeEl.blur();
+          return;
+        }
+        // Priority 3g: Toggle mode between Still Art and Dashboard
         if (state.mode === 'picture') flipToDashboard();
         else returnToArt();
+        return;
+      }
+
+      // If operator is typing in an input or textarea, avoid intercepting single-key shortcuts
+      if (isInput) return;
+
+      // 4. Keyboard Shortcuts cheatsheet: '?' or Shift+'/'
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        openShortcutsModal();
+        return;
+      }
+
+      // 5. Pomodoro toggle: Space
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePomodoro();
+        return;
+      }
+
+      // 6. Direct numeric view switching: '1' through '6'
+      const viewMap = {
+        '1': 'desk',
+        '2': 'tasks',
+        '3': 'focus',
+        '4': 'settings',
+        '5': 'parking',
+        '6': 'mirror'
+      };
+      if (viewMap[e.key]) {
+        e.preventDefault();
+        setMode('dashboard');
+        showView(viewMap[e.key]);
+        if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
+          window.DhritiAudio.playPebble(1.0);
+        }
+        return;
       }
     });
 
@@ -3207,7 +3724,7 @@
     if (prefillBtn) {
       prefillBtn.addEventListener('click', () => {
         if (!cachedYesterdayContract) {
-          alert('No previous contract found in history.');
+          DhritiToast.info('No previous contract found in history.');
           return;
         }
         const lineInput = document.getElementById('ritual-input-line');
@@ -3232,7 +3749,7 @@
         const lineInput = document.getElementById('ritual-input-line');
         const contractLine = (lineInput ? lineInput.value : '').trim();
         if (!contractLine) {
-          alert('Please enter a one-line focus contract before sealing.');
+          DhritiToast.warn('Please enter a one-line focus contract before sealing.');
           return;
         }
 
@@ -3268,18 +3785,19 @@
               statusEl.style.display = 'block';
               statusEl.textContent = '✓ Contract sealed cold. Sovereign day armed.';
             }
+            DhritiToast.success('Daily contract sealed cold. Sovereign day armed.');
             setTimeout(() => {
               if (overlay) overlay.style.display = 'none';
               const anchorEl = document.getElementById('tile-anchor-next');
               if (anchorEl) anchorEl.textContent = contractLine;
             }, 1200);
           } else {
-            alert('Failed to seal contract: ' + (res.error || 'unknown'));
+            DhritiToast.warn('Failed to seal contract: ' + (res.error || 'unknown'));
             sealBtn.disabled = false;
             sealBtn.textContent = 'Seal Today\'s Contract';
           }
         } catch (err) {
-          alert('Network error sealing contract: ' + err);
+          DhritiToast.warn('Network error sealing contract: ' + err);
           sealBtn.disabled = false;
           sealBtn.textContent = 'Seal Today\'s Contract';
         }
@@ -3290,19 +3808,38 @@
   // --- Decompression UI Updater ---
   function updateDecompressionUI(status) {
     if (!status) return;
+    const isActive = !!status.active;
     if (DOM.decompStatusVal) {
-      DOM.decompStatusVal.textContent = status.active ? 'Active (Bounded)' : 'Armed on Target Finish';
-      DOM.decompStatusVal.style.color = status.active ? '#10b981' : 'inherit';
+      DOM.decompStatusVal.textContent = isActive ? 'Active (Bounded)' : 'Armed on Target Finish';
+      DOM.decompStatusVal.style.color = isActive ? '#10b981' : 'inherit';
     }
     if (DOM.decompDurationVal) {
-      DOM.decompDurationVal.textContent = status.active ? `${status.remaining_minutes || 0} min remaining` : `${status.window_minutes || 90} min max`;
+      DOM.decompDurationVal.textContent = isActive ? `${status.remaining_minutes || 0} min remaining` : `${status.window_minutes || 90} min max`;
     }
     if (DOM.decompStrikesVal) {
       DOM.decompStrikesVal.textContent = `${status.strikes || 0} / ${status.max_strikes || 4}`;
     }
     const deskDecompFig = document.getElementById('desk-decomp-figure');
     if (deskDecompFig) {
-      deskDecompFig.textContent = status.active ? `${status.remaining_minutes || 0}m Left` : 'Ready';
+      deskDecompFig.textContent = isActive ? `${status.remaining_minutes || 0}m Left` : 'Ready';
+    }
+
+    // Progressive disclosure of transition controls & progress bar
+    if (DOM.btnStartDecomp && DOM.btnEndDecomp) {
+      if (isActive) {
+        DOM.btnStartDecomp.style.display = 'none';
+        DOM.btnEndDecomp.style.display = 'block';
+        if (DOM.decompProgressContainer) DOM.decompProgressContainer.style.display = 'block';
+        const rem = status.remaining_minutes || 0;
+        const total = status.window_minutes || 90;
+        const pct = Math.max(0, Math.min(100, Math.round((rem / Math.max(1, total)) * 100)));
+        if (DOM.decompProgressBar) DOM.decompProgressBar.style.width = `${pct}%`;
+        if (DOM.decompProgressText) DOM.decompProgressText.textContent = `${rem}m remaining`;
+      } else {
+        DOM.btnStartDecomp.style.display = 'block';
+        DOM.btnEndDecomp.style.display = 'none';
+        if (DOM.decompProgressContainer) DOM.decompProgressContainer.style.display = 'none';
+      }
     }
   }
 
