@@ -3712,8 +3712,10 @@
       } else {
         if (overlay) overlay.style.display = 'none';
         const anchorEl = document.getElementById('tile-anchor-next');
-        if (anchorEl && data.contract_line) {
-          anchorEl.textContent = data.contract_line;
+        const deskAnchorEl = document.getElementById('desk-anchor-next');
+        if (data.contract_line) {
+          if (anchorEl) anchorEl.textContent = data.contract_line;
+          if (deskAnchorEl) deskAnchorEl.textContent = data.contract_line;
         }
       }
     } catch (e) {
@@ -3805,7 +3807,9 @@
             setTimeout(() => {
               if (overlay) overlay.style.display = 'none';
               const anchorEl = document.getElementById('tile-anchor-next');
+              const deskAnchorEl = document.getElementById('desk-anchor-next');
               if (anchorEl) anchorEl.textContent = contractLine;
+              if (deskAnchorEl) deskAnchorEl.textContent = contractLine;
             }, 1200);
           } else {
             DhritiToast.warn('Failed to seal contract: ' + (res.error || 'unknown'));
@@ -3934,6 +3938,43 @@
         if (subnoteEl) {
           const verifiedCount = state.completedTasks.length;
           subnoteEl.textContent = `${verifiedCount} verified with machine proof`;
+        }
+
+        const tileAnchorNext = document.getElementById('tile-anchor-next');
+        const deskAnchorNext = document.getElementById('desk-anchor-next');
+        const tileAnchorBlocker = document.getElementById('tile-anchor-blocker');
+        const deskAnchorBlocker = document.getElementById('desk-anchor-blocker');
+        const tileTargetsList = document.getElementById('tile-targets-list');
+
+        if (state.activeTasks.length > 0) {
+          const nextTarget = state.activeTasks.find(t => !t.done) || state.activeTasks[0];
+          const nextTitle = nextTarget ? nextTarget.title : 'All targets verified for today.';
+          if (tileAnchorNext) tileAnchorNext.textContent = nextTitle;
+          if (deskAnchorNext) deskAnchorNext.textContent = nextTitle;
+          if (tileAnchorBlocker) tileAnchorBlocker.textContent = 'None recorded';
+          if (deskAnchorBlocker) deskAnchorBlocker.textContent = 'None recorded';
+
+          if (tileTargetsList) {
+            tileTargetsList.innerHTML = '';
+            state.activeTasks.slice(0, 3).forEach(t => {
+              const r = document.createElement('div');
+              r.className = 'metric-row';
+              r.style.marginBottom = '4px';
+              r.innerHTML = `
+                <span class="metric-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">${escapeHtml(t.title)}</span>
+                <span class="card-badge ${t.done ? 'success' : 'info'}">${t.done ? 'verified' : (t.proof || 'learning')}</span>
+              `;
+              tileTargetsList.appendChild(r);
+            });
+          }
+        } else {
+          if (tileAnchorNext) tileAnchorNext.textContent = 'Awaiting daily contract seal';
+          if (deskAnchorNext) deskAnchorNext.textContent = 'Awaiting daily contract seal';
+          if (tileAnchorBlocker) tileAnchorBlocker.textContent = 'None recorded';
+          if (deskAnchorBlocker) deskAnchorBlocker.textContent = 'None recorded';
+          if (tileTargetsList) {
+            tileTargetsList.innerHTML = '<div style="font-size: 12px; color: var(--text-dim); padding: 8px 0;">Awaiting daily contract seal.</div>';
+          }
         }
       }
     } catch (e) {
