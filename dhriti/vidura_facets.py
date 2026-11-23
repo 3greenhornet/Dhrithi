@@ -127,12 +127,16 @@ class FacetEngine:
         full_text = f"{title} {desc} {url}"
 
         # 1. FORM
-        if kind == "tool" or any(w in full_text for w in ("practice site", "calculator", "speedtest", "trainer", "timer")):
+        is_video = kind == "video" or "youtube.com" in url or "youtu.be" in url or duration_s > 0
+        if is_video:
+            if "course" in title or "playlist" in url or "lecture" in title:
+                form = "course"
+            else:
+                form = "video"
+        elif kind == "tool" or any(w in full_text for w in ("practice site", "typing test", "speedtest", "trainer", "interactive tool", "web app", "simulator")):
             form = "tool"
         elif "course" in title or "playlist" in url or "lecture" in title:
             form = "course"
-        elif kind == "video" or "youtube.com" in url or "youtu.be" in url or duration_s > 0:
-            form = "video"
         else:
             form = "article"
 
@@ -241,7 +245,8 @@ class FacetEngine:
         with self.corpus._get_conn() as conn:
             cur = conn.execute(
                 """SELECT * FROM content_item
-                   WHERE facet_intent = 'instrument' OR kind = 'tool'
+                   WHERE (facet_intent = 'instrument' OR kind = 'tool')
+                     AND (facet_form IS NULL OR facet_form != 'video')
                    ORDER BY title ASC"""
             )
             return [dict(r) for r in cur.fetchall()]

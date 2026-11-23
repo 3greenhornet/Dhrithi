@@ -3532,6 +3532,16 @@
         if (metaEl) {
           metaEl.textContent = `Source: ${data.result.source || 'vidura'} | Domain: ${data.result.facet_domain}`;
         }
+        const thumbEl = document.getElementById('vidura-revealed-thumb');
+        if (thumbEl) {
+          const extId = data.result.external_id || (data.result.url && data.result.url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]);
+          if (extId) {
+            thumbEl.src = `https://img.youtube.com/vi/${extId}/mqdefault.jpg`;
+            thumbEl.style.display = 'block';
+          } else {
+            thumbEl.style.display = 'none';
+          }
+        }
       }
     } catch (e) {
       console.warn('Vidura recall error:', e);
@@ -3556,22 +3566,28 @@
         card.className = 'alt-bubble-chip';
         card.style.flexDirection = 'column';
         card.style.alignItems = 'flex-start';
-        card.style.gap = '6px';
-        card.style.padding = '10px 14px';
-        card.style.borderRadius = '10px';
+        card.style.gap = '8px';
+        card.style.padding = '12px 14px';
+        card.style.borderRadius = '12px';
+
+        const extId = inst.external_id || (inst.url && inst.url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]);
+        const visualBadge = extId
+          ? `<img src="https://img.youtube.com/vi/${extId}/mqdefault.jpg" alt="${escapeHtml(inst.title)}" style="width: 100%; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">`
+          : `<div style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 8px; background: rgba(139, 120, 246, 0.15); border: 1px solid rgba(139, 120, 246, 0.25); border-radius: 6px; color: var(--accent-primary);"><span style="font-size: 13px;">⚙️</span> Interactive Foundation Instrument</div>`;
 
         card.innerHTML = `
-          <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); line-height: 1.3;">
+          ${visualBadge}
+          <div style="font-weight: 600; font-size: 13.5px; color: var(--text-primary); line-height: 1.35;">
             ${escapeHtml(inst.title)}
           </div>
-          <div style="font-size: 11px; opacity: 0.7; color: var(--text-secondary);">
-            Domain: ${escapeHtml(inst.facet_domain || 'craft')} | Effort: ${escapeHtml(inst.facet_effort || 'tool')}
+          <div style="font-size: 11px; opacity: 0.75; color: var(--text-secondary);">
+            Domain: <strong>${escapeHtml(inst.facet_domain || 'general')}</strong> | Effort: <strong>${escapeHtml(inst.facet_effort || '5min')}</strong>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 4px; width: 100%;">
-            <a href="${escapeHtml(inst.url)}" target="_blank" class="btn-primary btn-sm" style="text-decoration: none; padding: 3px 8px; font-size: 11px;">
-              Launch Tool
+            <a href="${escapeHtml(inst.url)}" target="_blank" class="btn-primary btn-sm" style="text-decoration: none; padding: 4px 10px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;">
+              <span>Launch Tool</span> ↗
             </a>
-            <button type="button" class="btn-sec btn-sm btn-log-inst" style="padding: 3px 8px; font-size: 11px;">
+            <button type="button" class="btn-sec btn-sm btn-log-inst" style="padding: 4px 10px; font-size: 11.5px;">
               Log Practice
             </button>
           </div>
