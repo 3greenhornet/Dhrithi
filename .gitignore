@@ -68,3 +68,7 @@ repomix-output.*
 
 # Demo output is regenerated, not tracked
 examples/demo/out/
+
+# Local User Uploaded Artwork
+dashboard/gallery/*
+!dashboard/gallery/.gitkeep

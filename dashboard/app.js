@@ -420,6 +420,9 @@
     DOM.setInspectorCount = document.getElementById('set-inspector-count');
     DOM.setInspectorGrid = document.getElementById('set-inspector-grid');
     DOM.btnUseInspectedSet = document.getElementById('btn-use-inspected-set');
+    DOM.btnInspectorAddPhotos = document.getElementById('btn-inspector-add-photos');
+    DOM.btnInspectorDeleteSet = document.getElementById('btn-inspector-delete-set');
+    DOM.btnCreateNewSet = document.getElementById('btn-create-new-set');
     DOM.btnCloseInspector = document.getElementById('btn-close-inspector');
     DOM.uploadSetModalOverlay = document.getElementById('upload-set-modal-overlay');
     DOM.uploadTargetSetSelect = document.getElementById('upload-target-set-select');
@@ -601,10 +604,25 @@
   }
 
   function updateUnderlayStyles() {
+    const brightnessVal = state.underlay.brightness / 100;
+    const blurVal = `${state.underlay.blur}px`;
+    const opacityVal = state.underlay.opacity / 100;
+
     const root = document.documentElement;
-    root.style.setProperty('--dash-bg-brightness', state.underlay.brightness / 100);
-    root.style.setProperty('--dash-bg-blur', `${state.underlay.blur}px`);
-    root.style.setProperty('--dash-bg-opacity', state.underlay.opacity / 100);
+    root.style.setProperty('--dash-bg-brightness', brightnessVal);
+    root.style.setProperty('--dash-bg-blur', blurVal);
+    root.style.setProperty('--dash-bg-opacity', opacityVal);
+    if (document.body) {
+      document.body.style.setProperty('--dash-bg-brightness', brightnessVal);
+      document.body.style.setProperty('--dash-bg-blur', blurVal);
+      document.body.style.setProperty('--dash-bg-opacity', opacityVal);
+    }
+
+    // Direct inline style application for zero-lag instant visual feedback
+    if (DOM.paintingUnderlay) {
+      DOM.paintingUnderlay.style.filter = `blur(${blurVal}) brightness(${brightnessVal})`;
+      DOM.paintingUnderlay.style.opacity = opacityVal.toString();
+    }
 
     // Persist to local storage
     try {
@@ -1872,6 +1890,13 @@
     });
   }
 
+  function promptAddPhotosToCurrentSet() {
+    state.preferredUploadSetId = state.inspectedSetId;
+    if (DOM.localArtFileInput) {
+      DOM.localArtFileInput.click();
+    }
+  }
+
   function openSetInspector(setId) {
     const set = state.artSets.find(s => s.id === setId);
     if (!set) return;
@@ -1879,6 +1904,10 @@
 
     if (DOM.setInspectorTitle) DOM.setInspectorTitle.textContent = set.name;
     if (DOM.setInspectorCount) DOM.setInspectorCount.textContent = `${set.images.length} artwork${set.images.length === 1 ? '' : 's'}`;
+
+    if (DOM.btnInspectorDeleteSet) {
+      DOM.btnInspectorDeleteSet.style.display = set.isDefault ? 'none' : 'inline-flex';
+    }
 
     renderSetInspectorGrid(set);
     if (DOM.setInspectorOverlay) DOM.setInspectorOverlay.style.display = 'flex';
@@ -1890,10 +1919,19 @@
 
     if (set.images.length === 0) {
       DOM.setInspectorGrid.innerHTML = `
-        <div class="gallery-empty-state" style="grid-column: 1 / -1;">
-          <span>This collection has no images. Upload images into it above.</span>
+        <div class="gallery-empty-state" style="grid-column: 1 / -1; padding: 48px 24px; text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 12px; opacity: 0.7;">🖼️</div>
+          <div class="arvo-bold" style="font-size: 15px; color: var(--text-main); margin-bottom: 6px;">This collection is currently empty</div>
+          <p style="margin-bottom: 18px; color: var(--text-muted); font-size: 13px;">Add photos to this set to use them as your live wallpaper pool.</p>
+          <button type="button" class="btn-primary btn-sm btn-empty-add-photos" style="padding: 8px 18px;">＋ Add Photos to Collection</button>
         </div>
       `;
+      const emptyBtn = DOM.setInspectorGrid.querySelector('.btn-empty-add-photos');
+      if (emptyBtn) {
+        emptyBtn.addEventListener('click', () => {
+          promptAddPhotosToCurrentSet();
+        });
+      }
       return;
     }
 
@@ -1907,8 +1945,8 @@
         <div class="set-img-body">
           <div class="set-img-title" title="${img.title}">${img.title}</div>
           <div class="set-img-actions">
-            <button type="button" class="btn-sec btn-sm btn-use-img">${isActive ? 'Active' : 'Use Art'}</button>
-            <button type="button" class="btn-sec btn-sm btn-del-img" style="color: var(--accent-rose);" title="Delete picture">Delete</button>
+            <button type="button" class="btn-sec btn-sm btn-use-img" title="Use as active wallpaper">${isActive ? 'Active' : 'Use Art'}</button>
+            <button type="button" class="btn-sec btn-sm btn-del-img" style="color: var(--accent-rose);" title="Delete picture from collection">Delete</button>
           </div>
         </div>
       `;
@@ -1917,6 +1955,8 @@
         state.activeSetId = set.id;
         setActiveArtwork(img);
         renderSetInspectorGrid(set);
+        renderArtSets();
+        DhritiToast.success(`Wallpaper set to "${img.title}".`);
       });
 
       card.querySelector('.btn-del-img').addEventListener('click', (e) => {
@@ -1933,8 +1973,6 @@
     if (!set) return;
     const img = set.images.find(i => i.id === imgId);
     if (!img) return;
-
-    if (!confirm(`Delete "${img.title}" from "${set.name}"?`)) return;
 
     if (img.filename) {
       try {
@@ -1957,15 +1995,18 @@
     if (DOM.setInspectorCount) DOM.setInspectorCount.textContent = `${set.images.length} artwork${set.images.length === 1 ? '' : 's'}`;
     renderSetInspectorGrid(set);
     renderArtSets();
+    DhritiToast.success(`Deleted "${img.title}".`);
     if (window.DhritiAudio) window.DhritiAudio.playChime(3, 0.25);
   }
 
   function deleteSet(setId) {
     const set = state.artSets.find(s => s.id === setId);
-    if (!set || set.isDefault) return;
+    if (!set || set.isDefault) {
+      DhritiToast.warn('Default curated collections cannot be deleted.');
+      return;
+    }
 
-    if (!confirm(`Permanently delete the entire collection "${set.name}" (${set.images.length} artworks)?`)) return;
-
+    const setName = set.name;
     set.images.forEach(img => {
       if (img.filename) {
         try {
@@ -1984,8 +2025,14 @@
       setActiveArtwork(state.artSets[0].images[0] || DEFAULT_ARTWORKS[0]);
     }
 
+    if (state.inspectedSetId === setId) {
+      if (DOM.setInspectorOverlay) DOM.setInspectorOverlay.style.display = 'none';
+      state.inspectedSetId = null;
+    }
+
     saveArtSets();
     renderArtSets();
+    DhritiToast.success(`Deleted collection "${setName}".`);
     if (window.DhritiAudio) window.DhritiAudio.playChime(3, 0.25);
   }
 
@@ -1999,6 +2046,7 @@
       setActiveArtwork(set.images[0]);
     }
     renderArtSets();
+    DhritiToast.success(`Active collection: ${set.name}`);
     if (window.DhritiAudio) window.DhritiAudio.playChime(5, 0.35);
   }
 
@@ -2008,7 +2056,10 @@
     localStorage.setItem('dhriti_active_art', art.id);
 
     document.documentElement.style.setProperty('--bg-image', `url('${art.url}')`);
-    document.body.style.setProperty('--bg-image', `url('${art.url}')`);
+    if (document.body) document.body.style.setProperty('--bg-image', `url('${art.url}')`);
+    if (DOM.paintingUnderlay) {
+      DOM.paintingUnderlay.style.backgroundImage = `url('${art.url}')`;
+    }
 
     renderArtSets();
     if (state.inspectedSetId) {
@@ -2030,7 +2081,10 @@
     }
     if (found && found.url) {
       document.documentElement.style.setProperty('--bg-image', `url('${found.url}')`);
-      document.body.style.setProperty('--bg-image', `url('${found.url}')`);
+      if (document.body) document.body.style.setProperty('--bg-image', `url('${found.url}')`);
+      if (DOM.paintingUnderlay) {
+        DOM.paintingUnderlay.style.backgroundImage = `url('${found.url}')`;
+      }
     }
   }
 
@@ -2048,18 +2102,21 @@
       DOM.uploadSetFilesCount.textContent = `${validFiles.length} image${validFiles.length === 1 ? '' : 's'} selected to upload.`;
     }
 
+    const preferredId = state.preferredUploadSetId || state.inspectedSetId || state.activeSetId;
+
     if (DOM.uploadTargetSetSelect) {
       DOM.uploadTargetSetSelect.innerHTML = '';
       state.artSets.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.id;
         opt.textContent = `${s.name} (${s.images.length} images)`;
-        if (s.id === state.activeSetId) opt.selected = true;
+        if (s.id === preferredId) opt.selected = true;
         DOM.uploadTargetSetSelect.appendChild(opt);
       });
       const newOpt = document.createElement('option');
       newOpt.value = '__new__';
       newOpt.textContent = '＋ Create a New Set...';
+      if (!preferredId) newOpt.selected = true;
       DOM.uploadTargetSetSelect.appendChild(newOpt);
     }
 
@@ -2072,14 +2129,13 @@
   }
 
   async function confirmUploadIntoSet() {
-    const files = state.pendingUploadFiles;
-    if (!files || files.length === 0) return;
+    const files = state.pendingUploadFiles || [];
 
     let targetSetId = DOM.uploadTargetSetSelect ? DOM.uploadTargetSetSelect.value : '__new__';
     let targetSet = null;
 
     if (targetSetId === '__new__') {
-      const newName = (DOM.inputNewSetName && DOM.inputNewSetName.value.trim()) || 'My Custom Collection';
+      const newName = (DOM.inputNewSetName && DOM.inputNewSetName.value.trim()) || `Custom Collection ${state.artSets.length + 1}`;
       targetSet = {
         id: `set-${Date.now()}`,
         name: newName,
@@ -2095,6 +2151,17 @@
     if (!targetSet) return;
 
     if (DOM.uploadSetModalOverlay) DOM.uploadSetModalOverlay.style.display = 'none';
+
+    // If no files (e.g. creating an empty collection via "＋ New Collection")
+    if (files.length === 0) {
+      saveArtSets();
+      renderArtSets();
+      openSetInspector(targetSet.id);
+      DhritiToast.success(`Collection "${targetSet.name}" created. You can now add photos!`);
+      if (window.DhritiAudio) window.DhritiAudio.playChime(5, 0.35);
+      return;
+    }
+
     if (DOM.uploadProgressWrap) DOM.uploadProgressWrap.style.display = 'block';
 
     let processed = 0;
@@ -2162,6 +2229,11 @@
     }, 1200);
 
     renderArtSets();
+    if (state.inspectedSetId === targetSet.id) {
+      renderSetInspectorGrid(targetSet);
+      if (DOM.setInspectorCount) DOM.setInspectorCount.textContent = `${targetSet.images.length} artwork${targetSet.images.length === 1 ? '' : 's'}`;
+    }
+    DhritiToast.success(`Added ${processed} image${processed === 1 ? '' : 's'} to "${targetSet.name}".`);
     if (window.DhritiAudio) window.DhritiAudio.playChime(6, 0.45);
   }
 
@@ -2274,6 +2346,51 @@
           if (DOM.setInspectorOverlay) DOM.setInspectorOverlay.style.display = 'none';
           state.inspectedSetId = null;
         }
+      });
+    }
+
+    if (DOM.btnInspectorAddPhotos) {
+      DOM.btnInspectorAddPhotos.addEventListener('click', () => {
+        promptAddPhotosToCurrentSet();
+      });
+    }
+
+    if (DOM.btnInspectorDeleteSet) {
+      DOM.btnInspectorDeleteSet.addEventListener('click', () => {
+        if (state.inspectedSetId) {
+          deleteSet(state.inspectedSetId);
+        }
+      });
+    }
+
+    if (DOM.btnCreateNewSet) {
+      DOM.btnCreateNewSet.addEventListener('click', () => {
+        state.pendingUploadFiles = [];
+        state.preferredUploadSetId = null;
+        if (DOM.uploadSetFilesCount) {
+          DOM.uploadSetFilesCount.textContent = 'Create a new collection. You can add photos now or later.';
+        }
+        if (DOM.uploadTargetSetSelect) {
+          DOM.uploadTargetSetSelect.innerHTML = '';
+          state.artSets.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `${s.name} (${s.images.length} images)`;
+            DOM.uploadTargetSetSelect.appendChild(opt);
+          });
+          const newOpt = document.createElement('option');
+          newOpt.value = '__new__';
+          newOpt.textContent = '＋ Create a New Set...';
+          newOpt.selected = true;
+          DOM.uploadTargetSetSelect.appendChild(newOpt);
+        }
+        if (DOM.groupNewSetName) DOM.groupNewSetName.style.display = 'block';
+        if (DOM.inputNewSetName) {
+          DOM.inputNewSetName.value = '';
+          DOM.inputNewSetName.placeholder = 'e.g. Zen Focus, Cyberpunk, Studio Ghibli...';
+          setTimeout(() => DOM.inputNewSetName.focus(), 80);
+        }
+        if (DOM.uploadSetModalOverlay) DOM.uploadSetModalOverlay.style.display = 'flex';
       });
     }
 

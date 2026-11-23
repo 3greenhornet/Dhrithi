@@ -13,6 +13,13 @@
   font-display: swap;
 }
 
+:root {
+  /* Live Underlay Controls (Bright & Crystal Clear by default: 0px blur) */
+  --dash-bg-brightness: 1;
+  --dash-bg-blur: 0px;
+  --dash-bg-opacity: 1;
+}
+
 :root, body.theme-dark {
   --bg-image: url('https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=2000&q=85');
   --bg-canvas: #141726;
@@ -56,11 +63,6 @@
   --badge-bg: rgba(139, 120, 246, 0.16);
   --badge-color: #c4bbf0;
   --progress-fill: linear-gradient(90deg, #6c5ce7, #8b78f6);
-
-  /* Live Underlay Controls (Bright & Crystal Clear by default: 0px blur) */
-  --dash-bg-brightness: 1;
-  --dash-bg-blur: 0px;
-  --dash-bg-opacity: 1;
 
   --glass-bg: rgba(20, 24, 42, 0.80);
   --glass-border: rgba(139, 120, 246, 0.25);
@@ -116,10 +118,6 @@ body.theme-light {
   --badge-bg: rgba(0, 184, 148, 0.12);
   --badge-color: #00b894;
   --progress-fill: linear-gradient(90deg, #00b894, #06b6d4);
-
-  --dash-bg-brightness: 1;
-  --dash-bg-blur: 0px;
-  --dash-bg-opacity: 1;
 
   --glass-bg: rgba(255, 255, 255, 0.88);
   --glass-border: rgba(226, 232, 240, 0.9);
@@ -192,7 +190,8 @@ html, body {
   pointer-events: none;
   opacity: var(--dash-bg-opacity, 1);
   filter: blur(var(--dash-bg-blur, 0px)) brightness(var(--dash-bg-brightness, 1));
-  transition: opacity 0.5s ease, filter 0.5s ease;
+  transition: opacity 0.12s ease, filter 0.12s ease;
+  will-change: filter, opacity;
 }
 
 body.mode-dashboard .painting-canvas-underlay {
