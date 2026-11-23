@@ -68,6 +68,20 @@ class DecompressionManager:
                 )
         return self.active
 
+    def end(self, now: Optional[float] = None) -> Dict[str, Any]:
+        """Manually conclude decompression."""
+        now = now or time.time()
+        was_active = self.active
+        self.active = False
+        if was_active and self.ledger:
+            self.ledger.record(
+                "decompression_window_ended",
+                observed={"strikes_used": self.strikes, "manual_end": True},
+                action_taken="transition concluded manually",
+                telemetry_quality="OK"
+            )
+        return self.status(now)
+
     def status(self, now: Optional[float] = None) -> Dict[str, Any]:
         now = now or time.time()
         active = self.is_active(now)

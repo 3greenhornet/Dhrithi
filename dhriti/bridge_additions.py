@@ -294,13 +294,55 @@ def _save_topic_ticks():
         pass
 
 
+def _get_db(ctx):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+        return ctx.daemon.db
+    if hasattr(ctx, "ledger") and getattr(ctx.ledger, "db", None):
+        return ctx.ledger.db
+    try:
+        from .constants import DB_PATH
+        from .db import Database
+        return Database(DB_PATH)
+    except Exception:
+        return None
+
+
+def _get_ledger(ctx):
+    if hasattr(ctx, "ledger") and ctx.ledger:
+        return ctx.ledger
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "ledger", None):
+        return ctx.daemon.ledger
+    return None
+
+
+def _get_clock(ctx):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "clock", None):
+        return ctx.daemon.clock
+    from .timeutil import RealClock
+    return RealClock()
+
+
+def _get_sessions(ctx):
+    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "sessions", None):
+        return ctx.daemon.sessions
+    try:
+        from .sessions import SessionService
+        db = _get_db(ctx)
+        if db:
+            return SessionService(db, clock=_get_clock(ctx), ledger=_get_ledger(ctx))
+    except Exception:
+        pass
+    return None
+
+
 @GuardRoutes.route("GET", "/history")
 def history(ctx, body):
-    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+    db = _get_db(ctx)
+    if db:
         try:
-            days = ctx.daemon.db.query(
+            days = db.query(
                 "SELECT date, state, targets_met FROM day ORDER BY date DESC LIMIT 31")
-            sessions = ctx.daemon.db.query(
+            sessions = db.query(
                 "SELECT s.task, s.state, s.ended_at, d.date AS day FROM session s "
                 "JOIN day d ON s.day_id=d.id ORDER BY s.started_at DESC LIMIT 200")
             return 200, {"days": days, "sessions": sessions}
@@ -329,22 +371,42 @@ def topic_tick(ctx, body):
 @GuardRoutes.route("GET", "/parking/timeline")
 def parking_timeline(ctx, body):
     items = []
-    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+    db = _get_db(ctx)
+    if db:
         try:
-            items = ctx.daemon.db.query(
-                "SELECT id, text, kind, sparked_by, created_at, disposition, note FROM parking_lot "
+            items = db.query(
+                "SELECT id, question AS text, kind, sparked_by_url AS sparked_by, created_at, disposition, note FROM parking_lot "
                 "ORDER BY created_at DESC LIMIT 200")
         except Exception:
             pass
     return 200, {"items": items, "open_count": sum(1 for it in items if not it.get("disposition"))}
 
 
+@GuardRoutes.route("POST", "/parking/delete")
+def parking_delete(ctx, body):
+    item_id = (body or {}).get("id")
+    if not item_id:
+        return 400, {"error": "item id required"}
+    db = _get_db(ctx)
+    if db:
+        try:
+            db.execute("DELETE FROM parking_lot WHERE id = ?", (item_id,))
+            ledger = _get_ledger(ctx)
+            if ledger:
+                ledger.record("parking_item_dropped", observed={"id": item_id})
+            return 200, {"ok": True, "dropped": item_id}
+        except Exception as ex:
+            return 500, {"error": str(ex)}
+    return 500, {"error": "database unavailable"}
+
+
 @GuardRoutes.route("GET", "/life/list")
 def life_list(ctx, body):
-    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+    db = _get_db(ctx)
+    if db:
         try:
             from .life_mirror import LifeMirrorService
-            svc = LifeMirrorService(ctx.daemon.db, getattr(ctx, "config", {}), ctx.daemon.clock, ctx.daemon.ledger)
+            svc = LifeMirrorService(db, getattr(ctx, "config", {}), _get_clock(ctx), _get_ledger(ctx))
             return 200, {"items": svc.list()}
         except Exception as e:
             return 200, {"items": [], "error": str(e)}
@@ -353,24 +415,43 @@ def life_list(ctx, body):
 
 @GuardRoutes.route("POST", "/life/declare")
 def life_declare(ctx, body):
-    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+    db = _get_db(ctx)
+    label = (body or {}).get("label", "").strip()
+    raw_kind = (body or {}).get("kind", "other").strip()
+    category_map = {
+        "physical": "movement",
+        "exercise": "movement",
+        "offline_craft": "hobby",
+        "craft": "hobby",
+        "rest": "contemplation",
+        "meditation": "contemplation",
+        "social": "social",
+        "speaking": "speaking",
+        "reading": "reading",
+    }
+    kind = category_map.get(raw_kind.lower(), raw_kind.lower())
+    if kind not in ("reading", "movement", "hobby", "social", "speaking", "contemplation", "other"):
+        kind = "other"
+
+    if db and label:
         try:
             from .life_mirror import LifeMirrorService
-            svc = LifeMirrorService(ctx.daemon.db, getattr(ctx, "config", {}), ctx.daemon.clock, ctx.daemon.ledger)
-            res = svc.declare(body.get("label", ""), body.get("kind", "other"), body.get("minimum_version", ""))
+            svc = LifeMirrorService(db, getattr(ctx, "config", {}), _get_clock(ctx), _get_ledger(ctx))
+            res = svc.declare(label, kind, (body or {}).get("minimum_version", ""))
             return 200, res
         except Exception as e:
             return 400, {"error": str(e)}
-    return 200, {"id": "local", "label": body.get("label", ""), "kind": body.get("kind", "other")}
+    return 200, {"id": "local", "label": label, "kind": kind}
 
 
 @GuardRoutes.route("POST", "/life/log")
 def life_log(ctx, body):
-    if hasattr(ctx, "daemon") and getattr(ctx.daemon, "db", None):
+    db = _get_db(ctx)
+    if db:
         try:
             from .life_mirror import LifeMirrorService
-            svc = LifeMirrorService(ctx.daemon.db, getattr(ctx, "config", {}), ctx.daemon.clock, ctx.daemon.ledger)
-            res = svc.log(body.get("id", ""))
+            svc = LifeMirrorService(db, getattr(ctx, "config", {}), _get_clock(ctx), _get_ledger(ctx))
+            res = svc.log((body or {}).get("id", ""))
             return 200, res
         except Exception as e:
             return 400, {"error": str(e)}
@@ -397,6 +478,8 @@ def decompression_action(ctx, body):
     act = body.get("action")
     if act == "start":
         return 200, _DECOMPRESSION_MGR.start()
+    elif act == "end":
+        return 200, _DECOMPRESSION_MGR.end()
     elif act == "eval":
         res = _DECOMPRESSION_MGR.evaluate_navigation(body.get("url", ""), body.get("category"))
         return 200, res

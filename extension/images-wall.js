@@ -337,8 +337,11 @@
           } else {
             // Normal search and study images are ALLOWED!
             isAdultDetected = false;
-            maxAllowedThumbnails = (resp && resp.max_thumbnails) ? resp.max_thumbnails : 16;
-            enforceAntiSpringboard();
+            const isEnforcing = resp && resp.enforcing !== false;
+            maxAllowedThumbnails = (resp && resp.max_thumbnails) ? resp.max_thumbnails : (isEnforcing ? 16 : 999);
+            if (isEnforcing) {
+              enforceAntiSpringboard();
+            }
             applyDynamicArtBlur();
           }
         }

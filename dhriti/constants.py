@@ -115,7 +115,7 @@ DEFAULT_CONFIG = {
         "host": "127.0.0.1",
         "port": 7311,
         "token_file": "bridge_token",  # inside the Dhriti home
-        "policy_ttl_minutes": 720,     # extension fail-safe cache lifetime
+        "policy_ttl_minutes": 15,      # extension fail-safe cache lifetime (15m so dead daemon falls dormant rapidly)
     },
     "ledger": {
         "anchor_interval_events": 100,  # hash-chain checkpoint frequency

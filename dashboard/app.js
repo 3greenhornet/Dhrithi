@@ -167,6 +167,16 @@
       .replace(/'/g, '&#039;');
   }
 
+  // --- Bridge Authentication Helper ---
+  function getAuthHeaders() {
+    const token = localStorage.getItem('dhriti_token') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['X-Dhriti-Token'] = token;
+    }
+    return headers;
+  }
+
   // --- DOM Elements Cache ---
   const DOM = {};
 
@@ -342,6 +352,38 @@
     DOM.btnConfirmUploadSet = document.getElementById('btn-confirm-upload-set');
     DOM.uploadSetFilesCount = document.getElementById('upload-set-files-count');
     DOM.btnCloseUploadSetModal = document.getElementById('btn-close-upload-set-modal');
+
+    // Emergency & Recall Modal elements
+    DOM.btnEmergencySidebar = document.getElementById('btn-emergency-sidebar');
+    DOM.btnEmergencyTop = document.getElementById('btn-emergency-top');
+    DOM.emergencyOverlay = document.getElementById('emergency-modal-overlay');
+    DOM.emergencyReason = document.getElementById('emergency-reason-input');
+    DOM.emergencyCharCount = document.getElementById('emergency-char-count');
+    DOM.btnConfirmEmergency = document.getElementById('btn-confirm-emergency');
+    DOM.btnCancelEmergency = document.getElementById('btn-cancel-emergency');
+    DOM.btnCancelEmergencyX = document.getElementById('btn-cancel-emergency-x');
+
+    DOM.recallOverlay = document.getElementById('recall-modal-overlay');
+    DOM.recallTargetLabel = document.getElementById('recall-target-label');
+    DOM.recallSynthesisInput = document.getElementById('recall-synthesis-input');
+    DOM.recallWordCount = document.getElementById('recall-word-count');
+    DOM.recallStatusHint = document.getElementById('recall-status-hint');
+    DOM.btnSubmitRecall = document.getElementById('btn-submit-recall');
+    DOM.btnCancelRecall = document.getElementById('btn-cancel-recall');
+    DOM.btnCancelRecallX = document.getElementById('btn-cancel-recall-x');
+
+    // Decompression elements
+    DOM.btnStartDecomp = document.getElementById('btn-start-decompression');
+    DOM.btnEndDecomp = document.getElementById('btn-end-decompression');
+    DOM.decompStatusVal = document.getElementById('decomp-status-val');
+    DOM.decompDurationVal = document.getElementById('decomp-duration-val');
+    DOM.decompStrikesVal = document.getElementById('decomp-strikes-val');
+
+    // System Settings elements
+    DOM.settingBridgeToken = document.getElementById('setting-bridge-token');
+    DOM.btnSaveToken = document.getElementById('btn-save-token');
+    DOM.saveTokenFeedback = document.getElementById('save-token-feedback');
+    DOM.btnFactoryReset = document.getElementById('btn-factory-reset');
   }
 
   // --- Dual-Mode Router ---
@@ -603,29 +645,69 @@
     state.activeTasks.forEach((task, idx) => {
       const row = document.createElement('div');
       row.className = 'task-item-row';
+      const safeTitle = escapeHtml(task.title);
       row.innerHTML = `
         <div class="task-item-left">
           <input type="checkbox" class="task-checkbox" data-index="${idx}" ${task.done ? 'checked' : ''}>
-          <span class="task-name" style="${task.done ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${task.title}</span>
+          <span class="task-name" style="${task.done ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${safeTitle}</span>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="task-units-badge">${task.units}u</span>
-          <span class="card-badge ${task.done ? 'success' : 'info'}">${task.proof}</span>
+          <span class="task-units-badge">${task.units || 1.0}u</span>
+          <span class="card-badge ${task.done ? 'success' : 'info'}">${task.proof || 'learning'}</span>
+          <button type="button" class="btn-verify-task" data-verify-task="${task.id}" data-task-title="${safeTitle}" title="Verify with 50-word synthesis">✍️ Verify Recall</button>
+          <button type="button" class="btn-edit-task" data-edit-task="${task.id}" title="Edit target">✏️</button>
           <button type="button" class="btn-remove-item" data-remove-task="${task.id}" title="Remove target">✕</button>
         </div>
       `;
       DOM.contractTaskList.appendChild(row);
     });
 
-    // Wire checkboxes
+    // Wire checkboxes (claim via bridge)
     DOM.contractTaskList.querySelectorAll('.task-checkbox').forEach(cb => {
-      cb.addEventListener('change', e => {
+      cb.addEventListener('change', async e => {
         const i = parseInt(e.target.dataset.index, 10);
-        state.activeTasks[i].done = e.target.checked;
-        if (e.target.checked && window.DhritiAudio) {
-          window.DhritiAudio.playBell();
+        const task = state.activeTasks[i];
+        if (!task) return;
+        task.done = e.target.checked;
+        if (task.done) {
+          if (window.DhritiAudio) window.DhritiAudio.playBell();
+          try {
+            await fetch('/targets/claim', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ target_id: task.id, label: task.title })
+            });
+            syncDashboardTruth();
+          } catch (err) {
+            console.warn('Target claim error:', err);
+          }
         }
         renderContractTasks();
+      });
+    });
+
+    // Wire Verify Recall button
+    DOM.contractTaskList.querySelectorAll('[data-verify-task]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-verify-task');
+        const title = btn.getAttribute('data-task-title') || 'Target Deliverable';
+        openRecallModal(tid, title);
+      });
+    });
+
+    // Wire Edit button
+    DOM.contractTaskList.querySelectorAll('[data-edit-task]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tid = btn.getAttribute('data-edit-task');
+        const task = state.activeTasks.find(t => t.id === tid);
+        if (!task) return;
+        const newTitle = prompt('Edit target title:', task.title);
+        if (newTitle && newTitle.trim()) {
+          task.title = newTitle.trim();
+          renderContractTasks();
+        }
       });
     });
 
@@ -638,6 +720,38 @@
         renderContractTasks();
       });
     });
+  }
+
+  // --- Modal Management (Emergency Release & Recall Synthesis) ---
+  let currentRecallTargetId = null;
+
+  function openRecallModal(targetId, targetTitle) {
+    currentRecallTargetId = targetId;
+    if (DOM.recallTargetLabel) DOM.recallTargetLabel.textContent = targetTitle;
+    if (DOM.recallSynthesisInput) DOM.recallSynthesisInput.value = '';
+    if (DOM.recallWordCount) DOM.recallWordCount.textContent = '0 / 50 words';
+    if (DOM.recallStatusHint) {
+      DOM.recallStatusHint.textContent = '50 words required';
+      DOM.recallStatusHint.style.color = 'var(--accent-amber)';
+    }
+    if (DOM.btnSubmitRecall) DOM.btnSubmitRecall.disabled = true;
+    if (DOM.recallOverlay) DOM.recallOverlay.classList.add('active');
+  }
+
+  function closeRecallModal() {
+    currentRecallTargetId = null;
+    if (DOM.recallOverlay) DOM.recallOverlay.classList.remove('active');
+  }
+
+  function openEmergencyModal() {
+    if (DOM.emergencyReason) DOM.emergencyReason.value = '';
+    if (DOM.emergencyCharCount) DOM.emergencyCharCount.textContent = '0 / 10 characters';
+    if (DOM.btnConfirmEmergency) DOM.btnConfirmEmergency.disabled = true;
+    if (DOM.emergencyOverlay) DOM.emergencyOverlay.classList.add('active');
+  }
+
+  function closeEmergencyModal() {
+    if (DOM.emergencyOverlay) DOM.emergencyOverlay.classList.remove('active');
   }
 
   function renderCompletedTasks() {
@@ -896,14 +1010,23 @@
       btn.addEventListener('click', e => {
         const action = e.target.dataset.parkAction;
         const i = parseInt(e.target.dataset.index, 10);
-        if (action === 'approve') {
+        const item = state.parkingItems[i];
+        if (action === 'approve' && item) {
           state.activeTasks.push({
             id: `task-${Date.now()}`,
-            title: state.parkingItems[i].text,
+            title: item.text,
             units: 1.0,
             proof: 'cold_approved',
             done: false
           });
+          renderContractTasks();
+        }
+        if (item && item.id) {
+          fetch('/parking/delete', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ id: item.id })
+          }).catch(err => console.warn('Could not delete parked thought:', err));
         }
         state.parkingItems.splice(i, 1);
         renderParkingTimeline();
@@ -1111,11 +1234,26 @@
   }
 
   // --- Honest Stats View (L-2: 7-Day Daemon Active Time Distribution) ---
-  function renderStreakRibbon() {
+  async function renderStreakRibbon() {
     if (!DOM.streakRibbon) return;
     DOM.streakRibbon.innerHTML = '';
 
-    // Honest 7-Day timeline (never claiming past days met before project began)
+    let todayHours = 0;
+    try {
+      const resp = await fetch('/history');
+      if (resp.ok) {
+        const hist = await resp.json();
+        const sessions = hist.sessions || [];
+        const todayIso = new Date().toISOString().slice(0, 10);
+        const todaySessions = sessions.filter(s => (s.day === todayIso || (s.ended_at && s.ended_at.startsWith(todayIso))));
+        const totalMinutes = todaySessions.reduce((acc, s) => acc + (s.duration_min || 0), 0);
+        todayHours = Math.round((totalMinutes / 60) * 10) / 10;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch history for streak ribbon:', e);
+    }
+
+    const hasData = todayHours > 0;
     const weekData = [
       { day: 'Mon', hours: 0, label: '0h', active: false },
       { day: 'Tue', hours: 0, label: '0h', active: false },
@@ -1123,10 +1261,10 @@
       { day: 'Thu', hours: 0, label: '0h', active: false },
       { day: 'Fri', hours: 0, label: '0h', active: false },
       { day: 'Sat', hours: 0, label: '0h', active: false },
-      { day: 'Today', hours: 2.4, label: '2.4h', active: true, isToday: true }
+      { day: 'Today', hours: todayHours, label: hasData ? `${todayHours}h` : 'Fresh start (0.0h)', active: hasData, isToday: true }
     ];
 
-    const maxHours = 4.0;
+    const maxHours = Math.max(4.0, todayHours);
 
     weekData.forEach(item => {
       const col = document.createElement('div');
@@ -1179,25 +1317,50 @@
   }
 
   // --- Topics & Co-occurrence View ---
-  function renderTopicsView() {
-    if (DOM.topicsBreakdownContainer) {
-      DOM.topicsBreakdownContainer.innerHTML = `
-        <div class="metric-row"><span class="metric-label">Compiler & Rust Architecture</span><span class="metric-val">120m</span></div>
-        <div class="metric-row"><span class="metric-label">Procedural Web Audio API</span><span class="metric-val">65m</span></div>
-        <div class="metric-row"><span class="metric-label">Verlet Physics & Doorway Beads</span><span class="metric-val">45m</span></div>
-        <div class="metric-row"><span class="metric-label">FTS5 SQLite Indexing</span><span class="metric-val">30m</span></div>
-      `;
+  async function renderTopicsView() {
+    let topics = [];
+    try {
+      const resp = await fetch('/topic/day');
+      if (resp.ok) {
+        const data = await resp.json();
+        topics = data.topics || [];
+      }
+    } catch (e) {
+      console.warn('Could not fetch topic/day:', e);
     }
+
+    if (topics.length === 0 && state.topicTime.length > 0) {
+      topics = state.topicTime.map(t => ({ name: t.domain || t.name, minutes: t.duration_min || 0 }));
+    }
+
+    if (DOM.topicsBreakdownContainer) {
+      if (topics.length === 0) {
+        DOM.topicsBreakdownContainer.innerHTML = `
+          <div style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px;">
+            No topic segments recorded yet today. Active work during focus sessions will populate topic distribution.
+          </div>
+        `;
+      } else {
+        DOM.topicsBreakdownContainer.innerHTML = topics.map(t => `
+          <div class="metric-row"><span class="metric-label">${escapeHtml(t.name || t.domain)}</span><span class="metric-val">${t.minutes || 0}m</span></div>
+        `).join('');
+      }
+    }
+
     if (DOM.coOccurrenceContainer) {
-      DOM.coOccurrenceContainer.innerHTML = `
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <span class="author-chip">compiler + rust</span>
-          <span class="author-chip">audio + oscillator</span>
-          <span class="author-chip">chimes + verlet</span>
-          <span class="author-chip">fts5 + sqlite</span>
-          <span class="author-chip">springboard + search</span>
-        </div>
-      `;
+      if (topics.length === 0) {
+        DOM.coOccurrenceContainer.innerHTML = `
+          <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 12px;">
+            No co-occurrence clusters recorded yet.
+          </div>
+        `;
+      } else {
+        DOM.coOccurrenceContainer.innerHTML = `
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            ${topics.slice(0, 6).map(t => `<span class="author-chip">${escapeHtml(t.name || t.domain)}</span>`).join('')}
+          </div>
+        `;
+      }
     }
   }
 
@@ -2038,10 +2201,11 @@
     });
 
     // Helper to add parked thought from Desk or Parking Lot view
-    function addParkedThought(text, feedbackEl, inputEl) {
+    async function addParkedThought(text, feedbackEl, inputEl) {
       const clean = (text || '').trim();
       if (!clean) return;
-      state.parkingItems.unshift({ id: `park-${Date.now()}`, text: clean, age_days: 0, type: 'spark' });
+      const tempId = `park-${Date.now()}`;
+      state.parkingItems.unshift({ id: tempId, text: clean, age_days: 0, type: 'spark' });
       if (inputEl) inputEl.value = '';
       if (feedbackEl) {
         feedbackEl.textContent = 'Parked in curiosity mail slot for cold review.';
@@ -2050,6 +2214,15 @@
       renderParkingTimeline();
       if (window.DhritiAudio && typeof window.DhritiAudio.playPebble === 'function') {
         window.DhritiAudio.playPebble(1.2);
+      }
+      try {
+        await fetch('/guard/park', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ prompt: clean, reason: 'Curiosity mail slot' })
+        });
+      } catch (e) {
+        console.warn('Could not sync parked thought to bridge:', e);
       }
     }
 
@@ -2169,6 +2342,12 @@
         try {
           localStorage.setItem('dhriti_life_alts', JSON.stringify(state.lifeAlts));
         } catch (e) {}
+        fetch('/life/declare', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ label: label, kind: DOM.newLifeCategory.value })
+        }).catch(err => console.warn('Could not declare life alt on bridge:', err));
+
         if (window.DhritiBubbles && typeof window.DhritiBubbles.refreshFeed === 'function') {
           window.DhritiBubbles.refreshFeed();
         }
@@ -2214,14 +2393,16 @@
     // Inline Add Contract Target Handler
     const btnAddTask = document.getElementById('btn-add-task');
     const inputTaskTitle = document.getElementById('new-task-title');
+    const selectTaskTier = document.getElementById('new-task-tier');
     if (btnAddTask && inputTaskTitle) {
       btnAddTask.addEventListener('click', () => {
         const t = (inputTaskTitle.value || '').trim();
         if (!t) return;
+        const units = selectTaskTier ? parseFloat(selectTaskTier.value) || 1.0 : 1.0;
         state.activeTasks.push({
           id: `task-${Date.now()}`,
           title: t,
-          units: 1.0,
+          units: units,
           proof: 'machine_check',
           done: false
         });
@@ -2245,6 +2426,12 @@
           duration: 15
         });
         try { localStorage.setItem('dhriti_life_alts', JSON.stringify(state.lifeAlts)); } catch (e) {}
+        fetch('/life/declare', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ label: lbl, kind: 'rest' })
+        }).catch(err => console.warn('Could not declare quick life alt on bridge:', err));
+
         if (window.DhritiBubbles && typeof window.DhritiBubbles.refreshFeed === 'function') {
           window.DhritiBubbles.refreshFeed();
         }
@@ -2270,6 +2457,174 @@
           if (window.DhritiAudio) window.DhritiAudio.playGong();
           alert(data.message || 'Daily Lockdown Engaged. Enforcement active until tomorrow morning.');
         } catch (e) {
+          DOM.lockdownModal.classList.remove('active');
+          alert('Lockdown signal engaged locally.');
+        }
+      });
+    }
+
+    // Decompression Zone buttons
+    if (DOM.btnStartDecomp) {
+      DOM.btnStartDecomp.addEventListener('click', async () => {
+        try {
+          const resp = await fetch('/decompression/action', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ action: 'start' })
+          });
+          const data = await resp.json();
+          updateDecompressionUI(data);
+        } catch (e) {
+          console.warn('Decompression start error:', e);
+        }
+      });
+    }
+
+    if (DOM.btnEndDecomp) {
+      DOM.btnEndDecomp.addEventListener('click', async () => {
+        try {
+          const resp = await fetch('/decompression/action', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ action: 'end' })
+          });
+          const data = await resp.json();
+          updateDecompressionUI(data);
+        } catch (e) {
+          console.warn('Decompression end error:', e);
+        }
+      });
+    }
+
+    // Emergency Break-Glass modal
+    if (DOM.btnEmergencySidebar) DOM.btnEmergencySidebar.addEventListener('click', openEmergencyModal);
+    if (DOM.btnEmergencyTop) DOM.btnEmergencyTop.addEventListener('click', openEmergencyModal);
+    if (DOM.btnCancelEmergency) DOM.btnCancelEmergency.addEventListener('click', closeEmergencyModal);
+    if (DOM.btnCancelEmergencyX) DOM.btnCancelEmergencyX.addEventListener('click', closeEmergencyModal);
+
+    if (DOM.emergencyReason) {
+      DOM.emergencyReason.addEventListener('input', () => {
+        const len = DOM.emergencyReason.value.trim().length;
+        if (DOM.emergencyCharCount) DOM.emergencyCharCount.textContent = `${len} / 10 characters`;
+        if (DOM.btnConfirmEmergency) DOM.btnConfirmEmergency.disabled = (len < 10);
+      });
+    }
+
+    if (DOM.btnConfirmEmergency) {
+      DOM.btnConfirmEmergency.addEventListener('click', async () => {
+        const reason = (DOM.emergencyReason ? DOM.emergencyReason.value : '').trim();
+        if (reason.length < 10) return;
+
+        DOM.btnConfirmEmergency.disabled = true;
+        DOM.btnConfirmEmergency.textContent = 'Releasing...';
+
+        try {
+          const resp = await fetch('/break-glass/emergency', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ reason })
+          });
+          const data = await resp.json();
+          if (resp.ok && data.ok) {
+            closeEmergencyModal();
+            alert('🚨 Emergency release active. Browser unblocked for 30 minutes. Event logged in audit ledger.');
+            syncDashboardTruth();
+          } else {
+            alert('Failed to execute emergency release: ' + (data.error || 'Unknown error'));
+            DOM.btnConfirmEmergency.disabled = false;
+            DOM.btnConfirmEmergency.textContent = 'Confirm Release';
+          }
+        } catch (err) {
+          alert('Network error connecting to bridge: ' + err);
+          DOM.btnConfirmEmergency.disabled = false;
+          DOM.btnConfirmEmergency.textContent = 'Confirm Release';
+        }
+      });
+    }
+
+    // Recall Synthesis Verification modal
+    if (DOM.btnCancelRecall) DOM.btnCancelRecall.addEventListener('click', closeRecallModal);
+    if (DOM.btnCancelRecallX) DOM.btnCancelRecallX.addEventListener('click', closeRecallModal);
+
+    if (DOM.recallSynthesisInput) {
+      DOM.recallSynthesisInput.addEventListener('input', () => {
+        const text = DOM.recallSynthesisInput.value || '';
+        const words = text.trim().split(/\s+/).filter(Boolean).length;
+        if (DOM.recallWordCount) DOM.recallWordCount.textContent = `${words} / 50 words`;
+        if (words >= 50) {
+          if (DOM.btnSubmitRecall) DOM.btnSubmitRecall.disabled = false;
+          if (DOM.recallStatusHint) {
+            DOM.recallStatusHint.textContent = '✓ Ready to verify';
+            DOM.recallStatusHint.style.color = '#10b981';
+          }
+        } else {
+          if (DOM.btnSubmitRecall) DOM.btnSubmitRecall.disabled = true;
+          if (DOM.recallStatusHint) {
+            DOM.recallStatusHint.textContent = `${50 - words} more word${50 - words === 1 ? '' : 's'} needed`;
+            DOM.recallStatusHint.style.color = 'var(--accent-amber)';
+          }
+        }
+      });
+    }
+
+    if (DOM.btnSubmitRecall) {
+      DOM.btnSubmitRecall.addEventListener('click', async () => {
+        if (!currentRecallTargetId) return;
+        const text = (DOM.recallSynthesisInput ? DOM.recallSynthesisInput.value : '').trim();
+        const words = text.split(/\s+/).filter(Boolean).length;
+        if (words < 50) return;
+
+        DOM.btnSubmitRecall.disabled = true;
+        DOM.btnSubmitRecall.textContent = 'Verifying...';
+
+        try {
+          const resp = await fetch('/targets/verify_recall', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ target_id: currentRecallTargetId, synthesis: text })
+          });
+          const data = await resp.json();
+          if (resp.ok && data.ok) {
+            if (window.DhritiAudio && typeof window.DhritiAudio.playBell === 'function') {
+              window.DhritiAudio.playBell();
+            }
+            closeRecallModal();
+            syncDashboardTruth();
+          } else {
+            alert('Verification rejected: ' + (data.error || 'Unknown error'));
+            DOM.btnSubmitRecall.disabled = false;
+            DOM.btnSubmitRecall.textContent = 'Verify & Complete Target';
+          }
+        } catch (err) {
+          alert('Failed to connect to verification service: ' + err);
+          DOM.btnSubmitRecall.disabled = false;
+          DOM.btnSubmitRecall.textContent = 'Verify & Complete Target';
+        }
+      });
+    }
+
+    // Focus & System Settings
+    if (DOM.settingBridgeToken) {
+      DOM.settingBridgeToken.value = localStorage.getItem('dhriti_token') || '';
+    }
+    if (DOM.btnSaveToken) {
+      DOM.btnSaveToken.addEventListener('click', () => {
+        const token = (DOM.settingBridgeToken ? DOM.settingBridgeToken.value : '').trim();
+        localStorage.setItem('dhriti_token', token);
+        if (DOM.saveTokenFeedback) {
+          DOM.saveTokenFeedback.style.display = 'block';
+          setTimeout(() => { if (DOM.saveTokenFeedback) DOM.saveTokenFeedback.style.display = 'none'; }, 3000);
+        }
+      });
+    }
+    if (DOM.btnFactoryReset) {
+      DOM.btnFactoryReset.addEventListener('click', () => {
+        if (confirm('Reset Dhriti UI to default factory setup? This clears local caches and reloads a clean fresh start.')) {
+          localStorage.clear();
+          window.location.reload();
+        }
+      });
+    }
           DOM.lockdownModal.classList.remove('active');
           alert('Lockdown signal engaged locally.');
         }
@@ -2932,6 +3287,69 @@
     }
   }
 
+  // --- Decompression UI Updater ---
+  function updateDecompressionUI(status) {
+    if (!status) return;
+    if (DOM.decompStatusVal) {
+      DOM.decompStatusVal.textContent = status.active ? 'Active (Bounded)' : 'Armed on Target Finish';
+      DOM.decompStatusVal.style.color = status.active ? '#10b981' : 'inherit';
+    }
+    if (DOM.decompDurationVal) {
+      DOM.decompDurationVal.textContent = status.active ? `${status.remaining_minutes || 0} min remaining` : `${status.window_minutes || 90} min max`;
+    }
+    if (DOM.decompStrikesVal) {
+      DOM.decompStrikesVal.textContent = `${status.strikes || 0} / ${status.max_strikes || 4}`;
+    }
+    const deskDecompFig = document.getElementById('desk-decomp-figure');
+    if (deskDecompFig) {
+      deskDecompFig.textContent = status.active ? `${status.remaining_minutes || 0}m Left` : 'Ready';
+    }
+  }
+
+  // --- Real-time Parking Timeline Loader ---
+  async function loadParkingTimeline() {
+    try {
+      const resp = await fetch('/parking/timeline');
+      if (resp.ok) {
+        const data = await resp.json();
+        const items = data.items || data.timeline || [];
+        if (items.length > 0) {
+          state.parkingItems = items.map(it => ({
+            id: it.id,
+            text: it.text || it.question || '',
+            age_days: it.age_days || 0,
+            type: it.type || (it.sparked_by ? 'spark' : 'curiosity')
+          }));
+          renderParkingTimeline();
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load parking timeline:', e);
+    }
+  }
+
+  // --- Real-time Life Alternatives Loader ---
+  async function loadLifeAltsFromBridge() {
+    try {
+      const resp = await fetch('/life/list');
+      if (resp.ok) {
+        const data = await resp.json();
+        const items = data.items || data.declarations || [];
+        if (items.length > 0) {
+          state.lifeAlts = items.map(it => ({
+            id: it.id || `life-${Date.now()}`,
+            label: it.label || it.name || '',
+            category: it.kind || it.category || 'hobby',
+            duration: it.duration || 15
+          }));
+          renderLifeAlts();
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load life alts from bridge:', e);
+    }
+  }
+
   // --- Sovereign Dashboard Data Synchronization (Package M Truth) ---
   async function syncDashboardTruth() {
     // 1. Fetch real targets from contract
@@ -3003,8 +3421,25 @@
       console.warn('Could not sync streak:', e);
     }
 
-    // 4. Fetch ledger events
+    // 4. Fetch decompression status
+    try {
+      const resp = await fetch('/decompression/status');
+      if (resp.ok) {
+        const decomp = await resp.json();
+        updateDecompressionUI(decomp);
+      }
+    } catch (e) {
+      console.warn('Could not sync decompression status:', e);
+    }
+
+    // 5. Fetch parking timeline & life alternatives
+    await loadParkingTimeline();
+    await loadLifeAltsFromBridge();
+
+    // 6. Fetch ledger events & honest analytics
     renderLedgerTable();
+    await renderStreakRibbon();
+    await renderTopicsView();
   }
 
   // --- Initialization ---
@@ -3024,6 +3459,7 @@
     loadLifeInstruments();
     checkRitualState();
     syncDashboardTruth();
+    setInterval(syncDashboardTruth, 15000);
   }
 
   if (document.readyState === 'loading') {

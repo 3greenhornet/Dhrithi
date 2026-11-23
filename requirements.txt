@@ -29,6 +29,15 @@ numpy>=1.24.0
 # activitywatch-client>=0.1.0
 # pm4py>=2.7.0
 
+# Image decoding & zero-retention vision axis
+pillow>=10.0.0
+
+# Browser bookmarks live watcher daemon (§6.6.3)
+watchdog>=4.0.0
+
+# Local media ingestion (offline study queues)
+yt-dlp>=2024.0.0
+
 # --- Testing & Quality Assurance ---
 pytest>=7.0.0
 pytest-cov>=4.0.0

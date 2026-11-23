@@ -257,7 +257,7 @@ class Daemon:
                     "reason": "no policy snapshot"}
         rules = self.policy_engine.extension_rules(snapshot)
         ttl_minutes = int(self.config.get("bridge", {}).get(
-            "policy_ttl_minutes", 720))
+            "policy_ttl_minutes", 15))
         from datetime import timedelta
         rules["expires_at"] = to_iso(
             self.clock.now_utc() + timedelta(minutes=ttl_minutes))
@@ -391,7 +391,10 @@ class Daemon:
 
     def release_lock(self):
         try:
-            self._lock_path.unlink()
+            if self._lock_path.exists():
+                pid = self._lock_path.read_text(encoding="utf-8").strip()
+                if pid == str(os.getpid()):
+                    self._lock_path.unlink()
         except Exception:
             pass
 
@@ -864,6 +867,21 @@ class Daemon:
 
 
 def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            k = ctypes.windll.kernel32
+            h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not h:
+                return False
+            code = ctypes.c_ulong()
+            ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+            k.CloseHandle(h)
+            return bool(ok and code.value == 259)  # STILL_ACTIVE
+        except Exception:
+            return False
     try:
         os.kill(pid, 0)
         return True

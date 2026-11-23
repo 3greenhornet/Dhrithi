@@ -352,7 +352,6 @@ def cmd_session(args, ctx):
             if getattr(args, "blocker", ""):
                 print(f"blocker: {args.blocker}")
         finally:
-            daemon.release_lock()
             daemon.db.close()
         return
     active = ctx.sessions.active() if args.sub in ("end", "status", "checkpoint") \
@@ -389,7 +388,6 @@ def cmd_session(args, ctx):
             if getattr(args, "blocker", ""):
                 print(f"blocker:     {args.blocker}")
         finally:
-            daemon.release_lock()
             daemon.db.close()
     elif args.sub == "end":
         if not active:
@@ -404,7 +402,6 @@ def cmd_session(args, ctx):
                 print(str(exc))
                 sys.exit(1)
             finally:
-                daemon.release_lock()
                 daemon.db.close()
         else:
             result = ctx.sessions.finish(
@@ -695,7 +692,6 @@ def cmd_adapter(args, ctx):
                     print(f"{'':18} capabilities: "
                           f"{', '.join(m['capabilities'])}")
     finally:
-        daemon.release_lock()
         daemon.db.close()
 
 

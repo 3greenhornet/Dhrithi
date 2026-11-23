@@ -284,15 +284,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           },
           body: JSON.stringify({ query: msg.query || "", url: msg.url || "" })
         });
+        const activePol = await getActivePolicy();
+        const isEnforcing = !!(activePol && activePol.enforce);
         if (resp.ok) {
           const data = await resp.json();
-          sendResponse(data);
+          sendResponse({ ...data, enforcing: isEnforcing });
         } else {
           // Graceful fail-open on transient network error for safe browsing
-          sendResponse({ allowed: true, is_adult: false, suppress_image_grid: false, max_thumbnails: 16 });
+          sendResponse({ allowed: true, is_adult: false, suppress_image_grid: false, max_thumbnails: isEnforcing ? 16 : 999, enforcing: isEnforcing });
         }
       } catch (err) {
-        sendResponse({ allowed: true, is_adult: false, suppress_image_grid: false, max_thumbnails: 16 });
+        const activePol = await getActivePolicy().catch(() => null);
+        const isEnforcing = !!(activePol && activePol.enforce);
+        sendResponse({ allowed: true, is_adult: false, suppress_image_grid: false, max_thumbnails: isEnforcing ? 16 : 999, enforcing: isEnforcing });
       }
     })();
     return true; // async response
@@ -318,7 +322,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const data = await resp.json();
           sendResponse(data);
         } else {
-          sendResponse({ action: "allow", is_safe: true, is_explicit: False });
+          sendResponse({ action: "allow", is_safe: true, is_explicit: false });
         }
       } catch (err) {
         sendResponse({ action: "allow", is_safe: true, is_explicit: false });
@@ -392,6 +396,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 if (chrome.windows && chrome.windows.onCreated) {
   chrome.windows.onCreated.addListener(async (win) => {
     if (win.incognito) {
+      // Only close incognito when active enforcement is armed (fail-open when dormant!)
+      const pol = await getActivePolicy().catch(() => null);
+      if (!pol || !pol.enforce) return;
       try {
         await chrome.windows.remove(win.id);
         postTypedEvent({ type: "private_window_closed", site: "browser", rule: "incognito" });

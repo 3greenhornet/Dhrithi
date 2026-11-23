@@ -35,8 +35,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["checklist_overlay.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "checklist_overlay.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -46,7 +50,9 @@
         "*://*.google.co.in/search*",
         "*://*.youtube.com/results*"
       ],
-      "js": ["search_escape.js"],
+      "js": [
+        "search_escape.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -62,7 +68,9 @@
         "*://claude.ai/*",
         "*://gemini.google.com/*"
       ],
-      "js": ["suppress.js"],
+      "js": [
+        "suppress.js"
+      ],
       "run_at": "document_idle"
     },
     {
@@ -73,7 +81,9 @@
         "*://chat.deepseek.com/*",
         "*://claude.ai/*"
       ],
-      "js": ["chatguard_content.js"],
+      "js": [
+        "chatguard_content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -86,15 +96,21 @@
         "*://*.google.com.au/*",
         "*://*.gstatic.com/*"
       ],
-      "js": ["images-wall.js"],
+      "js": [
+        "images-wall.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["blocked.html"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "blocked.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "icons": {}

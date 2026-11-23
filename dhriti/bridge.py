@@ -120,7 +120,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 or path.startswith("/api/vidura/") or path.startswith("/ledger/") or path.startswith("/stats/")
                 or path.startswith("/api/defense/") or path.startswith("/api/oa/") or path.startswith("/api/capability/")
                 or path in ("/targets", "/ritual/state", "/ritual/seal", "/targets/claim", "/targets/verify_recall",
-                            "/api/check_query", "/api/safe_anchor", "/api/vision/classify", "/pivot/declare", "/pivot/confirm", "/lockdown/engage", "/api/task/poison")):
+                            "/api/check_query", "/api/safe_anchor", "/api/vision/classify", "/pivot/declare", "/pivot/confirm", "/lockdown/engage", "/api/task/poison",
+                            "/break-glass/emergency", "/parking/timeline", "/parking/delete", "/guard/park", "/guard/state",
+                            "/life/declare", "/life/list", "/life/log", "/decompression/status", "/decompression/action")):
             return True
         # A bad token means either a stale extension config or a local
         # process probing the bridge (plan D-025: every client connection
@@ -255,6 +257,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
                        else {"topic": None, "session_id": None,
                              "expires_at": None})
         elif path == "/policy":
+            emergency_until = getattr(type(self), "_emergency_dormant_until", None)
+            if emergency_until:
+                import datetime as _dt
+                if _dt.datetime.now(_dt.timezone.utc) < emergency_until:
+                    self._send(200, {
+                        "enforce": False,
+                        "blocked_domains": [],
+                        "reason": "emergency_release_active",
+                        "expires_at": emergency_until.isoformat()
+                    })
+                    return
             self._send(200, snap["policy"] or {
                 "enforce": False, "reason": "no active policy (dormant)"})
         elif path == "/api/vidura/search":
@@ -555,13 +568,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     raw_targets = [{"label": contract_line, "kind": "learning", "evidence": {"class": "learning"}}]
                 
                 targets = []
-                for t in raw_targets:
+                for i, t in enumerate(raw_targets):
+                    target_dict = {}
                     if isinstance(t, str):
-                        targets.append({"label": t, "kind": "learning", "evidence": {"class": "learning"}})
+                        target_dict = {"label": t, "kind": "learning", "evidence": {"class": "learning"}}
                     elif isinstance(t, dict):
-                        if "evidence" not in t:
-                            t["evidence"] = {"class": "learning"}
-                        targets.append(t)
+                        target_dict = dict(t)
+                        if "evidence" not in target_dict:
+                            target_dict["evidence"] = {"class": "learning"}
+                    target_dict.setdefault("id", f"t-{i+1}")
+                    targets.append(target_dict)
 
                 full_payload = {
                     "identity_statement": payload.get("identity_statement", "I am a sovereign engineer focused on learning and shipping."),
@@ -594,6 +610,38 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if self.ledger:
                 self.ledger.record("target_claimed", observed={"target_id": target_id, "label": label})
             self._send(200, {"ok": True, "claimed": True, "target_id": target_id})
+            return
+
+        elif path == "/break-glass/emergency":
+            try:
+                from .constants import DB_PATH
+                from .db import Database
+                from .break_glass import BreakGlassService, BreakGlassError
+                from .sessions import SessionService
+                from .timeutil import RealClock
+                import datetime as _dt
+                db = self.ledger.db if self.ledger and hasattr(self.ledger, "db") else Database(DB_PATH)
+                clock = RealClock()
+                bg_svc = BreakGlassService(db, self.config, clock=clock, ledger=self.ledger)
+                sess_svc = SessionService(db, clock=clock, ledger=self.ledger)
+                active = sess_svc.active()
+                active_id = active["id"] if active else None
+                reason = payload.get("reason", "").strip()
+
+                res = bg_svc.emergency(active_id, reason, session_finish=lambda sid: sess_svc.finish(sid, note=reason))
+                unlock_until = _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(minutes=30)
+                type(self)._emergency_dormant_until = unlock_until
+
+                self._send(200, {
+                    "ok": True,
+                    "emergency_id": res["id"],
+                    "message": "Emergency release activated. Browser wall unlocked for 30 minutes.",
+                    "dormant_until": unlock_until.isoformat()
+                })
+            except BreakGlassError as bge:
+                self._send(400, {"error": str(bge)})
+            except Exception as e:
+                self._send(500, {"error": str(e)})
             return
 
         elif path in ("/pivot/declare", "/pivot/confirm"):

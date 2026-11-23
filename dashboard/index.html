@@ -502,6 +502,9 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
           <span>Daily Lockdown</span>
         </button>
+        <button class="btn-emergency" id="btn-emergency-sidebar" title="Immediate emergency browser release (D-019)" style="margin-top: 8px; width: 100%; justify-content: center; font-size: 12px;">
+          <span>🚨 Emergency Unlock</span>
+        </button>
       </div>
     </aside>
 
@@ -521,6 +524,7 @@
             <p class="view-subtitle">Executive overview: contract state, topic distribution, return anchor, and stage ratio.</p>
           </div>
           <div class="view-actions">
+            <button type="button" class="btn-emergency btn-sm" id="btn-emergency-top" title="Immediate emergency browser release (D-019)">🚨 Emergency Release</button>
             <button type="button" class="btn-sec btn-sm" id="btn-sync-youtube-top" title="Sync YouTube Watch Later & Liked Videos into Vidura">Sync YouTube Queue</button>
             <span class="session-pill active">Session Active: 42m</span>
           </div>
@@ -627,6 +631,10 @@
               <div class="capsule-box" style="margin-top: 10px;">
                 <div class="capsule-key">Decompression Rules</div>
                 <div class="capsule-value">Google Search & images allowed. Video and entertainment blocked. Leaps trigger auto-revert.</div>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 14px;">
+                <button type="button" class="btn-primary btn-sm" id="btn-start-decompression" style="flex: 1;">Start Decompression</button>
+                <button type="button" class="btn-sec btn-sm" id="btn-end-decompression" style="flex: 1;">End Decompression</button>
               </div>
             </div>
           </div>
@@ -787,8 +795,14 @@
             <div class="task-list-table" id="contract-task-list">
               <!-- Rendered via app.js -->
             </div>
-            <div class="inline-add-row" id="task-add-row" style="margin-top: 14px;">
-              <input type="text" class="form-input inline-input" id="new-task-title" placeholder="e.g: Complete compiler AST optimization (1.5u)">
+            <div class="inline-add-row" id="task-add-row" style="margin-top: 14px; display: flex; gap: 8px; align-items: center;">
+              <input type="text" class="form-input inline-input" id="new-task-title" placeholder="e.g: Complete compiler AST optimization" style="flex: 1;">
+              <select class="form-select inline-select" id="new-task-tier" style="width: 150px;">
+                <option value="0.5">Light (0.5u)</option>
+                <option value="1.0" selected>Medium (1.0u)</option>
+                <option value="2.0">Hard (2.0u)</option>
+                <option value="3.0">Challenging (3.0u)</option>
+              </select>
               <button type="button" class="btn-sec inline-add-btn" id="btn-add-task">+ Add Target</button>
             </div>
           </div>
@@ -1324,6 +1338,7 @@
           <button class="tab-btn" data-tab="tab-art">Art & Gallery</button>
           <button class="tab-btn" data-tab="tab-quotes">Hourly Quotes</button>
           <button class="tab-btn" data-tab="tab-poems">PoetryDB</button>
+          <button class="tab-btn" data-tab="tab-system">Focus &amp; System</button>
         </nav>
         <div class="settings-tab-content">
           <!-- Tab: Appearance -->
@@ -1495,7 +1510,98 @@
               <button class="author-chip" data-author="Robert Frost">Robert Frost</button>
             </div>
           </div>
+          <!-- Tab: Focus & System -->
+          <div class="tab-pane" id="tab-system">
+            <div class="form-group">
+              <label class="form-label">Bridge Security Token</label>
+              <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                Required by the Chrome extension and dashboard to communicate with local bridge (Port 7311).
+              </p>
+              <div class="form-row">
+                <input type="password" class="form-input" id="setting-bridge-token" placeholder="Paste bridge token here">
+                <button type="button" class="btn-primary" id="btn-save-token">Save Token</button>
+              </div>
+              <div id="save-token-feedback" style="font-size: 12px; color: #10b981; margin-top: 6px; display: none;">Token saved to local storage.</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+              <label class="form-label">Focus Window &amp; Timezone</label>
+              <div class="capsule-box" style="margin-top: 6px;">
+                <div class="capsule-key">Enforcement Architecture</div>
+                <div class="capsule-value" style="font-size: 12.5px;">
+                  Active hours: <strong>09:00 - 21:00</strong>. Dormant outside focus window.<br>
+                  Outside this window or during emergency release, browser restrictions fail-open automatically (L-1 fail-open guarantee).
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+              <label class="form-label" style="color: #ef4444;">Factory Reset UI State</label>
+              <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                Clears all local storage, dashboard caches, and custom presets to restore a pristine factory setup.
+              </p>
+              <button type="button" class="btn-danger btn-sm" id="btn-factory-reset">Reset Dashboard State</button>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Emergency Break-Glass Modal Overlay (D-019) -->
+  <div class="emergency-modal-overlay" id="emergency-modal-overlay">
+    <div class="emergency-modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0; font-size: 18px; color: #ef4444; display: flex; align-items: center; gap: 8px;">
+          <span>🚨</span> Emergency Break-Glass Release
+        </h3>
+        <button type="button" class="icon-btn" id="btn-cancel-emergency-x">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.5;">
+        Asymmetric Consent (L-6): This immediately unblocks the browser and sets a 30-minute dormant override. This action is recorded permanently in the tamper-evident audit ledger with your mandatory reason.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Reason for Emergency Release (min 10 characters)</label>
+        <textarea class="form-textarea" id="emergency-reason-input" rows="3" placeholder="Provide factual reason (e.g. Production incident, urgent client call)..."></textarea>
+        <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
+          <span id="emergency-char-count">0 / 10 characters</span>
+          <span style="color: #ef4444;">Tamper-evident audit logged</span>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+        <button type="button" class="btn-sec" id="btn-cancel-emergency">Cancel</button>
+        <button type="button" class="btn-danger" id="btn-confirm-emergency" disabled>Confirm Release</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recall Verification Synthesis Modal Overlay (D-098 / L-11) -->
+  <div class="recall-modal-overlay" id="recall-modal-overlay">
+    <div class="recall-modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0; font-size: 17px; color: #10b981; display: flex; align-items: center; gap: 8px;">
+          <span>✍️</span> Target Recall Synthesis Verification
+        </h3>
+        <button type="button" class="icon-btn" id="btn-cancel-recall-x">✕</button>
+      </div>
+      <div class="capsule-box" style="margin: 0;">
+        <div class="capsule-key">Target Deliverable</div>
+        <div class="capsule-value" id="recall-target-label" style="font-weight: 600; font-size: 14px;">Target Title</div>
+      </div>
+      <p style="font-size: 12.5px; color: var(--text-muted); margin: 0; line-height: 1.5;">
+        Explain what you learned, built, or solved (50+ words). Concrete synthesis reinforces long-term memory and verifies legitimate target completion.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Synthesis / Retrospective (min 50 words)</label>
+        <textarea class="form-textarea" id="recall-synthesis-input" rows="5" placeholder="Synthesize the core mechanisms, concepts learned, or proof of implementation..."></textarea>
+        <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
+          <span id="recall-word-count">0 / 50 words</span>
+          <span id="recall-status-hint" style="color: var(--accent-amber);">50 words required</span>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+        <button type="button" class="btn-sec" id="btn-cancel-recall">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-submit-recall" disabled>Verify &amp; Complete Target</button>
       </div>
     </div>
   </div>
